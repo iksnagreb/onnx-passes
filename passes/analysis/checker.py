@@ -1,0 +1,28 @@
+# ONNXScript IR subpackage (actually moved to its own package in more recent
+# ONNX and ONNXScript versions)
+from onnxscript import ir
+
+# Model checker pass built into ONNX IR and ONNXScript
+from onnxscript.ir.passes.common import CheckerPass
+
+# Need to import the passes module to set up the registry and make the
+# @passes.register decorator work
+import passes
+
+
+# Runs the ONNX model checker on the entire model graph - checks for consistency
+# of IR/Opset versions and domains, raises an exception if something is wrong
+@passes.register("analysis")
+@passes.register("checker")
+class Checker(passes.base.Analysis):
+    # Applies the built-in ONNX IR model checker pass on the model without
+    # modifying anything.
+    #
+    # Configuration options can be supplied via the "model_checker" field of
+    # the configuration dictionary referenced by the pass base.
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        # Load optional configuration parameters - defaults to what is specified
+        # by the ONNX IR
+        config = self.config.setdefault("model_checker", {})
+        # Apply the built-in ONNX IR model checker pass on the original model
+        return CheckerPass(**config)(model)
