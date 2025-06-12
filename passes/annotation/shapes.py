@@ -1,7 +1,3 @@
-# Deep copies to have functional transformations, i.e., not modifying the
-# original
-import copy
-
 # ONNXScript IR subpackage (actually moved to its own package in more recent
 # ONNX and ONNXScript versions)
 from onnxscript import ir
@@ -30,4 +26,4 @@ class ShapeInference(passes.base.Annotation):
         config = self.config.setdefault("shape_inference", {})
         # Apply the built-in ONNX IR shape inference pass on a deep copy of the
         # model
-        return ShapeInferencePass(**config)(copy.deepcopy(model))
+        return ShapeInferencePass(**config)(ir.from_proto(ir.to_proto(model)))
