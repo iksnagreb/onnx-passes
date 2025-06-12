@@ -58,7 +58,7 @@ class GiveReadableTensorNames(passes.base.Transformation):
             # Enumerate all inputs to the node
             for i, inp in enumerate(node.inputs):
                 # Select a different name to reflect global inputs
-                if inp.is_graph_input():
+                if inp.is_graph_input() and not inp.is_initializer():
                     # Collect global inputs to update the name later
                     inputs.append(inp)
                 # Derive a new name by enumerating all inputs to the node
@@ -73,7 +73,7 @@ class GiveReadableTensorNames(passes.base.Transformation):
             # Enumerate all outputs from the node
             for i, out in enumerate(node.outputs):
                 # Select a different name to reflect global outputs
-                if out.is_graph_output():
+                if out.is_graph_output() and not out.is_initializer():
                     # Collect global outputs to update the name later
                     outputs.append(out)
                 # Derive a new name by enumerating all outputs to the node
