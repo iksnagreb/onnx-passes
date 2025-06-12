@@ -1,7 +1,7 @@
 # ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
 import onnx_ir as ir
 
-# Unused node, function and opset removal passes built into ONNX IR
+# Unused node, function and opset removal passes build into ONNX IR
 from onnx_ir.passes.common import (
     RemoveUnusedNodesPass, RemoveUnusedFunctionsPass, RemoveUnusedOpsetsPass
 )

@@ -1,7 +1,7 @@
 # ir.Model, ir.passes.PassResult, ...
 import onnx_ir as ir
 
-# Model checker pass built into ONNX IR and ONNXScript
+# Model checker pass build into ONNX IR and ONNXScript
 from onnx_ir.passes.common import CheckerPass
 
 # Need to import the passes module to set up the registry and make the

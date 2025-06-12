@@ -1,7 +1,7 @@
 # ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
 import onnx_ir as ir
 
-# Topological sort pass built into ONNX IR and ONNXScript
+# Topological sort pass build into ONNX IR and ONNXScript
 from onnx_ir.passes.common import TopologicalSortPass
 
 # Need to import the passes module to set up the registry and make the
