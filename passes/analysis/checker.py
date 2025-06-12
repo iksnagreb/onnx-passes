@@ -1,9 +1,8 @@
-# ONNXScript IR subpackage (actually moved to its own package in more recent
-# ONNX and ONNXScript versions)
-from onnxscript import ir
+# ir.Model, ir.passes.PassResult, ...
+import onnx_ir as ir
 
 # Model checker pass built into ONNX IR and ONNXScript
-from onnxscript.ir.passes.common import CheckerPass
+from onnx_ir.passes.common import CheckerPass
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work

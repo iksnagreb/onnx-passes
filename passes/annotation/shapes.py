@@ -1,9 +1,8 @@
-# ONNXScript IR subpackage (actually moved to its own package in more recent
-# ONNX and ONNXScript versions)
-from onnxscript import ir
+# ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
+import onnx_ir as ir
 
 # Shape inference pass built into ONNX IR and ONNXScript
-from onnxscript.ir.passes.common import ShapeInferencePass
+from onnx_ir.passes.common import ShapeInferencePass
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work

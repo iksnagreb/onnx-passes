@@ -2,8 +2,8 @@
 # abstract bases themselves
 from abc import ABC
 
-# Base classes inherited from ONNXScript used by the custom ONNX passes
-from onnxscript.ir.passes import PassBase, FunctionalPass
+# Base classes inherited from ONNX IR used by the custom ONNX passes
+from onnx_ir.passes import PassBase, FunctionalPass
 
 
 # Base class for deriving all custom passes of the ONNX IR pass library: This

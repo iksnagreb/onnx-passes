@@ -1,6 +1,5 @@
-# ONNXScript IR subpackage (actually moved to its own package in more recent
-# ONNX and ONNXScript versions)
-from onnxscript import ir
+# ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
+import onnx_ir as ir
 
 # Recursively iterate nodes from model graphs and function in order
 from onnx_ir.traversal import RecursiveGraphIterator
