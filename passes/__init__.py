@@ -1,5 +1,8 @@
-# ONNX IR passes base classes
+# Base classes for all custom ONNX IR passes developed in this library
 import passes.base
+# Infrastructure for injecting automatic verification of passes via pre- and
+# post-conditions evaluated by a Passmanager
+import passes.verify
 
 # Registry of ONNX IR passes by names/categories
 _registry = {}
