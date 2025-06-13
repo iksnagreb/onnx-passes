@@ -30,9 +30,11 @@ from passes import collect
 @click.argument("passes", type=str, nargs=-1)
 # Optional arguments specifying the output file and configuration and state
 # dictionary to load before applying the ONNX IR passes
-@click.option("-o", "--output", type=click.Path(exists=False), default=None)
-@click.option("-c", "--config", type=click.Path(exists=True), default=None)
-@click.option("-s", "--state", type=click.Path(exists=True), default=None)
+@click.option("-o", "output", type=click.Path(exists=False), default=None)
+@click.option("-c", "config", type=click.Path(exists=True), default=None)
+@click.option("-s", "state", type=click.Path(exists=True), default=None)
+# TODO: Add some catch-all argument list collecting all unknown arguments to be
+#  parsed and injected into the configuration dictionary...
 def main(model: str, passes: list[str], output: str, config: str, state: str):
     # Initially assume empty configuration and state dictionaries shared by all
     # ONNX IR passes: these will be shared by reference!
