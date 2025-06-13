@@ -1,12 +1,18 @@
+# sys.exit for quitting upon error
+import sys
+
 # Dynamically import python modules at runtime used for dynamically registering
 # passes according to configuration files
 import importlib
+
 # Click is used for building a command line interface from python functions as
 # the entrypoint for the script
 import click
-# YAML is used for handling extra configuration options and potential state of
-# the passes
+# YAML is used for handling extra configuration options for the ONNX IR passes
 import yaml
+# Pickle is used for serializing the state dictionary tracked with the ONNX IR
+# passes
+import pickle
 
 # Infrastructure for handling ONNX IR models and managing sequences of passes:
 #   ir.load, ir.save, ir.to_proto, ir.PassManager
@@ -46,13 +52,11 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
         with open(config, "r") as file:
             _config = yaml.safe_load(file)
 
-    # If an initial state file is specified, lod the YAML into the configuration
+    # If an initial state file is specified, load the pickle into the state
     # dictionary
-    # TODO: Consider using a different file format than YAML more easily
-    #  serialize data such as arrays/tensors, custom types/structures, ...
     if state is not None:
-        with open(state, "r") as file:
-            _state = yaml.safe_load(file)
+        with open(state, "rb") as file:
+            _state = pickle.load(file)
 
     # Inject dynamic module imports if the configuration specifies an imports
     # section, e.g., for dynamically registering passes
@@ -76,9 +80,32 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
         # for automatic verification.
         passes = ir.passes.PassManager(passes=passes, steps=1)
 
-        # Load ONNX IR to modify/analyze from the model file - format should be
-        # inferred and apply the sequence of passes
-        result = passes(ir.load(model))
+        # Try to apply the sequence of manged passes until any exception, e.g.,
+        # by verification occurs
+        try:
+            # Load ONNX IR to modify/analyze from the model file - format should
+            # be inferred and apply the sequence of passes
+            result = passes(ir.load(model))
+        # Catch any exception and walk up the context chain to find the initial
+        # causing exception
+        except Exception as error:
+            # Walk up until there is no further causing exception
+            while error.__context__:
+                # If we see some pre- or post-condition error along the way,
+                # print this as well to see at which pass the error occurred
+                if isinstance(error, ir.passes.PreconditionError):
+                    print(f"{error.__class__.__name__}: {error}")
+                if isinstance(error, ir.passes.PostconditionError):
+                    print(f"{error.__class__.__name__}: {error}")
+                # Continue walking up the chain of exceptions
+                error = error.__context__
+            # Make sure to always save the state dictionary if we have an output
+            # file name - helps with debugging
+            if output is not None:
+                with open(f"{output}.pkl", "wb") as file:
+                    pickle.dump(_state, file)  # noqa: 'SupportsWrite[bytes]'?
+            # Exit with printing the exception name and message
+            sys.exit(f"{error.__class__.__name__}: {error}")
     # Assume unmodified pass-through result in case there are no ONNX IR passes
     # specified
     else:
@@ -90,12 +117,10 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
         # Serialize the model back to the proto representations and save to the
         # specified file
         ir.save(result.model, output)
-        # Derive the state dictionary namae from the output model name by
-        # appending the YAML suffix
-        # TODO: Consider using a different file format than YAML more easily
-        #  serialize data such as arrays/tensors, custom types/structures, ...
-        with open(f"{output}.yaml", "w") as file:
-            yaml.safe_dump(state, file)
+        # Derive the state dictionary name from the output model name by
+        # appending the pickle suffix
+        with open(f"{output}.pkl", "wb") as file:
+            pickle.dump(_state, file)  # noqa: 'SupportsWrite[bytes]'?
     # If no output file name is specified, serialize the model back to the proto
     # representation but print to the standard output - state ist lost!
     else:

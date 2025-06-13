@@ -15,6 +15,8 @@ class Pass(PassBase, ABC):
     def __init__(self, config: dict | None, state: dict | None):
         self.config = config
         self.state_dict = state
+        # Used by verification to inject expected outputs for post-condition
+        self.expected = None
 
 
 # Base class for deriving analysis passes, which are side-effect-only passes,
