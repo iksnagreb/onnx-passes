@@ -5,12 +5,16 @@ import numpy as np
 
 # Base class for all custom ONNX IR passes developed in this library - this base
 # class defines the (optional) interface for configuration and state tracking
-from passes.base import Pass
+from passes.base import Pass, Analysis
 # Utility functions on Pass objects for loading reference data and injecting
 # pre- and post-conditions
 from passes.util import inject_pre_post_condition, load_reference_data
 # Custom, configurable wrapper around ONNX Runtime for model execution
 from passes.runtime import evaluate_model
+
+# Need to import the passes module to set up the registry and make the
+# @passes.register decorator work
+import passes
 
 
 # Exception type indicating verification failure while evaluating pre- and
@@ -68,6 +72,16 @@ def equality(cls: type[Pass]):
     return inject_pre_post_condition(cls, requires, ensures)
 
 
+# Explicit verification pass: Treated as an analysis pass, does not change the
+# model but has side effects by running equality-based verification
+@equality
+@passes.register("verify")
+@passes.register("verify-equality")
+class VerifyEquality(Analysis):
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        return ir.passes.PassResult(model, False)
+
+
 # Injects tolerance-based verification into an ONNX IR pass by showing the model
 # output on some reference to be within tolerance of the known expected output
 def tolerance(cls: type[Pass]):
@@ -111,7 +125,6 @@ def tolerance(cls: type[Pass]):
         # Append the error to the log associated to the just-verified pass
         self.state_dict["verify"]["max_abs_error"].append({cls.__name__: error})
 
-
         # Read the optional verification tolerance configuration from the
         # configuration dictionary of the pass. Defaults according to NumPy.
         _tolerance = self.config["verify"].setdefault("tolerance", {})
@@ -124,6 +137,16 @@ def tolerance(cls: type[Pass]):
     # Inject the pre- and post-condition into the ONNX IR pass and return the
     # modified class to allow for arbitrarily stacking decorators
     return inject_pre_post_condition(cls, requires, ensures)
+
+
+# Explicit verification pass: Treated as an analysis pass, does not change the
+# model but has side effects by running tolerance-based verification
+@tolerance
+@passes.register("verify")
+@passes.register("verify-tolerance")
+class VerifyTolerance(Analysis):
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        return ir.passes.PassResult(model, False)
 
 
 # Injects metric-based verification into an ONNX IR pass by evaluating a metric,
@@ -159,3 +182,13 @@ def metric(cls: type[Pass]):
     # Inject the pre- and post-condition into the ONNX IR pass and return the
     # modified class to allow for arbitrarily stacking decorators
     return inject_pre_post_condition(cls, requires, ensures)
+
+
+# Explicit verification pass: Treated as an analysis pass, does not change the
+# model but has side effects by running metric-based verification
+@metric
+@passes.register("verify")
+@passes.register("verify-metric")
+class VerifyMetric(Analysis):
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        return ir.passes.PassResult(model, False)

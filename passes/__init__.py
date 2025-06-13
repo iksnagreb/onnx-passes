@@ -1,8 +1,5 @@
 # Base classes for all custom ONNX IR passes developed in this library
 import passes.base
-# Infrastructure for injecting automatic verification of passes via pre- and
-# post-conditions evaluated by a Passmanager
-import passes.verify
 
 # Registry of ONNX IR passes by names/categories
 _registry = {}
@@ -29,6 +26,10 @@ def collect(names: list[str]):
     # Flatten all passes registered for names
     return [cls for name in names for cls in _registry[name]]
 
+
+# Infrastructure for injecting automatic verification of passes via pre- and
+# post-conditions evaluated by a Passmanager
+import passes.verify
 
 # Some passes should always be available by default without extra, dynamic
 # imports, such as cleanup, checks and verification related passes.
