@@ -28,3 +28,8 @@ def register(name: str):
 def collect(names: list[str]):
     # Flatten all passes registered for names
     return [cls for name in names for cls in _registry[name]]
+
+
+# Some passes should always be available by default without extra, dynamic
+# imports, such as cleanup, checks and verification related passes.
+from passes import analysis, annotation, convert, cleanup, inline
