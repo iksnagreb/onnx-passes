@@ -18,6 +18,26 @@ class Pass(PassBase, ABC):
         # Used by verification to inject expected outputs for post-condition
         self.expected = None
 
+    # Pre-condition evaluated before entering a pass - implements verbosity
+    def requires(self, _) -> None:
+        # Verbosity can be enabled globally by setting it to True
+        self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Verbosity should now be defined, either defaulting to False or
+        # explicitly
+        if self.config["logging"]["verbose"]:
+            # TODO: Make use of a proper logger...
+            print(f"Entering {self.__class__.__name__}")
+
+    # Post-condition evaluated after leaving a pass - implements verbosity
+    def ensures(self, _) -> None:
+        # Verbosity can be enabled globally by setting it to True
+        self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Verbosity should now be defined, either defaulting to False or
+        # explicitly
+        if self.config["logging"]["verbose"]:
+            # TODO: Make use of a proper logger...
+            print(f"Leaving {self.__class__.__name__}")
+
 
 # Base class for deriving analysis passes, which are side-effect-only passes,
 # i.e., may only modify configuration and state dictionaries or other externally
