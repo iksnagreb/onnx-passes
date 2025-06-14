@@ -65,6 +65,14 @@ def equality(cls: type[Pass]):
             if np.any(x != y):
                 raise VerificationError(f"{output.name} not as expected")
 
+        # Verbosity can be enabled globally by setting it to True
+        self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Verbosity should now be defined, either defaulting to False or
+        # explicitly
+        if self.config["logging"]["verbose"]:
+            # TODO: Make use of a proper logger...
+            print(f"Verified {self.__class__.__name__}")
+
     # Inject the pre- and post-condition into the ONNX IR pass and return the
     # modified class to allow for arbitrarily stacking decorators
     return inject_pre_post_condition(cls, requires, ensures)
@@ -129,6 +137,14 @@ def tolerance(cls: type[Pass]):
         for output, x, y in zip(model.graph.outputs, produced, self.expected):
             if not np.allclose(x, y, **_tolerance):
                 raise VerificationError(f"{output.name} not within tolerance")
+
+        # Verbosity can be enabled globally by setting it to True
+        self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Verbosity should now be defined, either defaulting to False or
+        # explicitly
+        if self.config["logging"]["verbose"]:
+            # TODO: Make use of a proper logger...
+            print(f"Verified {self.__class__.__name__}")
 
     # Inject the pre- and post-condition into the ONNX IR pass and return the
     # modified class to allow for arbitrarily stacking decorators
@@ -201,6 +217,14 @@ def metric(cls: type[Pass]):
             # exception if not
             if not (_min <= value <= _max):
                 raise VerificationError(msg)
+
+        # Verbosity can be enabled globally by setting it to True
+        self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Verbosity should now be defined, either defaulting to False or
+        # explicitly
+        if self.config["logging"]["verbose"]:
+            # TODO: Make use of a proper logger...
+            print(f"Verified {self.__class__.__name__}")
 
     # Inject the pre- and post-condition into the ONNX IR pass and return the
     # modified class to allow for arbitrarily stacking decorators
