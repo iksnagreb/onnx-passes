@@ -23,8 +23,7 @@ class Pass(PassBase, ABC):
 
     # Pre-condition evaluated before entering a pass - implements verbosity
     def requires(self, model: ir.Model) -> None:
-        # Verbosity can be enabled globally by  # noqa: Duplicate
-        # setting it to True
+        # Verbosity can be enabled globally by setting it to True
         self.config.setdefault("logging", {}).setdefault("verbose", False)
         # Verbosity should now be defined, either defaulting to False or
         # explicitly
@@ -43,8 +42,7 @@ class Pass(PassBase, ABC):
 
     # Post-condition evaluated after leaving a pass - implements verbosity
     def ensures(self, model: ir.Model) -> None:
-        # Verbosity can be enabled globally by  # noqa: Duplicate
-        # setting it to True
+        # Verbosity can be enabled globally by setting it to True
         self.config.setdefault("logging", {}).setdefault("verbose", False)
         # Verbosity should now be defined, either defaulting to False or
         # explicitly
@@ -60,6 +58,10 @@ class Pass(PassBase, ABC):
             filename = f"after-{self.config['logging']['checkpoint']}"
             # Save the model checkpoint
             ir.save(model, filename)
+
+        # Write a detailed history of passes finished on the model into the
+        # state dictionary
+        self.state_dict.setdefault("history", []).append(type(self))
 
 
 # Base class for deriving analysis passes, which are side-effect-only passes,
