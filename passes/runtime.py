@@ -1,7 +1,7 @@
 # ir.Model, ir.from_proto, ir.to_proto, ...
 import onnx_ir as ir
 
-# The runtime simpyl builds a wrapper around ONNX Runtime for model execution
+# The runtime simply builds a wrapper around ONNX Runtime for model execution
 import onnxruntime
 
 

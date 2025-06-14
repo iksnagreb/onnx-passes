@@ -11,6 +11,7 @@ import passes
 
 # Performs shape inference on the entire model graph, adding or updating the
 # shape annotations wherever possible
+@passes.verify.equality
 @passes.register("annotation")
 @passes.register("shape-inference")
 class ShapeInference(passes.base.Annotation):

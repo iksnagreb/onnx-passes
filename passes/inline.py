@@ -10,6 +10,7 @@ import passes
 
 
 # Performs function inlining on the entire model graph
+@passes.verify.equality
 @passes.register("inline")
 @passes.register("inline-functions")
 class InlineFunctions(passes.base.Transformation):

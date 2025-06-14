@@ -10,6 +10,7 @@ import passes
 
 
 # Gives unique names to each node by enumerating nodes per operator type
+@passes.verify.equality
 @passes.register("cleanup")
 @passes.register("unique-names")
 class GiveUniqueNodeNames(passes.base.Transformation):
@@ -43,6 +44,7 @@ class GiveUniqueNodeNames(passes.base.Transformation):
 # Gives readable names to each tensor by deriving the name from the producer
 # node - or the first consumer node if initializers or globals if graph inputs
 # or outputs.
+@passes.verify.equality
 @passes.register("cleanup")
 @passes.register("unique-names")
 class GiveReadableTensorNames(passes.base.Transformation):

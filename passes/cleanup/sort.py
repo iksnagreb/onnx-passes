@@ -10,6 +10,7 @@ import passes
 
 
 # Performs topological sort on the entire model graph, reordering the nodes
+@passes.verify.equality
 @passes.register("cleanup")
 @passes.register("topological-sort")
 class TopologicalSort(passes.base.Transformation):
