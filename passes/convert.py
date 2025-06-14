@@ -15,41 +15,41 @@ import passes
 
 # Converts the model to ONNX opset version 18 if supported
 @passes.register("convert-opset18")
-class ConvertVersion(passes.base.Annotation):
+class ConvertVersion18(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ConvertVersionPass(18)(ir.from_proto(ir.to_proto(model)))
 
 
 # Converts the model to ONNX opset version 19 if supported
 @passes.register("convert-opset19")
-class ConvertVersion(passes.base.Annotation):
+class ConvertVersion19(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ConvertVersionPass(19)(ir.from_proto(ir.to_proto(model)))
 
 
 # Converts the model to ONNX opset version 20 if supported
 @passes.register("convert-opset20")
-class ConvertVersion(passes.base.Annotation):
+class ConvertVersion20(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ConvertVersionPass(20)(ir.from_proto(ir.to_proto(model)))
 
 
 # Converts the model to ONNX opset version 21 if supported
 @passes.register("convert-opset21")
-class ConvertVersion(passes.base.Annotation):
+class ConvertVersion21(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ConvertVersionPass(21)(ir.from_proto(ir.to_proto(model)))
 
 
 # Converts the model to ONNX opset version 22 if supported
 @passes.register("convert-opset22")
-class ConvertVersion(passes.base.Annotation):
+class ConvertVersion22(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ConvertVersionPass(22)(ir.from_proto(ir.to_proto(model)))
 
 
 # Converts the model to ONNX opset version 23 if supported
 @passes.register("convert-opset23")
-class ConvertVersion(passes.base.Annotation):
+class ConvertVersion23(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ConvertVersionPass(23)(ir.from_proto(ir.to_proto(model)))
