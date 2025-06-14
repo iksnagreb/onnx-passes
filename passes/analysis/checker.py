@@ -20,8 +20,4 @@ class Checker(passes.base.Analysis):
     # Configuration options can be supplied via the "model_checker" field of
     # the configuration dictionary referenced by the pass base.
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        # Load optional configuration parameters - defaults to what is specified
-        # by the ONNX IR
-        config = self.config.setdefault("model_checker", {})
-        # Apply the built-in ONNX IR model checker pass on the original model
-        return CheckerPass(**config)(model)
+        return CheckerPass(**self.config.setdefault("model_checker", {}))(model)

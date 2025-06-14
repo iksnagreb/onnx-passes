@@ -37,7 +37,6 @@ def equality(cls: type[Pass]):
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {True: True}):
-            # Just exit here doing nothing...
             return
 
         # Load reference input data for verification
@@ -54,7 +53,6 @@ def equality(cls: type[Pass]):
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {True: True}):
-            # Just exit here doing nothing...
             return
 
         # Load reference input data for verification
@@ -86,12 +84,11 @@ class VerifyEquality(Analysis):
 # output on some reference to be within tolerance of the known expected output
 def tolerance(cls: type[Pass]):
     # Pre-condition comparing model outputs to a reference for equality within
-    # tolerance - fails raising VerificationError if the output does not match
+    # tolerance - should not fail, prepares for post-condition
     def requires(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {True: True}):
-            # Just exit here doing nothing...
             return
 
         # Load reference input data for verification
@@ -108,7 +105,6 @@ def tolerance(cls: type[Pass]):
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {True: True}):
-            # Just exit here doing nothing...
             return
 
         # Load reference input data for verification
@@ -151,21 +147,18 @@ class VerifyTolerance(Analysis):
 
 # Injects metric-based verification into an ONNX IR pass by evaluating a metric,
 # such as accuracy, over some reference dataset.
-#
-# Once the model passes metric-based verification, the generated output is used
-# as a new reference for following equality- or tolerance-based verification.
 def metric(cls: type[Pass]):
     # Pre-condition comparing model outputs to a reference via a task-specific
-    # metric - fails raising VerificationError if the output does not match
+    # metric - should not fail, prepares for post-condition
     def requires(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {True: True}):
-            # Just exit here doing nothing...
             return
 
-        # TODO: Implement the actual verification here...
-        print(f"Verifying by metric before {cls.__name__}")
+        # Metric-based verification requires as section configuring how to
+        # calculate metrics and the range of acceptable results: Assume empty...
+        self.config["verify"].setdefault("metrics", [])
 
     # Post-condition comparing model outputs to a reference via a task-specific
     # metric - fails raising VerificationError if the output does not match
@@ -173,11 +166,41 @@ def metric(cls: type[Pass]):
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {True: True}):
-            # Just exit here doing nothing...
             return
 
-        # TODO: Implement the actual verification here...
-        print(f"Verifying by metric after {cls.__name__}")
+        # Load reference input and output data for verification
+        inputs, expected = load_reference_data(self)
+
+        # Specifiyng no expected reference output allows to skip all
+        # metric-based verification
+        if not expected:
+            return
+
+        # Evaluate the model on the reference inputs and collect all results
+        produced = evaluate_model(model, inputs)
+
+        # Metric-based verification requires as section configuring how to
+        # calculate metrics and the range of acceptable results
+        for _metric, (_min, _max) in self.config["verify"]["metrics"].items():
+            # The _metric key should be resolvable to some functions within
+            # scope - custom functions can be injected via config "imports"
+            function = eval(_metric)
+            # Evaluate the metric on the produced vs. expected outputs
+            value = function(produced, expected)
+
+            # Prepare logging of the metric to the state dictionary to track
+            # model degradation
+            self.state_dict.setdefault("verify", {}).setdefault(_metric, [])
+            # Append the metric to the log associated to the just-verified pass
+            self.state_dict["verify"][_metric].append({cls.__name__: value})
+
+            # Assemble the potential error message in advance...
+            msg = f"{_metric} {value} not within [{_min}, {_max}] as required"
+
+            # Check whether the metric lies within the required range and raise
+            # exception if not
+            if not (_min <= value <= _max):
+                raise VerificationError(msg)
 
     # Inject the pre- and post-condition into the ONNX IR pass and return the
     # modified class to allow for arbitrarily stacking decorators
