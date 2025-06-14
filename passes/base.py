@@ -1,3 +1,6 @@
+# os.makedirs for creating logging directories on the fly
+import os
+
 # The base classes defined below are still not fully functional passes, but
 # abstract bases themselves
 from abc import ABC
@@ -56,6 +59,22 @@ class Pass(PassBase, ABC):
         if self.config["logging"].setdefault("checkpoint", False):
             # Mark this as the after-the-pass checkpoint
             filename = f"after-{self.config['logging']['checkpoint']}"
+            # Save the model checkpoint
+            ir.save(model, filename)
+
+        # Detailed logging of all intermediate models be disabled globally by
+        # setting the option to False, otherwise it is interpreted as a pathname
+        # to write the models checkpoints to
+        if self.config["logging"].setdefault("keep_intermediates", False):
+            # Get the logging directory pathname
+            path = self.config["logging"]["keep_intermediates"]
+            # Make sure the directory exists...
+            os.makedirs(path, exist_ok=True)
+            # Count the number of passes already applied to the model to derive
+            # unique checkpoint filenames
+            i = len(self.state_dict.setdefault("history", []))
+            # Mark this as the after-the-pass checkpoint
+            filename = os.path.join(path, f"{i:08d}-{type(self).__name__}.onnx")
             # Save the model checkpoint
             ir.save(model, filename)
 
