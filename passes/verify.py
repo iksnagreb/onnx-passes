@@ -42,7 +42,7 @@ def equality(cls: type[Pass]):
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced = evaluate_model(model, inputs)
+        produced = evaluate_model(model, inputs, **self.config["onnxruntime"])
         # Set the produced output as the expectation checked against as the
         # post-condition
         self.expected = produced
@@ -58,7 +58,16 @@ def equality(cls: type[Pass]):
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced = evaluate_model(model, inputs)
+        produced = evaluate_model(model, inputs, **self.config["onnxruntime"])
+
+        # Prepare logging verification results to the state dictionary
+        self.state_dict.setdefault("verify", {})
+
+        # Log the full input-output-expectation history for each
+        # verification pass
+        self.state_dict["verify"].setdefault("history", {})[self.id] = (
+            inputs, produced, self.expected
+        )
 
         # Compare for *strict* equality of *all* values from *all* outputs
         for output, x, y in zip(model.graph.outputs, produced, self.expected):
@@ -102,7 +111,7 @@ def tolerance(cls: type[Pass]):
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced = evaluate_model(model, inputs)
+        produced = evaluate_model(model, inputs, **self.config["onnxruntime"])
         # Set the produced output as the expectation checked against as the
         # post-condition
         self.expected = produced
@@ -118,7 +127,7 @@ def tolerance(cls: type[Pass]):
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced = evaluate_model(model, inputs)
+        produced = evaluate_model(model, inputs, **self.config["onnxruntime"])
 
         # Prepare logging of the error to the state dictionary to track model
         # degradation
@@ -128,6 +137,12 @@ def tolerance(cls: type[Pass]):
         error = max_abs_error(produced, self.expected)
         # Append the error to the log associated to the just-verified pass
         self.state_dict["verify"]["max_abs_error"].append({cls.__name__: error})
+
+        # Log the full input-output-expectation history for each
+        # verification pass
+        self.state_dict["verify"].setdefault("history", {})[self.id] = (
+            inputs, produced, self.expected
+        )
 
         # Read the optional verification tolerance configuration from the
         # configuration dictionary of the pass. Defaults according to NumPy.
@@ -193,7 +208,7 @@ def metric(cls: type[Pass]):
             return
 
         # Evaluate the model on the reference inputs and collect all results
-        produced = evaluate_model(model, inputs)
+        produced = evaluate_model(model, inputs, **self.config["onnxruntime"])
 
         # Metric-based verification requires as section configuring how to
         # calculate metrics and the range of acceptable results
@@ -209,6 +224,12 @@ def metric(cls: type[Pass]):
             self.state_dict.setdefault("verify", {}).setdefault(_metric, [])
             # Append the metric to the log associated to the just-verified pass
             self.state_dict["verify"][_metric].append({cls.__name__: value})
+
+            # Log the full input-output-expectation history for each
+            # verification pass
+            self.state_dict["verify"].setdefault("history", {})[self.id] = (
+                inputs, produced, self.expected
+            )
 
             # Assemble the potential error message in advance...
             msg = f"{_metric} {value} not within [{_min}, {_max}] as required"
