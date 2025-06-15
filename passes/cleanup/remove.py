@@ -36,6 +36,7 @@ class RemoveUnusedFunctions(passes.base.Transformation):
 
 
 # Removes unused opset imports from the graph - wrapper around ONNX IR pass
+@passes.verify.equality
 @passes.register("cleanup")
 @passes.register("remove-unused")
 @passes.register("remove-unused-opsets")
