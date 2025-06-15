@@ -23,6 +23,24 @@ class Pass(PassBase, ABC):
         self.state_dict = state
         # Used by verification to inject expected outputs for post-condition
         self.expected = None
+        self._id = None
+
+    # Inject generating a unique pass-id available for all pre- and post-
+    # conditions, as well as the wrapped __call__ and call methods
+    def __call__(self, *args, **kwargs):
+        # Count the number of passes already applied to the model to derive
+        # unique checkpoint filenames
+        i = len(self.state_dict.setdefault("history", []))
+        # Generate a unique pass id valid until the next call to this pass
+        self._id = f"{i:08d}-{type(self).__name__}"
+        # Now forward all arguments to the base-class __call__ implementation
+        return PassBase.__call__(self, *args, **kwargs)  # noqa: *args, *kwargs
+
+    # Unique pass-id to identify a pass across repeated applications within a
+    # sequence of passes
+    @property
+    def id(self):
+        return self._id
 
     # Pre-condition evaluated before entering a pass - implements verbosity
     def requires(self, model: ir.Model) -> None:
@@ -62,19 +80,16 @@ class Pass(PassBase, ABC):
             # Save the model checkpoint
             ir.save(model, filename)
 
-        # Detailed logging of all intermediate models be disabled globally by
-        # setting the option to False, otherwise it is interpreted as a pathname
-        # to write the models checkpoints to
+        # Detailed logging of all intermediate models can be disabled globally
+        # by setting the option to False, otherwise it is interpreted as a
+        # pathname to write the models checkpoints to
         if self.config["logging"].setdefault("keep_intermediates", False):
             # Get the logging directory pathname
             path = self.config["logging"]["keep_intermediates"]
             # Make sure the directory exists...
             os.makedirs(path, exist_ok=True)
-            # Count the number of passes already applied to the model to derive
-            # unique checkpoint filenames
-            i = len(self.state_dict.setdefault("history", []))
             # Mark this as the after-the-pass checkpoint
-            filename = os.path.join(path, f"{i:08d}-{type(self).__name__}.onnx")
+            filename = os.path.join(path, f"{self.id}.onnx")
             # Save the model checkpoint
             ir.save(model, filename)
 
