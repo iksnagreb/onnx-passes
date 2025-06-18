@@ -1,5 +1,5 @@
 onnx==1.18.0
-onnx-ir @ git+https://github.com/onnx/ir-py.git@d251d2fc0ba96fb6e20aa2fc7208531a695f3578
+onnx-ir==0.1.2
 onnxruntime==1.22.0
 onnxscript==0.3.0
 netron==8.3.8
