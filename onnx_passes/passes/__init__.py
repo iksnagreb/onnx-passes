@@ -33,4 +33,5 @@ import onnx_passes.passes.verify
 
 # Some passes should always be available by default without extra, dynamic
 # imports, such as cleanup, checks and verification related passes.
-from onnx_passes.passes import analysis, annotation, convert, cleanup, inline
+from onnx_passes.passes import analysis, annotation, convert, constants, \
+    cleanup, inline
