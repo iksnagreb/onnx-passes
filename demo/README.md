@@ -9,7 +9,7 @@ netron --browse model.onnx
 
 # Run Demo Sequence of Passes on the Exported Model
 ```bash
-onnx-passes -c cfg.yaml model.onnx -o out.onnx cleanup shape-inference verify
+onnx-passes -c cfg.yaml model.onnx -o out.onnx shape-inference streamline verify
 ```
 ## Show the Modified Model
 ```bash

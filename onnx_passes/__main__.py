@@ -86,6 +86,10 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
             # Load ONNX IR to modify/analyze from the model file - format should
             # be inferred and apply the sequence of passes
             result = passes(ir.load(model))
+            # If the composed pass is marked exhaustive, apply the sequence of
+            # passes as long as there are changes to the model
+            while _config.setdefault("exhaustive", False) and result.modified:
+                result = passes(result.model)
         # Catch any exception and walk up the context chain to find the initial
         # causing exception
         except Exception as error:

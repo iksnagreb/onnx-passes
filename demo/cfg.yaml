@@ -36,3 +36,5 @@ logging:
   checkpoint: false
   # Keeps intermediate models after each pass - path to some logging directory
   keep_intermediates: intermediate_models
+# Keep applying the passes exhaustively until the model stops changing
+exhaustive: true

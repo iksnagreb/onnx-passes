@@ -117,4 +117,6 @@ class GiveReadableTensorNames(passes.base.Transformation):
             out.name = name
 
         # We prefer functional passes - return a deep copy to be modified
-        return ir.passes.PassResult(model, modified)
+        # TODO: Seems to never stop when returning the true modification state
+        #  as iterations overwrite the result of previous over and over again...
+        return ir.passes.PassResult(model, False)
