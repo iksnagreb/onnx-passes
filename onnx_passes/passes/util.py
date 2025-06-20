@@ -5,7 +5,7 @@ import numpy as np
 
 # Base class for all custom ONNX IR passes developed in this library - this base
 # class defines the (optional) interface for configuration and state tracking
-from passes.base import Pass
+from onnx_passes.passes.base import Pass
 
 
 # Injects pre- and post-condition methods into an ONNX IR pass, i.e., wraps and

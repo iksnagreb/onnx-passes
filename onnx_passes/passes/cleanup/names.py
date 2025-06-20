@@ -6,7 +6,7 @@ from onnx_ir.traversal import RecursiveGraphIterator
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
-import passes
+import onnx_passes.passes as passes
 
 
 # Gives unique names to each node by enumerating nodes per operator type

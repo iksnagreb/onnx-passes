@@ -5,16 +5,18 @@ import numpy as np
 
 # Base class for all custom ONNX IR passes developed in this library - this base
 # class defines the (optional) interface for configuration and state tracking
-from passes.base import Pass, Analysis
+from onnx_passes.passes.base import Pass, Analysis
 # Utility functions on Pass objects for loading reference data and injecting
 # pre- and post-conditions
-from passes.util import inject_pre_post_condition, load_reference_data
+from onnx_passes.passes.util import (
+    inject_pre_post_condition, load_reference_data
+)
 # Custom, configurable wrapper around ONNX Runtime for model execution
-from passes.runtime import evaluate_model
+from onnx_passes.passes.runtime import evaluate_model
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
-import passes
+import onnx_passes.passes as passes
 
 
 # Exception type indicating verification failure while evaluating pre- and

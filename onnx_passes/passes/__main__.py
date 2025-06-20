@@ -19,7 +19,7 @@ import pickle
 import onnx_ir as ir
 
 # Collect custom ONNX IR passes from the library by name
-from passes import collect
+from onnx_passes.passes import collect
 
 
 # Main function called from the entrypoint below. Applies a sequence of ONNX IR

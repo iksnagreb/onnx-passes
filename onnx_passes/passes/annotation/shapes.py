@@ -6,7 +6,7 @@ from onnx_ir.passes.common import ShapeInferencePass
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
-import passes
+import onnx_passes.passes as passes
 
 
 # Performs shape inference on the entire model graph, adding or updating the

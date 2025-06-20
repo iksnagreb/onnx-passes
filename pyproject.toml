@@ -1,0 +1,55 @@
+# General project configuration: name, version, documentation, etc., authors,
+# dependencies, ...
+[project]
+name = "onnx-passes"
+version = "0.0.0"
+description = "Collection of ONNX IR Graph Passes"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Christoph Berganski", email = "christoph.berganski@upb.de" }
+]
+maintainers = [
+    { name = "Christoph Berganski", email = "christoph.berganski@upb.de" }
+]
+# Project version is derivced dynamically and managed by the build-system
+dynamic = ["version"]
+# click dependencies needs at least python 3.10, thus this is the minimum python
+# version required
+requires-python = ">=3.10"
+# List of project dependencies with pinned versions followig the format of
+# requirements.txt
+dependencies = [
+    "onnx==1.18.0",
+    "onnx-ir==0.1.2",
+    "onnxruntime==1.22.0",
+    "onnxscript==0.3.0",
+    "netron==8.3.8",
+    "click==8.2.1",
+    "PyYAML==6.0.2",
+    "numpy==2.2.6"
+]
+# Reference to the project websites (GitHub repository)
+[project.urls]
+GitHub = "https://github.com/iksnagreb/onnx-passes"
+# Script entrypoints which should be registered when installing the project
+[project.scripts]
+onnx-passes = "onnx_passes.passes.__main__:main"
+
+# Build-system configuration: Build the proejct using poetry with dynamic
+# versioning where the version is derived from the latest git tag
+[build-system]
+requires = ["poetry-core>=2.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+# Poetry build-system configuration: Configures collecting the python packages
+# dynamic versioning
+[tool.poetry]
+packages = [
+    { include = "onnx_passes" }
+]
+[tool.poetry.requires-plugins]
+poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
+[tool.poetry-dynamic-versioning]
+enable = true

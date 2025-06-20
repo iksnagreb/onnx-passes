@@ -8,7 +8,7 @@ from onnx_ir.passes.common import (
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
-import passes
+import onnx_passes.passes as passes
 
 
 # Removes unused nodes from the graph - wrapper around ONNX IR pass

@@ -1,5 +1,5 @@
 # Base classes for all custom ONNX IR passes developed in this library
-import passes.base
+from onnx_passes.passes.base import Pass
 
 # Registry of ONNX IR passes by names/categories
 _registry = {}
@@ -10,7 +10,7 @@ def register(name: str):
     # Inner decorator registering the pass
     def inner(cls: type):
         # Must be derived from the ONNX IR pass base
-        assert issubclass(cls, passes.base.Pass)
+        assert issubclass(cls, Pass)
         # Add this transformation to the registry
         _registry.setdefault(name, []).append(cls)
         # Return the decorated class for chaining decorators
@@ -29,8 +29,8 @@ def collect(names: list[str]):
 
 # Infrastructure for injecting automatic verification of passes via pre- and
 # post-conditions evaluated by a Passmanager
-import passes.verify
+import onnx_passes.passes.verify
 
 # Some passes should always be available by default without extra, dynamic
 # imports, such as cleanup, checks and verification related passes.
-from passes import analysis, annotation, convert, cleanup, inline
+from onnx_passes.passes import analysis, annotation, convert, cleanup, inline

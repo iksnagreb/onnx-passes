@@ -6,7 +6,7 @@ from onnxscript.version_converter import ConvertVersionPass
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
-import passes
+import onnx_passes.passes as passes
 
 
 # TODO: Instantiating all these manually is slightly annoying... but as long as
