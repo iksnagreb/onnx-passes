@@ -35,7 +35,7 @@ dependencies = [
 GitHub = "https://github.com/iksnagreb/onnx-passes"
 # Script entrypoints which should be registered when installing the project
 [project.scripts]
-onnx-passes = "onnx_passes.passes.__main__:main"
+onnx-passes = "onnx_passes.__main__:main"
 
 # Build-system configuration: Build the proejct using poetry with dynamic
 # versioning where the version is derived from the latest git tag
