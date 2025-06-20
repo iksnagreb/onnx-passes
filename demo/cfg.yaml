@@ -1,6 +1,6 @@
 # Import additional python modules dynamically before running the pass manger
 # with the sequence of ONNX IR passes
-imports: [ onnx_passes.passes.streamline.associative ]
+imports: [ ]
 # Reference data for verification and analysis: Inputs, expected outputs, ...
 reference:
   inp: [ inp.npy ]
@@ -19,7 +19,7 @@ onnxruntime:
   # Execution providers for accelerated inference
   providers:
     - - CPUExecutionProvider
-      - {}
+      - { }
   # Produce a full execution context dump
   full_context_dump: true
 # Configuration of model verification methods
