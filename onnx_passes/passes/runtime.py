@@ -57,9 +57,16 @@ def evaluate_model(model: ir.Model, inputs: list,
     # Convert the model to a string-serialized protobuf representation
     # understood by ONNX Runtime
     model = ir.to_proto(model).SerializeToString()
+
+    # Disable further ONNX Runtime session graph optimizations
+    sess_options = onnxruntime.SessionOptions()
+    sess_options.graph_optimization_level = (
+        onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+    )
+
     # Create an inference session from the ONNX model converted to proto
     # representation
-    session = onnxruntime.InferenceSession(model, **kwargs)
+    session = onnxruntime.InferenceSession(model, sess_options, **kwargs)
 
     # Fill the execution context with inputs paired-up with the corresponding
     # input names from the model graph
