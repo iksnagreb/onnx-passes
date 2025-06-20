@@ -1,6 +1,6 @@
 # Import additional python modules dynamically before running the pass manger
 # with the sequence of ONNX IR passes
-imports: [  ]
+imports: [ onnx_passes.passes.streamline.associative ]
 # Reference data for verification and analysis: Inputs, expected outputs, ...
 reference:
   inp: [ inp.npy ]

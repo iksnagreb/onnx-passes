@@ -129,12 +129,12 @@ class Transformation(Pass, FunctionalPass, abc.ABC):
 
 # Pattern-based graph rewriting implemented in ONNX Script
 from onnxscript.rewriter import RewritePass
-from onnxscript.rewriter.pattern import RewriteRuleClassBase, RewriteRule
+from onnxscript.rewriter.pattern import RewriteRule, RewriteRuleSet, MatchResult
 
 
 # Base class for deriving pattern-based rewrite passes - when specialized must
 # be mixed with either Annotation or Transformations as needed
-class RewriteRulePass(Pass, RewriteRuleClassBase, abc.ABC):
+class RewriteRulePass(Pass, abc.ABC):
     # Assemble a RewriteRule from the class definition: The specializing class
     # must implement the rules according to the base class RewriteRuleClassBase
     def rule(self):
@@ -142,12 +142,29 @@ class RewriteRulePass(Pass, RewriteRuleClassBase, abc.ABC):
         v = self.config.setdefault("logging", {}).setdefault("verbose", False)
         # Inject bound(!) methods for detecting and replacing the pattern into
         # the rewrite rule
-        return RewriteRule(
-            self.pattern, self.rewrite, self.check, verbose=v
-        )
+        return RewriteRule(self.pattern, self.rewrite, self.check, verbose=v)
+
+    @abc.abstractmethod
+    def pattern(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Method 'pattern' must be implemented by derived class.")
+
+    @abc.abstractmethod
+    def rewrite(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Method 'rewrite' must be implemented by derived class.")
+
+    def check(self, *args, **kwargs) -> MatchResult:
+        return MatchResult()
+
+    @property
+    def commute(self) -> bool:
+        return False
 
     # Implement the pass by assembling the pattern-based rewrite rule from the
     # class definition and applying it to a deep copy of the model
     def call(self, model: ir.Model) -> ir.passes.PassResult:
+        # Create a rule set from the class definition and commutativity flag
+        rule_set = RewriteRuleSet([self.rule()], commute=self.commute)
         # Apply the rule as the single rule of a rewrite pass on the model copy
-        return RewritePass([self.rule()])(ir.from_proto(ir.to_proto(model)))
+        return RewritePass(rule_set)(ir.from_proto(ir.to_proto(model)))
