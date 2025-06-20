@@ -20,11 +20,11 @@ class DistributiveAddMul(passes.base.Transformation,
         return True
 
     # Match pattern (a * x) + (b * x)
-    def pattern(self, op, x, a, b):  # noqa: Signature...
+    def pattern(self, op, x, a, b):
         return op.Add(op.Mul(a, x), op.Mul(b, x))
 
     # Replacement pattern x * (a + b) regrouping the
-    def rewrite(self, op, x, a, b):  # noqa: Signature...
+    def rewrite(self, op, x, a, b):
         return op.Mul(x, op.Add(a, b))
 
 
@@ -42,13 +42,13 @@ class DistributiveAddMulConst(passes.base.Transformation,
         return True
 
     # Match pattern (a * x) + (b * x)
-    def pattern(self, op, x, y, a, b):  # noqa: Signature...
+    def pattern(self, op, x, y, a, b):
         return op.Add(op.Mul(a, x), op.Mul(b, y))
 
     # Pattern match condition: Checks for identical constants a and b
-    def check(self, _, x, y, a, b):  # noqa: Signature...
+    def check(self, _, x, y, a, b):
         return identical_constants(a, b)
 
     # Replacement pattern x * (a + b) regrouping the
-    def rewrite(self, op, x, y, a, b):  # noqa: Signature...
+    def rewrite(self, op, x, y, a, b):
         return op.Mul(a, op.Add(x, y))

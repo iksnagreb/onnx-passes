@@ -21,17 +21,17 @@ class AssociativeMul(passes.base.Transformation, passes.base.RewriteRulePass):
         return True
 
     # Match pattern ((x * a) * b) where a and b are constants
-    def pattern(self, op, x, a, b):  # noqa: Signature...
+    def pattern(self, op, x, a, b):
         return op.Mul(op.Mul(x, a), b)
 
     # Pattern match conditions checking constant parameters - either
     # initializers or const_value must be present
-    def check(self, _, x, a, b):  # noqa: Signature...
+    def check(self, _, x, a, b):
         return is_constant(a) and is_constant(b)
 
     # Replacement pattern  (x * (a * b)) regrouping the two constants a and b
     # next to each other
-    def rewrite(self, op, x, a, b):  # noqa: Signature...
+    def rewrite(self, op, x, a, b):
         return op.Mul(x, op.Mul(a, b))
 
 
@@ -47,17 +47,17 @@ class AssociativeAdd(passes.base.Transformation, passes.base.RewriteRulePass):
         return True
 
     # Match pattern ((x + a) + b) where a and b are constants
-    def pattern(self, op, x, a, b):  # noqa: Signature...
+    def pattern(self, op, x, a, b):
         return op.Add(op.Add(x, a), b)
 
     # Pattern match conditions checking constant parameters - either
     # initializers or const_value must be present
-    def check(self, _, x, a, b):  # noqa: Signature...
+    def check(self, _, x, a, b):
         return is_constant(b) and is_constant(b)
 
     # Replacement pattern  (x + (a + b)) regrouping the two constants a and b
     # next to each other
-    def rewrite(self, op, x, a, b):  # noqa: Signature...
+    def rewrite(self, op, x, a, b):
         return op.Add(x, op.Add(a, b))
 
 
@@ -74,17 +74,17 @@ class AssociativeAddMany(passes.base.Transformation,
         return True
 
     # Match pattern ((a + x) + (b + y)) where a and b are constants
-    def pattern(self, op, x, y, a, b):  # noqa: Signature...
+    def pattern(self, op, x, y, a, b):
         return op.Add(op.Add(a, x), op.Add(b, y))
 
     # Pattern match conditions checking constant parameters - either
     # initializers or const_value must be present
-    def check(self, _, x, y, a, b):  # noqa: Signature...
+    def check(self, _, x, y, a, b):
         return is_constant(a) and is_constant(b)
 
     # Replacement pattern  ((x + y) + (a + b)) regrouping the two constants a
     # and b next to each other
-    def rewrite(self, op, x, y, a, b):  # noqa: Signature...
+    def rewrite(self, op, x, y, a, b):
         return op.Add(op.Add(x, y), op.Add(a, b))
 
 
@@ -101,10 +101,10 @@ class AssociativeAddSelf(passes.base.Transformation,
         return True
 
     # Match pattern x + (x + a) where x is added to itself
-    def pattern(self, op, x, a):  # noqa: Signature...
+    def pattern(self, op, x, a):
         return op.Add(x, op.Add(x, a))
 
     # Replacement pattern 2 * x + a replacing the addition of x + x by a
     # constant multiplication
-    def rewrite(self, op, x, a):  # noqa: Signature...
+    def rewrite(self, op, x, a):
         return op.Add(op.Mul(x, op.initializer(ir.tensor(2.0), name="b")), a)

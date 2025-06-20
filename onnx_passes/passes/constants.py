@@ -29,15 +29,15 @@ class FoldConstants(passes.base.Transformation):
 class FoldConstantShapes(passes.base.Transformation,
                          passes.base.RewriteRulePass):
     # Match a Shape operation applied to a single tensor x
-    def pattern(self, op, x):  # noqa: Signature...
+    def pattern(self, op, x):
         return op.Shape(x)
 
     # Pattern match conditions checking for non-symbolic shapes - dynamic
     # shapes (or missing shapes) is not supported
-    def check(self, _, x: ir.Value):  # noqa: Signature...
+    def check(self, _, x: ir.Value):
         return x.shape and all(isinstance(dim, int) for dim in x.shape)
 
     # Replacement pattern inserting a constant of list of integers
     # representing the shape
-    def rewrite(self, op, x):  # noqa: Signature...
+    def rewrite(self, op, x):
         return op.Constant(value_ints=list(x.shape))
