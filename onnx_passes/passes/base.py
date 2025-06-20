@@ -3,7 +3,7 @@ import os
 
 # The base classes defined below are still not fully functional passes, but
 # abstract bases themselves
-from abc import ABC
+import abc
 
 # ir.Model, ir.save, ...
 import onnx_ir as ir
@@ -15,7 +15,7 @@ from onnx_ir.passes import PassBase, FunctionalPass
 # Base class for deriving all custom passes of the ONNX IR pass library: This
 # adds configuration and state handling and serves as a marker type for building
 # the registry of named/categorized passes.
-class Pass(PassBase, ABC):
+class Pass(PassBase, abc.ABC):
     # Initializes a pass sets references to optional configuration and state
     # dictionary as instance attributes
     def __init__(self, config: dict | None, state: dict | None):
@@ -101,7 +101,7 @@ class Pass(PassBase, ABC):
 # Base class for deriving analysis passes, which are side-effect-only passes,
 # i.e., may only modify configuration and state dictionaries or other externally
 # referenced objects (this includes printing/output), but not the model.
-class Analysis(Pass, ABC):
+class Analysis(Pass, abc.ABC):
     @property
     def in_place(self) -> bool:
         return True
@@ -115,7 +115,7 @@ class Analysis(Pass, ABC):
 # may return a modified copy of the original model but may not modify the
 # original model. Annotation passes *should* not modify the structure or any
 # values contained in the model, only attributes, shapes or data types.
-class Annotation(Pass, FunctionalPass, ABC):
+class Annotation(Pass, FunctionalPass, abc.ABC):
     ...
 
 
@@ -123,5 +123,31 @@ class Annotation(Pass, FunctionalPass, ABC):
 # i.e., may return a modified copy of the original model but may not modify the
 # original model. Transformation passes may modify arbitrary properties of the
 # model, including structure and values.
-class Transformation(Pass, FunctionalPass, ABC):
+class Transformation(Pass, FunctionalPass, abc.ABC):
     ...
+
+
+# Pattern-based graph rewriting implemented in ONNX Script
+from onnxscript.rewriter import RewritePass
+from onnxscript.rewriter.pattern import RewriteRuleClassBase, RewriteRule
+
+
+# Base class for deriving pattern-based rewrite passes - when specialized must
+# be mixed with either Annotation or Transformations as needed
+class RewriteRulePass(Pass, RewriteRuleClassBase, abc.ABC):
+    # Assemble a RewriteRule from the class definition: The specializing class
+    # must implement the rules according to the base class RewriteRuleClassBase
+    def rule(self):
+        # Verbosity can be enabled globally by setting it to True
+        v = self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Inject bound(!) methods for detecting and replacing the pattern into
+        # the rewrite rule
+        return RewriteRule(
+            self.pattern, self.rewrite, self.check, verbose=v
+        )
+
+    # Implement the pass by assembling the pattern-based rewrite rule from the
+    # class definition and applying it to a deep copy of the model
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        # Apply the rule as the single rule of a rewrite pass on the model copy
+        return RewritePass([self.rule()])(ir.from_proto(ir.to_proto(model)))
