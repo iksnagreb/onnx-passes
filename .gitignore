@@ -6,9 +6,8 @@
 *.onnx
 # Python cache
 __pycache__
-/inp.npy
-/out.npy
-/build
+*.npy
+*.pkl
 # Python packages and poetry lockfile
 dist/
 poetry.lock
