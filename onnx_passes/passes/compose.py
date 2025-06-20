@@ -12,7 +12,7 @@ import onnx_passes.passes as passes
 
 # Composes a list of passes to a single pass which can optionally be applied
 # exhaustively
-class ComposedPass(passes.base.Pass, abc.ABC):
+class ComposePass(passes.base.Pass, abc.ABC):
     # Sequence of passes as class attribute - will be parsed to Pass instances
     # when initializing the concrete pass instance
     __passes__: list[str]

@@ -6,6 +6,6 @@ import onnx_passes.passes as passes
 # Set of so-called "streamlining" transformations: Moves scales and biases
 # through the model graph and tries to collapse them via constant folding
 @passes.register("streamline")
-class Streamline(passes.composed.ComposedPass, passes.base.Transformation):
+class Streamline(passes.compose.ComposePass, passes.base.Transformation):
     __passes__ = ["shape-inference", "associative", "fold-constants", "cleanup"]
     __exhaustive__ = True

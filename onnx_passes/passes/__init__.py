@@ -40,7 +40,7 @@ def collect(names: list[str | type]):
 import onnx_passes.passes.verify
 # Composing sequences of passes managed by nested PassManager instances and
 # potential exhaustive application
-import onnx_passes.passes.composed
+import onnx_passes.passes.compose
 
 # Some passes should always be available by default without extra, dynamic
 # imports, such as cleanup, checks and verification related passes.
