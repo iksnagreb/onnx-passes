@@ -1,3 +1,6 @@
+# ir.Value, ir.tensor
+import onnx_ir as ir
+
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
 import onnx_passes.passes as passes
@@ -45,6 +48,23 @@ class DistributiveAXAddBY(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y, a, b):
         return op.Mul(x, op.Add(a, b))
+
+
+# Distributive property: x + yx = x(1 + y), if y is a constant, this reduces
+# additions and allows for further constant propagation/fusion.
+@passes.verify.tolerance
+@passes.register("algebraic")
+@passes.register("distributive")
+class DistributiveXAddXY(Transformation, RewriteRulePass):
+    @property
+    def commute(self) -> bool:
+        return True
+
+    def pattern(self, op, x, y):
+        return op.Add(x, op.Mul(y, x))
+
+    def rewrite(self, op, x, y):
+        return op.Mul(x, op.Add(y, op.initializer(ir.tensor(1.0, name="_"))))
 
 
 # Distributive property: a(x + b) = ax + ab, additions past multiplications
