@@ -6,13 +6,15 @@ _registry = {}
 
 
 # Registers an ONNX IR pass with a name/category
-def register(name: str):
+def register(name_or_group: str | None = None):
     # Inner decorator registering the pass
     def inner(cls: type):
         # Must be derived from the ONNX IR pass base
         assert issubclass(cls, Pass)
+        # If no name is specified, default to the class name
+        key = cls.__name__ if name_or_group is None else name_or_group
         # Add this transformation to the registry
-        _registry.setdefault(name, []).append(cls)
+        _registry.setdefault(key, []).append(cls)
         # Return the decorated class for chaining decorators
         return cls
 

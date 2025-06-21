@@ -133,7 +133,7 @@ from onnxscript.rewriter.pattern import RewriteRule, RewriteRuleSet, MatchResult
 
 
 # Base class for deriving pattern-based rewrite passes - when specialized must
-# be mixed with either Annotation or Transformations as needed
+# be mixed with either Annotation or Transformation as needed
 class RewriteRulePass(Pass, abc.ABC):
     # Assemble a RewriteRule from the class definition: The specializing class
     # must implement the rules according to the base class RewriteRuleClassBase
