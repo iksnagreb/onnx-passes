@@ -1,6 +1,9 @@
 # ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
 import onnx_ir as ir
 
+# Unused node removal passes build into ONNX IR
+from onnx_ir.passes.common import RemoveUnusedNodesPass
+
 # Constant folding pass build into ONNX IR and ONNX Script
 from onnxscript.optimizer import fold_constants
 
@@ -20,7 +23,13 @@ class FoldConstants(passes.base.Transformation):
         # operate in-place
         model = ir.from_proto(ir.to_proto(model))
         # Run in-place constant folding on deep copy - yields PassResult
-        return fold_constants(model)
+        modified = fold_constants(model).modified
+        # Constant folding might leave unused initializer nodes in the graph
+        # which can be removed in-place
+        result = RemoveUnusedNodesPass()(model)
+        # Combine pass result from both passes to not miss modifications due to
+        # unused nodes unrelated to constant folding
+        return ir.passes.PassResult(result.model, modified or result.modified)
 
 
 # Folds constant shape operators on the entire model graph
