@@ -28,8 +28,16 @@ def collect(names: list[str | type]):
         # If the key is a type, this is already the resolved pass class
         if isinstance(key, type):
             return [key]
-        # Otherwise flatten and resolve the pass class from the registry
-        return [cls for cls in _registry[key]]
+        # Try to resolve from the registry by collecting all passes registered
+        # for the key
+        try:
+            # Otherwise flatten and resolve the pass class from the registry
+            return [cls for cls in _registry[key]]
+        # If the key is not in the registry, try once again interpreting this as
+        # a pass class
+        except KeyError:
+            # Try to interpret the key string as a class name
+            return [eval(key)]
 
     # Flatten and resolve all pass classes from the pass registry
     return [cls for key in names for cls in _resolve(key)]
