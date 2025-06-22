@@ -7,7 +7,7 @@ import onnx_passes.passes as passes
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
 # Checking ir.Value for being constants and comparing constants to be identical
-from onnx_passes.passes.streamline.util import is_constant
+from onnx_passes.passes.util import is_constant
 
 
 # Associative property: (x + a) + b = x + (a + b), grouping constants a and b to

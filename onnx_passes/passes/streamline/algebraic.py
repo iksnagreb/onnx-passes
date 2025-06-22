@@ -10,7 +10,7 @@ import onnx_passes.passes as passes
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
 # Checking ir.Value for being constants and comparing constants to be identical
-from onnx_passes.passes.streamline.util import identical_constants, is_constant
+from onnx_passes.passes.util import identical_constants, is_constant
 
 
 # Algebraic property: x + y = 2x if x = y, transforms a joining addition into

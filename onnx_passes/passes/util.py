@@ -1,11 +1,35 @@
-# ir.Model
+# ir.Model, ir.Value, ir.convenience.get_const_tensor
 import onnx_ir as ir
-# np.load for loading reference data
+# np.load for loading reference data, np.all
 import numpy as np
 
 # Base class for all custom ONNX IR passes developed in this library - this base
 # class defines the (optional) interface for configuration and state tracking
 from onnx_passes.passes.base import Pass
+
+
+# Checks whether the ir.Value represents a constant: Either is_initializer or
+# has a const_value set
+def is_constant(v: ir.Value):
+    return v.const_value is not None or v.is_initializer()
+
+
+# Checks whether the two ir.Values are identical constants, i.e., all values are
+# equal according to NumPy semantics
+def identical_constants(a: ir.Value, b: ir.Value) -> bool:
+    if is_constant(a) and is_constant(b):
+        return np.all(a.const_value.numpy() == b.const_value.numpy())
+    return False
+
+
+# Checks whether two potentially constant ir.Values match i.e., all values are
+# equal according to NumPy semantics
+def constant_match(a, b):
+    if isinstance(a, ir.Value):
+        a = ir.convenience.get_const_tensor(a).numpy()
+    if isinstance(b, ir.Value):
+        b = ir.convenience.get_const_tensor(b).numpy()
+    return (a is not None or b is not None) and np.all(a == b)
 
 
 # Injects pre- and post-condition methods into an ONNX IR pass, i.e., wraps and
