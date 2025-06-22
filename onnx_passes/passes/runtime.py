@@ -2,7 +2,7 @@
 import onnx_ir as ir
 
 # The runtime simply builds a wrapper around ONNX Runtime for model execution
-import onnxruntime
+import onnxruntime, onnxruntime_extensions
 
 
 # Evaluates the model on the inputs via ONNX Runtime inference session
@@ -63,6 +63,11 @@ def evaluate_model(model: ir.Model, inputs: list,
     sess_options.graph_optimization_level = (
         onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
     )
+
+    # Path to custom operators provided by ONNX Runtime Extensions
+    extensions_library_path = onnxruntime_extensions.get_library_path()
+    # Register the extension library to make custom operators available
+    sess_options.register_custom_ops_library(extensions_library_path)
 
     # Create an inference session from the ONNX model converted to proto
     # representation

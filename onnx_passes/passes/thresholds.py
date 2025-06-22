@@ -11,9 +11,11 @@ import onnx_passes.passes as passes
 # All threshold transformations are transformations derived from pattern-based
 # rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
-
 # Checking ir.Value for being constants and comparing constants to be identical
 from onnx_passes.passes.util import constant_match
+
+# Domain used by custom operators implemented with this library
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 
 
 # Infers a fused multi-threshold function operator from the pattern according to
@@ -59,10 +61,10 @@ class FuseThresholds(Transformation, RewriteRulePass):
     def rewrite(self, op, x, thresholds, weights, weighted, **kwargs):
         # Positive unit step thresholds: No weights or all weights detected to
         # be constant one
-        if not weighted or constant_match(weights, 1):
-            return op.MultiThreshold(x, thresholds)
+        # if not weighted or constant_match(weights, 1):
+        #     return op.MultiThreshold(x, thresholds, _domain=custom)
         # Weighted, potentially non-monotonic multi-threshold function
-        return op.MultiThreshold(x, thresholds, weights)
+        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
 
 
 # Reverts multi-threshold function operator fusion: Unpacks the operator to the
@@ -72,7 +74,7 @@ class FuseThresholds(Transformation, RewriteRulePass):
 @passes.register("inline-thresholds")
 class InlineThresholds(Transformation, RewriteRulePass):
     def pattern(self, op, x, thresholds, weights):
-        return op.MultiThreshold(x, thresholds, weights)
+        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
 
     def rewrite(self, op, x, thresholds, weights):
         # Comparison of inputs and all corresponding thresholds: Expand input
@@ -97,7 +99,7 @@ class InlineThresholds(Transformation, RewriteRulePass):
 @passes.register("inline-thresholds")
 class InlineUnitThresholds(Transformation, RewriteRulePass):
     def pattern(self, op, x, thresholds):
-        return op.MultiThreshold(x, thresholds)
+        return op.MultiThreshold(x, thresholds, _domain=CUSTOM_DOMAIN)
 
     def rewrite(self, op, x, thresholds):
         # Comparison of inputs and all corresponding thresholds: Expand input
