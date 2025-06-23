@@ -60,6 +60,7 @@ class FoldConstantShapes(Transformation, RewriteRulePass):
 
 # Eliminates Where operators if the condition is a constant and always chooses
 # the same branch: This rule selects the left hand side if possible
+@passes.verify.equality
 @passes.register("simplify")
 @passes.register("fold-constants")
 @passes.register("eliminate-where")
@@ -78,6 +79,7 @@ class EliminateWhereLhs(Transformation, RewriteRulePass):
 
 # Eliminates Where operators if the condition is a constant and always chooses
 # the same branch: This rule selects the right hand side if possible
+@passes.verify.equality
 @passes.register("simplify")
 @passes.register("fold-constants")
 @passes.register("eliminate-where")
