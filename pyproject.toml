@@ -2,7 +2,8 @@
 # dependencies, ...
 [project]
 name = "onnx-passes"
-description = "Collection of ONNX IR Graph Passes"
+description = """Collection of ONNX model graph transformation and analysis
+ passes based on ONNX IR and ONNX Script"""
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
