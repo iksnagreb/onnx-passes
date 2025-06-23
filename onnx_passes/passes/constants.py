@@ -11,11 +11,18 @@ from onnxscript.optimizer import fold_constants
 # @passes.register decorator work
 import onnx_passes.passes as passes
 
+# Derive Transformations (allowed to modify the graph) from pattern-based
+# rewrite rules
+from onnx_passes.passes.base import Transformation, RewriteRulePass
+
+# NumPy used during match condition checks to operate on shapes and tensors
+import numpy as np
+
 
 # Performs constant folding on the entire model graph
 @passes.verify.equality
 @passes.register("fold-constants")
-class FoldConstants(passes.base.Transformation):
+class FoldConstants(Transformation):
     # Applies the built-in ONNX IR constant folding pass on a deep copy of the
     # model (as we prefer functional passes not modifying the original).
     def call(self, model: ir.Model) -> ir.passes.PassResult:
@@ -35,8 +42,7 @@ class FoldConstants(passes.base.Transformation):
 # Folds constant shape operators on the entire model graph
 @passes.verify.equality
 @passes.register("fold-constants")
-class FoldConstantShapes(passes.base.Transformation,
-                         passes.base.RewriteRulePass):
+class FoldConstantShapes(Transformation, RewriteRulePass):
     # Match a Shape operation applied to a single tensor x
     def pattern(self, op, x):
         return op.Shape(x)
@@ -50,3 +56,39 @@ class FoldConstantShapes(passes.base.Transformation,
     # representing the shape
     def rewrite(self, op, x):
         return op.Constant(value_ints=list(x.shape))
+
+
+# Eliminates Where operators if the condition is a constant and always chooses
+# the same branch: This rule selects the left hand side if possible
+@passes.register("simplify")
+@passes.register("fold-constants")
+@passes.register("eliminate-where")
+class EliminateWhereLhs(Transformation, RewriteRulePass):
+    def pattern(self, op, condition, lhs, rhs):
+        return op.Where(condition, lhs, rhs)
+
+    def check(self, op, condition, lhs, rhs):
+        if condition := ir.convenience.get_const_tensor(condition):
+            return np.all(condition.numpy())
+        return False
+
+    def rewrite(self, op, condition, lhs, rhs):
+        return lhs
+
+
+# Eliminates Where operators if the condition is a constant and always chooses
+# the same branch: This rule selects the right hand side if possible
+@passes.register("simplify")
+@passes.register("fold-constants")
+@passes.register("eliminate-where")
+class EliminateWhereRhs(Transformation, RewriteRulePass):
+    def pattern(self, op, condition, lhs, rhs):
+        return op.Where(condition, lhs, rhs)
+
+    def check(self, op, condition, lhs, rhs):
+        if condition := ir.convenience.get_const_tensor(condition):
+            return np.all(condition.numpy() == False)
+        return False
+
+    def rewrite(self, op, condition, lhs, rhs):
+        return rhs
