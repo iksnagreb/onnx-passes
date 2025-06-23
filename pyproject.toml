@@ -2,7 +2,6 @@
 # dependencies, ...
 [project]
 name = "onnx-passes"
-version = "0.0.0"
 description = "Collection of ONNX IR Graph Passes"
 readme = "README.md"
 license = "MIT"
@@ -32,6 +31,7 @@ dependencies = [
     "numpy==2.2.6"
 ]
 # Reference to the project websites (GitHub repository)
+
 [project.urls]
 GitHub = "https://github.com/iksnagreb/onnx-passes"
 # Script entrypoints which should be registered when installing the project
@@ -50,6 +50,8 @@ build-backend = "poetry_dynamic_versioning.backend"
 packages = [
     { include = "onnx_passes" }
 ]
+version = "0.0.0"
+
 [tool.poetry.requires-plugins]
 poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
 [tool.poetry-dynamic-versioning]
