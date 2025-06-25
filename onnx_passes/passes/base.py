@@ -119,12 +119,20 @@ class Annotation(Pass, FunctionalPass, abc.ABC):
     ...
 
 
+# Node-removal pass build into ONNX IR and ONNX Script
+from onnxscript.optimizer import remove_unused_nodes
+
+
 # Base class for deriving transformation passes, which are functional passes,
 # i.e., may return a modified copy of the original model but may not modify the
 # original model. Transformation passes may modify arbitrary properties of the
 # model, including structure and values.
 class Transformation(Pass, FunctionalPass, abc.ABC):
-    ...
+    # There might be unused nodes after transforming parts of the graph, always
+    # make sure to remove those before checking any other post-conditions - this
+    # mostly prevents th output to be spammed with warning messages...
+    def ensures(self, model: ir.Model) -> None:
+        super().ensures(model), remove_unused_nodes(model)
 
 
 # Pattern-based graph rewriting implemented in ONNX Script

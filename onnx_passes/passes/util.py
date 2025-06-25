@@ -18,17 +18,25 @@ def is_constant(v: ir.Value):
 # equal according to NumPy semantics
 def identical_constants(a: ir.Value, b: ir.Value) -> bool:
     if is_constant(a) and is_constant(b):
-        return np.all(a.const_value.numpy() == b.const_value.numpy())
+        return bool(np.all(a.const_value.numpy() == b.const_value.numpy()))
     return False
+
+
+# If v is a constant ir.Value (either from Constant op or initializer), returns
+# the constant value as NumPy, otherwise returns None
+def get_const_or_none(v: ir.Value):
+    if (v := ir.convenience.get_const_tensor(v)) is not None:
+        return v.numpy()
+    return None
 
 
 # Checks whether two potentially constant ir.Values match i.e., all values are
 # equal according to NumPy semantics
 def constant_match(a, b):
     if isinstance(a, ir.Value):
-        a = ir.convenience.get_const_tensor(a).numpy()
+        a = get_const_or_none(a)
     if isinstance(b, ir.Value):
-        b = ir.convenience.get_const_tensor(b).numpy()
+        b = get_const_or_none(b)
     return (a is not None or b is not None) and np.all(a == b)
 
 

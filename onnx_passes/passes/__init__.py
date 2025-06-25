@@ -55,4 +55,4 @@ import onnx_passes.passes.compose
 # Some passes should always be available by default without extra, dynamic
 # imports, such as cleanup, checks and verification related passes.
 from onnx_passes.passes import analysis, annotation, convert, constants, \
-    cleanup, inline, streamline
+    cleanup, eliminate, inline, streamline
