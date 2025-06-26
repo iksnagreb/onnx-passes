@@ -25,7 +25,7 @@ dependencies = [
     "onnx-ir==0.1.3",
     "onnxruntime-gpu[cuda,cudnn]==1.22.0",
     "onnxruntime-extensions==0.14.0",
-    "transformers==4.52.4",  # Somehow required by onnxruntime-extensions...
+    "transformers==4.53.0",  # Somehow required by onnxruntime-extensions...
     "onnxscript==0.3.0",
     "netron==8.4.0",
     "click==8.2.1",
