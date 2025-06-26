@@ -27,7 +27,7 @@ dependencies = [
     "onnxruntime-extensions==0.14.0",
     "transformers==4.52.4",  # Somehow required by onnxruntime-extensions...
     "onnxscript==0.3.0",
-    "netron==8.3.8",
+    "netron==8.4.0",
     "click==8.2.1",
     "PyYAML==6.0.2",
     "numpy==2.2.6"
