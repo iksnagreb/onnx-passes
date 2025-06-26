@@ -110,10 +110,8 @@ class ConvertSubToAdd(Transformation, RewriteRulePass):
         # Create a constant operator producing the inverse of a with the type
         # matching the other input x: Type-cast to avoid issues due to
         # typ-promotion, such as implicit float->double...
-        # TODO: The extra np.asarray(...) can probably be dropped with ONNX IR
-        #  version 0.1.3, see https://github.com/onnx/ir-py/pull/102
         return op.Add(x, op.CastLike(
-            op.Constant(value=ir.tensor(np.asarray(- a.const_value.numpy()))), x
+            op.Constant(value=ir.tensor(- a.const_value.numpy())), x
         ))
 
 
@@ -196,11 +194,8 @@ class ConvertDivToMul(Transformation, RewriteRulePass):
         # Create a constant operator producing the inverse of a with the type
         # matching the other input x: Type-cast to avoid issues due to
         # typ-promotion, such as implicit float->double...
-        # TODO: The extra np.asarray(...) can probably be dropped with ONNX IR
-        #  version 0.1.3, see https://github.com/onnx/ir-py/pull/102
         return op.Mul(x, op.CastLike(
-            op.Constant(value=ir.tensor(np.asarray(1 / a.const_value.numpy()))),
-            x
+            op.Constant(value=ir.tensor(1 / a.const_value.numpy())), x
         ))
 
 

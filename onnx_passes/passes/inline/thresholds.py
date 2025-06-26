@@ -24,7 +24,7 @@ class InlineThresholds(Transformation, RewriteRulePass):
     def rewrite(self, op, x, thresholds, weights):
         # Comparison of inputs and all corresponding thresholds: Expand input
         # dimensions to match the threshold parameter shape via broadcasting
-        shape = op.initializer(ir.tensor([*x.shape, 1], name="shape"))
+        shape = op.Constant(value=ir.tensor([*x.shape, 1], name="shape"))
         steps = op.LessOrEqual(thresholds, op.Reshape(x, shape, allowzero=0))
 
         # Type-casing turns boolean unit steps to reducible floats followed by
@@ -33,7 +33,7 @@ class InlineThresholds(Transformation, RewriteRulePass):
 
         # Finally the multi-threshold output reduces over all steps removing the
         # previously expanded dimension
-        axes = op.initializer(ir.tensor([-1], name="axes"))
+        axes = op.Constant(value=ir.tensor([-1], name="axes"))
         return op.ReduceSum(steps, axes, keepdims=0)
 
 
@@ -49,7 +49,7 @@ class InlineUnitThresholds(Transformation, RewriteRulePass):
     def rewrite(self, op, x, thresholds):
         # Comparison of inputs and all corresponding thresholds: Expand input
         # dimensions to match the threshold parameter shape via broadcasting
-        shape = op.initializer(ir.tensor([*x.shape, 1], name="shape"))
+        shape = op.Constant(value=ir.tensor([*x.shape, 1], name="shape"))
         steps = op.LessOrEqual(thresholds, op.Reshape(x, shape, allowzero=0))
 
         # Type-casing turns boolean unit steps to reducible floats
@@ -57,5 +57,5 @@ class InlineUnitThresholds(Transformation, RewriteRulePass):
 
         # Finally the multi-threshold output reduces over all steps removing the
         # previously expanded dimension
-        axes = op.initializer(ir.tensor([-1], name="axes"))
+        axes = op.Constant(value=ir.tensor([-1], name="axes"))
         return op.ReduceSum(steps, axes, keepdims=0)
