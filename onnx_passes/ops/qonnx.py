@@ -4,8 +4,12 @@ import numpy as np
 # Registers a python function as implementing a custom ONNX operator
 from onnx_passes.ops import register_op, FLOAT, INT64, STRING
 
-# The domain of custom operators exported by QONNX and Brevitas
+# The domain of custom operators exported by QONNX
 DOMAIN = "qonnx.custom_op.general"
+# Brevitas exports to the brevitas domain, which, however, can be transplated to
+# the QONNX domain
+BREVITAS_DOMAIN = "onnx.brevitas"
+
 
 # Resolve rounding modes from string identifiers
 ROUNDING_FXS = {
