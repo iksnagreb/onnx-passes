@@ -7,7 +7,7 @@ from onnx_ir.passes.common import (
     LiftConstantsToInitializersPass,
     LiftSubgraphInitializersToMainGraphPass,
     RemoveInitializersFromInputsPass,
-    # TODO: Add DeduplicateInitializersPass with ONNX IR 0.1.3?
+    DeduplicateInitializersPass
 )
 
 # Need to import the passes module to set up the registry and make the
@@ -41,14 +41,14 @@ class LiftConstantsToInitializers(passes.base.Transformation):
         config = self.config.setdefault("lift_constants", {
             "lift_all_constants": True, "size_limit": 0
         })
-        # Apply the built-in ONNX IR shape inference pass on a deep copy of the
+        # Apply the built-in ONNX IR initializer lift pass on a deep copy of the
         # model
         return LiftConstantsToInitializersPass(**config)(
             ir.from_proto(ir.to_proto(model))
         )
 
 
-# Lift subgraph initializers to main graph  - wrapper around ONNX IR pass
+# Lift subgraph initializers to main graph - wrapper around ONNX IR pass
 @passes.verify.equality
 @passes.register("cleanup")
 @passes.register("lift-constants")
@@ -57,5 +57,22 @@ class LiftSubgraphInitializersToMainGraph(passes.base.Transformation):
     # model (as we prefer functional passes not modifying the original).
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return LiftSubgraphInitializersToMainGraphPass()(
+            ir.from_proto(ir.to_proto(model))
+        )
+
+
+# Deduplicates initializers - wrapper around ONNX IR pass
+@passes.verify.equality
+@passes.register("deduplicate-initializers")
+class DeduplicateInitializers(passes.base.Transformation):
+    # Applies the built-in ONNX IR initializer deduplication pass on a deep copy
+    # of the model (as we prefer functional passes not modifying the original).
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        # Load optional configuration parameters - defaults to what is specified
+        # by the ONNX IR
+        config = self.config.setdefault("deduplicate_initializers", {})
+        # Apply the built-in ONNX IR initializer deduplication pass on a deep
+        # copy of the  model
+        return DeduplicateInitializersPass(**config)(
             ir.from_proto(ir.to_proto(model))
         )
