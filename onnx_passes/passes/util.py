@@ -8,6 +8,31 @@ import numpy as np
 from onnx_passes.passes.base import Pass
 
 
+# Checks whether the ir.DataType is considered a signed data type: These are all
+# signed integers as well as floating-point datatypes
+# TODO: Replace all uses by data_type.is_signed() once available via ONNX IR,
+#  see https://github.com/onnx/ir-py/pull/110
+def is_signed(data_type: ir.DataType):
+    return data_type in {
+        ir.DataType.FLOAT,
+        ir.DataType.INT8,
+        ir.DataType.INT16,
+        ir.DataType.INT32,
+        ir.DataType.INT64,
+        ir.DataType.FLOAT16,
+        ir.DataType.DOUBLE,
+        ir.DataType.COMPLEX64,
+        ir.DataType.COMPLEX128,
+        ir.DataType.BFLOAT16,
+        ir.DataType.FLOAT8E4M3FN,
+        ir.DataType.FLOAT8E4M3FNUZ,
+        ir.DataType.FLOAT8E5M2,
+        ir.DataType.FLOAT8E5M2FNUZ,
+        ir.DataType.INT4,
+        ir.DataType.FLOAT4E2M1,
+    }
+
+
 # Checks whether the ir.Value represents a constant: Either is_initializer or
 # has a const_value set
 def is_constant(v: ir.Value):

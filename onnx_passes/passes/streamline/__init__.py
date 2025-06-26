@@ -4,8 +4,6 @@ import onnx_passes.passes as passes
 
 # Include basic streamlining transformations
 import onnx_passes.passes.streamline.algebraic
-import onnx_passes.passes.streamline.associative
-import onnx_passes.passes.streamline.distributive
 
 
 # Set of so-called "streamlining" transformations: Moves scales and biases
@@ -13,5 +11,5 @@ import onnx_passes.passes.streamline.distributive
 @passes.verify.tolerance
 @passes.register("streamline")
 class Streamline(passes.compose.ComposePass, passes.base.Transformation):
-    __passes__ = ["algebraic", "fold-constants", "cleanup"]
+    __passes__ = ["algebraic", "shape-inference", "fold-constants", "cleanup"]
     __exhaustive__ = True
