@@ -35,7 +35,7 @@ class EliminateIdentityMul(Transformation, RewriteRulePass):
         return x
 
 
-# Removes all bitwise-and without effect from the graph, i.e., x & 1 = x
+# Removes all bitwise-and without effect from the graph, i.e., x & 11...1 = x
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
@@ -50,7 +50,7 @@ class EliminateIdentityBitwiseAnd(Transformation, RewriteRulePass):
 
     def check(self, op, x, a):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == 1)
+            return np.all(a.numpy() == ~0)
         return False
 
     def rewrite(self, op, x, a):
