@@ -17,7 +17,6 @@ import numpy as np
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-mul")
 class EliminateIdentityMul(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -39,7 +38,6 @@ class EliminateIdentityMul(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-bitwise-and")
 class EliminateIdentityBitwiseAnd(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -61,7 +59,6 @@ class EliminateIdentityBitwiseAnd(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-logical-and")
 class EliminateIdentityAnd(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -83,7 +80,6 @@ class EliminateIdentityAnd(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-add")
 class EliminateIdentityAdd(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -105,7 +101,6 @@ class EliminateIdentityAdd(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-bitwise-or")
 class EliminateIdentityBitwiseOr(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -127,7 +122,6 @@ class EliminateIdentityBitwiseOr(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-logical-or")
 class EliminateIdentityOr(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -149,7 +143,6 @@ class EliminateIdentityOr(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-bitwise-xor")
 class EliminateIdentityBitwiseXor(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -171,7 +164,6 @@ class EliminateIdentityBitwiseXor(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-logical-xor")
 class EliminateIdentityXor(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -193,7 +185,6 @@ class EliminateIdentityXor(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-bitwise-shift")
 class EliminateIdentityBitShift(Transformation, RewriteRulePass):
     @property
     def commute(self):
@@ -252,7 +243,6 @@ class EliminateWhereRhs(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-cast")
 class EliminateIdentityCast(Transformation, RewriteRulePass):
     def pattern(self, op, x, to):
         return op.Cast(x, to=to)
@@ -270,7 +260,6 @@ class EliminateIdentityCast(Transformation, RewriteRulePass):
 @passes.verify.equality
 @passes.register("eliminate")
 @passes.register("eliminate-identity")
-@passes.register("eliminate-identity-cast")
 class EliminateIdentityCastLike(Transformation, RewriteRulePass):
     def pattern(self, op, x, y):
         return op.CastLike(x, y)
