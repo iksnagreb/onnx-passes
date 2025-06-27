@@ -95,7 +95,6 @@ def equality(cls: type[Pass]):
 # model but has side effects by running equality-based verification
 @equality
 @passes.register("verify")
-@passes.register("verify-equality")
 class VerifyEquality(Analysis):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.PassResult(model, False)
@@ -176,7 +175,6 @@ def tolerance(cls: type[Pass]):
 # model but has side effects by running tolerance-based verification
 @tolerance
 @passes.register("verify")
-@passes.register("verify-tolerance")
 class VerifyTolerance(Analysis):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.PassResult(model, False)
@@ -263,7 +261,6 @@ def metric(cls: type[Pass]):
 # model but has side effects by running metric-based verification
 @metric
 @passes.register("verify")
-@passes.register("verify-metric")
 class VerifyMetric(Analysis):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.PassResult(model, False)

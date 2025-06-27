@@ -12,7 +12,6 @@ import onnx_passes.passes as passes
 # Performs shape inference on the entire model graph, adding or updating the
 # shape annotations wherever possible
 @passes.verify.equality
-@passes.register("annotation")
 @passes.register("shape-inference")
 class ShapeInference(passes.base.Annotation):
     # Applies the built-in ONNX IR shape inference pass on a deep copy of the

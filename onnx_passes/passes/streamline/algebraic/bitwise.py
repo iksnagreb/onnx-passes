@@ -30,8 +30,6 @@ from onnx_passes.passes.util import identical_constants, is_constant
 # enable constant propagation and fusion
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-bitwise-or")
 class GroupConstantBitwiseOr(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -51,8 +49,6 @@ class GroupConstantBitwiseOr(Transformation, RewriteRulePass):
 # y to enable constant propagation and fusion for constant a
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-bitwise-or")
 class GroupNonConstantBitwiseOr(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -96,8 +92,6 @@ class EliminateIdempotenceBitwiseOr(Transformation, RewriteRulePass):
 # enable constant propagation and fusion
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-bitwise-and")
 class GroupConstantBitwiseAnd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -117,8 +111,6 @@ class GroupConstantBitwiseAnd(Transformation, RewriteRulePass):
 # y to enable constant propagation and fusion for constant a
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-bitwise-and")
 class GroupNonConstantBitwiseAnd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -167,8 +159,6 @@ class EliminateIdempotenceBitwiseAnd(Transformation, RewriteRulePass):
 # and, if a and b are constants, allows for further constant propagation/fusion.
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("distributive")
-@passes.register("distributive-and-past-or")
 class MoveBitwiseAndPastBitwiseOr(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -203,8 +193,6 @@ class MoveBitwiseAndPastBitwiseOr(Transformation, RewriteRulePass):
 # And and Or nodes to be fused.
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("distributive")
-@passes.register("distributive-or-past-and")
 class MoveBitwiseOrPastBitwiseAnd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:

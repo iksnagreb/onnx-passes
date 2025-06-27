@@ -30,8 +30,6 @@ from onnx_passes.passes.util import identical_constants, is_constant
 # b to enable constant propagation and fusion
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-logical-or")
 class GroupConstantOr(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -51,8 +49,6 @@ class GroupConstantOr(Transformation, RewriteRulePass):
 # and y to enable constant propagation and fusion for constant a
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-logical-or")
 class GroupNonConstantOr(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -96,8 +92,6 @@ class EliminateIdempotenceOr(Transformation, RewriteRulePass):
 # and b to enable constant propagation and fusion
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-logical-and")
 class GroupConstantAnd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -117,8 +111,6 @@ class GroupConstantAnd(Transformation, RewriteRulePass):
 # non-constants x and y to enable constant propagation and fusion for constant a
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-logical-and")
 class GroupNonConstantAnd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -167,8 +159,6 @@ class EliminateIdempotenceAnd(Transformation, RewriteRulePass):
 # and, if a and b are constants, allows for further constant propagation/fusion.
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("distributive")
-@passes.register("distributive-and-past-or")
 class MoveAndPastOr(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -201,8 +191,6 @@ class MoveAndPastOr(Transformation, RewriteRulePass):
 # And and Or nodes to be fused.
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("distributive")
-@passes.register("distributive-or-past-and")
 class MoveOrPastAnd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:

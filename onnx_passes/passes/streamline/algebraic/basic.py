@@ -38,8 +38,6 @@ import numpy as np
 # enable constant propagation and fusion
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-add")
 class GroupConstantAdd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -59,8 +57,6 @@ class GroupConstantAdd(Transformation, RewriteRulePass):
 # y to enable constant propagation and fusion for constant a
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-add")
 class GroupNonConstantAdd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -114,8 +110,6 @@ class ConvertSubToAdd(Transformation, RewriteRulePass):
 # enable constant propagation and fusion
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-mul")
 class GroupConstantMul(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -135,8 +129,6 @@ class GroupConstantMul(Transformation, RewriteRulePass):
 # y to enable constant propagation and fusion for constant a
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("associative")
-@passes.register("associative-mul")
 class GroupNonConstantMul(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -197,8 +189,6 @@ class ConvertDivToMul(Transformation, RewriteRulePass):
 # addition as constant multiplication
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("distributive")
-@passes.register("distributive-mul-past-add")
 class MoveMulPastAdd(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:
@@ -233,8 +223,6 @@ class MoveMulPastAdd(Transformation, RewriteRulePass):
 # Mul and Add nodes to be fused.
 @passes.verify.tolerance
 @passes.register("algebraic")
-@passes.register("distributive")
-@passes.register("distributive-add-past-mul")
 class MoveAddPastMul(Transformation, RewriteRulePass):
     @property
     def commute(self) -> bool:

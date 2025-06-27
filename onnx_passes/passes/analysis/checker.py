@@ -11,7 +11,6 @@ import onnx_passes.passes as passes
 
 # Runs the ONNX model checker on the entire model graph - checks for consistency
 # of IR/Opset versions and domains, raises an exception if something is wrong
-@passes.register("analysis")
 @passes.register("checker")
 class Checker(passes.base.Analysis):
     # Applies the built-in ONNX IR model checker pass on the model without
