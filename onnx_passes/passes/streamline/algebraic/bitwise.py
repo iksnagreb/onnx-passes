@@ -28,7 +28,7 @@ from onnx_passes.passes.util import identical_constants, is_constant
 
 # Associative property: (x | a) | b = x | (a | b), grouping constants a and b to
 # enable constant propagation and fusion
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupConstantBitwiseOr(Transformation, RewriteRulePass):
     @property
@@ -47,7 +47,7 @@ class GroupConstantBitwiseOr(Transformation, RewriteRulePass):
 
 # Associative property: (x | a) | y = (x | y) | a, grouping non-constants x and
 # y to enable constant propagation and fusion for constant a
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupNonConstantBitwiseOr(Transformation, RewriteRulePass):
     @property
@@ -71,7 +71,7 @@ class GroupNonConstantBitwiseOr(Transformation, RewriteRulePass):
 
 # Idempotence property: x | x = x, two identical inputs (dynamic or constant)
 # yield the identity
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateIdempotenceBitwiseOr(Transformation, RewriteRulePass):
     @property
@@ -90,7 +90,7 @@ class EliminateIdempotenceBitwiseOr(Transformation, RewriteRulePass):
 
 # Associative property: (x & a) & b = x & (a & b), grouping constants a and b to
 # enable constant propagation and fusion
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupConstantBitwiseAnd(Transformation, RewriteRulePass):
     @property
@@ -109,7 +109,7 @@ class GroupConstantBitwiseAnd(Transformation, RewriteRulePass):
 
 # Associative property: (x & a) & y = (x & y) & a, grouping non-constants x and
 # y to enable constant propagation and fusion for constant a
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupNonConstantBitwiseAnd(Transformation, RewriteRulePass):
     @property
@@ -133,7 +133,7 @@ class GroupNonConstantBitwiseAnd(Transformation, RewriteRulePass):
 
 # Idempotence property: x & x = x, two identical inputs (dynamic or constant)
 # yield the identity
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateIdempotenceBitwiseAnd(Transformation, RewriteRulePass):
     @property
@@ -157,7 +157,7 @@ class EliminateIdempotenceBitwiseAnd(Transformation, RewriteRulePass):
 
 # Distributive property: ax | by = x(a | b) if x = y, reduces conjunctions
 # and, if a and b are constants, allows for further constant propagation/fusion.
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class MoveBitwiseAndPastBitwiseOr(Transformation, RewriteRulePass):
     @property
@@ -191,7 +191,7 @@ class MoveBitwiseAndPastBitwiseOr(Transformation, RewriteRulePass):
 #
 # Note: This, together with various associativity rules nicely groups constant
 # And and Or nodes to be fused.
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class MoveBitwiseOrPastBitwiseAnd(Transformation, RewriteRulePass):
     @property
@@ -210,7 +210,7 @@ class MoveBitwiseOrPastBitwiseAnd(Transformation, RewriteRulePass):
 
 # Absorption property: x & (x | y) = x, reduces two-input joining pattern to
 # identity in the first, independent of the second input
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAbsorptionBitwiseAndBitwiseOr(Transformation, RewriteRulePass):
     @property
@@ -226,7 +226,7 @@ class EliminateAbsorptionBitwiseAndBitwiseOr(Transformation, RewriteRulePass):
 
 # Absorption property: x | (x & y) = x, reduces two-input joining pattern to
 # identity in the first, independent of the second input
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAbsorptionBitwiseOrBitwiseAnd(Transformation, RewriteRulePass):
     @property
@@ -242,7 +242,7 @@ class EliminateAbsorptionBitwiseOrBitwiseAnd(Transformation, RewriteRulePass):
 
 # De Morgan's law: ~x & ~y = ~(x | y), propagates BitwiseNot downstream through
 # the graph
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DeMorganBitwiseAnd(Transformation, RewriteRulePass):
     @property
@@ -258,7 +258,7 @@ class DeMorganBitwiseAnd(Transformation, RewriteRulePass):
 
 # De Morgan's law: ~x | ~y = ~(x & y), propagates BitwiseNot downstream through
 # the graph
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DeMorganBitwiseOr(Transformation, RewriteRulePass):
     @property
@@ -273,7 +273,7 @@ class DeMorganBitwiseOr(Transformation, RewriteRulePass):
 
 
 # Double negation law: ~~x = x, eliminates/fuses aggregated bitwise negations
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateDoubleBitwiseNot(Transformation, RewriteRulePass):
     def pattern(self, op, x):

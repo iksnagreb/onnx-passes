@@ -28,7 +28,7 @@ from onnx_passes.passes.util import identical_constants, is_constant
 
 # Associative property: (x or a) or b = x or (a or b), grouping constants a and
 # b to enable constant propagation and fusion
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupConstantOr(Transformation, RewriteRulePass):
     @property
@@ -47,7 +47,7 @@ class GroupConstantOr(Transformation, RewriteRulePass):
 
 # Associative property: (x or a) or y = (x or y) or a, grouping non-constants x
 # and y to enable constant propagation and fusion for constant a
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupNonConstantOr(Transformation, RewriteRulePass):
     @property
@@ -71,7 +71,7 @@ class GroupNonConstantOr(Transformation, RewriteRulePass):
 
 # Idempotence property: x or x = x, two identical inputs (dynamic or constant)
 # yield the identity
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateIdempotenceOr(Transformation, RewriteRulePass):
     @property
@@ -90,7 +90,7 @@ class EliminateIdempotenceOr(Transformation, RewriteRulePass):
 
 # Associative property: (x and a) and b = x and (a and b), grouping constants a
 # and b to enable constant propagation and fusion
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupConstantAnd(Transformation, RewriteRulePass):
     @property
@@ -109,7 +109,7 @@ class GroupConstantAnd(Transformation, RewriteRulePass):
 
 # Associative property: (x and a) and y = (x and y) and a, grouping
 # non-constants x and y to enable constant propagation and fusion for constant a
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupNonConstantAnd(Transformation, RewriteRulePass):
     @property
@@ -133,7 +133,7 @@ class GroupNonConstantAnd(Transformation, RewriteRulePass):
 
 # Idempotence property: x and x = x, two identical inputs (dynamic or constant)
 # yield the identity
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateIdempotenceAnd(Transformation, RewriteRulePass):
     @property
@@ -157,7 +157,7 @@ class EliminateIdempotenceAnd(Transformation, RewriteRulePass):
 
 # Distributive property: ax or by = x(a or b) if x = y, reduces conjunctions
 # and, if a and b are constants, allows for further constant propagation/fusion.
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class MoveAndPastOr(Transformation, RewriteRulePass):
     @property
@@ -189,7 +189,7 @@ class MoveAndPastOr(Transformation, RewriteRulePass):
 #
 # Note: This, together with various associativity rules nicely groups constant
 # And and Or nodes to be fused.
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class MoveOrPastAnd(Transformation, RewriteRulePass):
     @property
@@ -208,7 +208,7 @@ class MoveOrPastAnd(Transformation, RewriteRulePass):
 
 # Absorption property: x and (x or y) = x, reduces two-input joining pattern to
 # identity in the first, independent of the second input
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAbsorptionAndOr(Transformation, RewriteRulePass):
     @property
@@ -224,7 +224,7 @@ class EliminateAbsorptionAndOr(Transformation, RewriteRulePass):
 
 # Absorption property: x or (x and y) = x, reduces two-input joining pattern to
 # identity in the first, independent of the second input
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAbsorptionOrAnd(Transformation, RewriteRulePass):
     @property
@@ -240,7 +240,7 @@ class EliminateAbsorptionOrAnd(Transformation, RewriteRulePass):
 
 # De Morgan's law: (not x) and (not y) = not (x or y), propagates Not downstream
 # through the graph
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DeMorganAnd(Transformation, RewriteRulePass):
     @property
@@ -256,7 +256,7 @@ class DeMorganAnd(Transformation, RewriteRulePass):
 
 # De Morgan's law: (not x) or (not y) = not (x and y), propagates Not downstream
 # through the graph
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DeMorganOr(Transformation, RewriteRulePass):
     @property
@@ -271,7 +271,7 @@ class DeMorganOr(Transformation, RewriteRulePass):
 
 
 # Double negation law: not not x = x, eliminates/fuses aggregated negations
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateDoubleNot(Transformation, RewriteRulePass):
     def pattern(self, op, x):
