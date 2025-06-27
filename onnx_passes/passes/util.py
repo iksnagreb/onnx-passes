@@ -39,6 +39,12 @@ def is_constant(v: ir.Value):
     return v.const_value is not None or v.is_initializer()
 
 
+# Checks whether the ir.Value represents a scalar: Either the shape is empty or
+# any dimension is of size 1
+def is_scalar(v: ir.Value):
+    return np.prod(v.shape) == 1
+
+
 # Checks whether the two ir.Values are identical constants, i.e., all values are
 # equal according to NumPy semantics
 def identical_constants(a: ir.Value, b: ir.Value) -> bool:

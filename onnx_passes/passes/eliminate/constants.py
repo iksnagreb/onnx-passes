@@ -202,6 +202,43 @@ class EliminateIdentityBitShift(Transformation, RewriteRulePass):
         return x
 
 
+# Eliminates constant matrix multiplications without effect, i.e.,
+# multiplications by the identity matrix which exists for square matrices
+@passes.verify.equality
+@passes.register("eliminate")
+@passes.register("eliminate-identity")
+class EliminateIdentityMatMul(Transformation, RewriteRulePass):
+    # Multiplication by the identity matrix does actually commute, as this is
+    # square and without effect: x @ eye = eye @ x = x
+    @property
+    def commute(self):
+        return True
+
+    def pattern(self, op, x, eye):
+        return op.MatMul(x, eye)
+
+    def check(self, op, x, eye):
+        # Try to unpack the shapes, raises ValueError if there are not enough
+        # dimensions to unpack (identity matrix needs at least 2 dimensions)
+        try:
+            *_, N, M = eye.shape
+        except ValueError:
+            return False
+
+        # The potential identity matrix must be square and match the last two
+        # dimensions of the intput (only last dimension in case of 1D input)
+        if N == M and tuple(x.shape[-2:]) in {(N, N), (N,)}:
+            if eye := ir.convenience.get_const_tensor(eye):
+                # Broadcasts over any batch dimensions
+                return np.all(eye == np.eye(*x.shape[-2:]))
+
+        # Not constant or not a valid identity matrix
+        return False
+
+    def rewrite(self, op, x, eye):
+        return x
+
+
 # Eliminates Where operators if the condition is a constant and always chooses
 # the same branch: This rule selects the left hand side if possible
 @passes.verify.equality
