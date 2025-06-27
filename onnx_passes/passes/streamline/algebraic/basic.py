@@ -107,12 +107,7 @@ class ConvertSubToAdd(Transformation, RewriteRulePass):
         return is_constant(a) and is_signed(a.dtype)
 
     def rewrite(self, op, x, a):
-        # Create a constant operator producing the inverse of a with the type
-        # matching the other input x: Type-cast to avoid issues due to
-        # typ-promotion, such as implicit float->double...
-        return op.Add(x, op.CastLike(
-            op.Constant(value=ir.tensor(- a.const_value.numpy())), x
-        ))
+        return op.Add(x, op.Neg(a))
 
 
 # Associative property: (x * a) * b = x * (a * b), grouping constants a and b to
@@ -187,12 +182,7 @@ class ConvertDivToMul(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        # Create a constant operator producing the inverse of a with the type
-        # matching the other input x: Type-cast to avoid issues due to
-        # typ-promotion, such as implicit float->double...
-        return op.Mul(x, op.CastLike(
-            op.Constant(value=ir.tensor(1 / a.const_value.numpy())), x
-        ))
+        return op.Mul(x, op.Reciprocal(a))
 
 
 # ==============================================================================
