@@ -15,6 +15,9 @@ import onnx_passes.passes as passes
 # rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
+# NumPy used to operate on shapes and constant tensors
+import numpy as np
+
 
 # Performs constant folding on the entire model graph
 @passes.verify.equality
@@ -36,20 +39,34 @@ class FoldConstants(Transformation):
         return ir.passes.PassResult(result.model, modified or result.modified)
 
 
-# Folds constant shape operators on the entire model graph
+# Replaces Shape operators with Constant operators of the input tensor shape to
+# enable constant folding of shape calculations - dynamic shapes (or missing
+# shapes) are not supported
 @passes.verify.equality
 @passes.register("fold-constants")
-class FoldConstantShapes(Transformation, RewriteRulePass):
-    # Match a Shape operation applied to a single tensor x
+class FoldConstantShape(Transformation, RewriteRulePass):
     def pattern(self, op, x):
         return op.Shape(x)
 
-    # Pattern match conditions checking for non-symbolic shapes - dynamic
-    # shapes (or missing shapes) is not supported
     def check(self, _, x: ir.Value):
         return x.shape and all(isinstance(dim, int) for dim in x.shape)
 
-    # Replacement pattern inserting a constant of list of integers
-    # representing the shape
     def rewrite(self, op, x):
         return op.Constant(value_ints=list(x.shape))
+
+
+# Replaces Size operators with Constant operators of the input tensor size to
+# enable constant folding of shape calculations - dynamic shapes (or missing
+# shapes) are not supported
+@passes.verify.equality
+@passes.register("fold-constants")
+@passes.register()
+class FoldConstantSize(Transformation, RewriteRulePass):
+    def pattern(self, op, x):
+        return op.Size(x)
+
+    def check(self, _, x: ir.Value):
+        return x.shape and all(isinstance(dim, int) for dim in x.shape)
+
+    def rewrite(self, op, x):
+        return op.Constant(value_int=int(np.prod(x.shape)))
