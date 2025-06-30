@@ -148,9 +148,16 @@ class RewriteRulePass(Pass, abc.ABC):
     def rule(self):
         # Verbosity can be enabled globally by setting it to True
         v = self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Extra arguments passed to the constructed rewrite rule: removing the
+        # nodes for some reason prevents effective streamlining of residuals,
+        # probably because the forking node has multiple consumer and thus
+        # cannot be removed causing the pattern to be ignored even if matched.
+        # TODO: Verify whether this is indeed the case and if so, whether this
+        #  is intended behavior or a bug...
+        kwargs = {"verbose": v, "remove_nodes": False}
         # Inject bound(!) methods for detecting and replacing the pattern into
         # the rewrite rule
-        return RewriteRule(self.pattern, self.rewrite, self.check, verbose=v)
+        return RewriteRule(self.pattern, self.rewrite, self.check, **kwargs)
 
     @abc.abstractmethod
     def pattern(self, *args, **kwargs):
