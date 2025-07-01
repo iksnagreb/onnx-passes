@@ -62,35 +62,39 @@ class GiveReadableTensorNames(passes.base.Transformation):
         for node in RecursiveGraphIterator(model.graph, reverse=True):
             # Enumerate all inputs to the node
             for i, inp in enumerate(node.inputs):
-                # Select a different name to reflect global inputs
-                if inp.is_graph_input() and not inp.is_initializer():
-                    # Collect global inputs to update the name later
-                    inputs.append(inp)
-                # Derive a new name by enumerating all inputs to the node
-                name = f"{node.name}_input_{i}"
-                # Check whether the value already has this name and consider the
-                # model to have changed if at least one name changes
-                modified = modified or name != node.inputs[i].name  # noqa: []?
-                # Assign the new name after checking for change
-                # TODO: According to the specification, inputs should be
-                #  immutable, however, this seems to work fine...
-                node.inputs[i].name = name
+                # Optional inputs can be represented by None...
+                if inp is not None:
+                    # Select a different name to reflect global inputs
+                    if inp.is_graph_input() and not inp.is_initializer():
+                        # Collect global inputs to update the name later
+                        inputs.append(inp)
+                    # Derive a new name by enumerating all inputs to the node
+                    name = f"{node.name}_input_{i}"
+                    # Check whether the value already has this name and consider
+                    # the model to have changed if at least one name changes
+                    modified = modified or name != node.inputs[i].name  # noqa
+                    # Assign the new name after checking for change
+                    # TODO: According to the specification, inputs should be
+                    #  immutable, however, this seems to work fine...
+                    node.inputs[i].name = name
 
             # Enumerate all outputs from the node
             for i, out in enumerate(node.outputs):
-                # Select a different name to reflect global outputs
-                if out.is_graph_output() and not out.is_initializer():
-                    # Collect global outputs to update the name later
-                    outputs.append(out)
-                # Derive a new name by enumerating all outputs to the node
-                name = f"{node.name}_output_{i}"
-                # Check whether the value already has this name and consider the
-                # model to have changed if at least one name changes
-                modified = modified or name != node.outputs[i].name  # noqa: []?
-                # Assign the new name after checking for change
-                # TODO: According to the specification, outputs should be
-                #  immutable, however, this seems to work fine...
-                node.outputs[i].name = name
+                # Optional outputs can be represented by None...
+                if out is not None:
+                    # Select a different name to reflect global outputs
+                    if out.is_graph_output() and not out.is_initializer():
+                        # Collect global outputs to update the name later
+                        outputs.append(out)
+                    # Derive a new name by enumerating all outputs to the node
+                    name = f"{node.name}_output_{i}"
+                    # Check whether the value already has this name and consider
+                    # the model to have changed if at least one name changes
+                    modified = modified or name != node.outputs[i].name  # noqa
+                    # Assign the new name after checking for change
+                    # TODO: According to the specification, outputs should be
+                    #  immutable, however, this seems to work fine...
+                    node.outputs[i].name = name
 
         # Enumerate all inputs to the model graph to assign new names
         for i, inp in enumerate(set(inputs)):
