@@ -156,6 +156,10 @@ class _MoveTransposePastElementwise(Transformation, RewriteRulePass):
             # Collect permutations for further checks
             perms.append(perm.as_ints())
 
+        # There must be at least one Transposed input for this to apply...
+        if len(perms) < 1:
+            return False
+
         # Check each pairing of permutations: Common dimensions must match
         for perm1 in perms:
             for perm2 in perms:
