@@ -5,6 +5,7 @@ import onnx_passes.passes as passes
 # Include basic streamlining transformations
 import onnx_passes.passes.streamline.algebraic
 import onnx_passes.passes.streamline.shapes
+import onnx_passes.passes.streamline.transpose
 
 
 # Set of so-called "streamlining" transformations: Moves scales and biases
