@@ -183,3 +183,55 @@ class RewriteRulePass(Pass, abc.ABC):
         rule_set = RewriteRuleSet([self.rule()], commute=self.commute)
         # Apply the rule as the single rule of a rewrite pass on the model copy
         return RewritePass(rule_set)(ir.from_proto(ir.to_proto(model)))
+
+
+# Base class for deriving pattern-based rewrite passes from a set of rewrite
+# rules - when specialized must be mixed with either Annotation or
+# Transformation as needed
+class RewriteRuleSetPass(Pass, abc.ABC):
+    # Assemble list of RewriteRule from the class definition: The specializing
+    # class must implement lists of matching rules returned by pattern and
+    # rewrite (and optionally check) methods.
+    def rules(self):
+        # Verbosity can be enabled globally by setting it to True
+        v = self.config.setdefault("logging", {}).setdefault("verbose", False)
+        # Extra arguments passed to the constructed rewrite rule: removing the
+        # nodes for some reason prevents effective streamlining of residuals,
+        # probably because the forking node has multiple consumer and thus
+        # cannot be removed causing the pattern to be ignored even if matched.
+        # TODO: Verify whether this is indeed the case and if so, whether this
+        #  is intended behavior or a bug...
+        kwargs = {"verbose": v, "remove_nodes": False}
+        # Create the list of rules by combining input and output pattern and the
+        # condition
+        rules = zip(self.pattern(), self.rewrite(), self.check())
+        # Inject methods for detecting and replacing the pattern into the
+        # rewrite rule
+        return [RewriteRule(*rule, **kwargs) for rule in rules]
+
+    @abc.abstractmethod
+    def pattern(self):
+        raise NotImplementedError(
+            "Method 'pattern' must be implemented by derived class.")
+
+    @abc.abstractmethod
+    def rewrite(self):
+        raise NotImplementedError(
+            "Method 'rewrite' must be implemented by derived class.")
+
+    def check(self):
+        return [
+            lambda *args, **kwargs: MatchResult() for _ in self.pattern()
+        ]
+
+    @property
+    def commute(self) -> bool:
+        return False
+
+    # Implement the pass by assembling the pattern-based rewrite rule from the
+    # class definition and applying it to a deep copy of the model
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        # Create a rule set from the class definition and commutativity flag
+        rule_set = RewriteRuleSet(self.rules(), commute=self.commute)
+        # Apply the rules as the rewrite pass on the model copy
+        return RewritePass(rule_set)(ir.from_proto(ir.to_proto(model)))
