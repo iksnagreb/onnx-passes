@@ -187,7 +187,7 @@ class _MoveTransposePastElementwise(Transformation, RewriteRulePass):
 
             # This is a proper input. Track the permutation of the largest rank
             if permx is not None:
-                if len(permx.as_ints()) > len(perm):
+                if len(permx.as_ints()) >= len(perm):
                     perm = permx.as_ints()
             # This is a constant input. However, it might be the one determining
             # the output rank - the permutation must be adjusted accordingly
