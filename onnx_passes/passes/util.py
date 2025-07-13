@@ -111,8 +111,8 @@ def load_reference_data(p: Pass) -> tuple[list, list]:
         p.config["reference"].setdefault("inp", [])
         p.config["reference"].setdefault("out", [])
 
-        # If no reference data is tracked via the state dictionary, this is probably
-        # the first attempt at loading the data: Check the config
+        # If no reference data is tracked via the state dictionary, this is
+        # probably the first attempt at loading the data: Check the config
         if p.config and "reference" in p.config:
             return ([np.load(file) for file in p.config["reference"]["inp"]],
                     [np.load(file) for file in p.config["reference"]["out"]])
