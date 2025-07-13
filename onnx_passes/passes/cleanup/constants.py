@@ -63,6 +63,7 @@ class LiftSubgraphInitializersToMainGraph(passes.base.Transformation):
 
 # Deduplicates initializers - wrapper around ONNX IR pass
 @passes.verify.equality
+@passes.register("cleanup")
 @passes.register("deduplicate-initializers")
 class DeduplicateInitializers(passes.base.Transformation):
     # Applies the built-in ONNX IR initializer deduplication pass on a deep copy
