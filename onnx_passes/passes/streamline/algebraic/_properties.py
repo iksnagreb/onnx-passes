@@ -24,34 +24,86 @@ import inspect
 import numpy as np
 
 
+# # Left-distributivity template: x * (y + z) = x * y + x * z
+# class _DistributiveLhs(Transformation, RewriteRulePass):
+#     __MUL__: callable
+#     __ADD__: callable
+#
+#     def pattern(self, op, x, y, z):
+#         return self.__MUL__(op, x, self.__ADD__(op, y, z))
+#
+#     def check(self, op, x, y, z):
+#         return is_constant(x) and (is_constant(y) or is_constant(z))
+#
+#     def rewrite(self, op, x, y, z):
+#         return self.__ADD__(op, self.__MUL__(op, x, y), self.__MUL__(op, x,z))
+
+
 # Left-distributivity template: x * (y + z) = x * y + x * z
-class _DistributiveLhs(Transformation, RewriteRulePass):
+class _DistributiveLhs(Transformation, RewriteRuleSetPass):
     __MUL__: callable
     __ADD__: callable
 
-    def pattern(self, op, x, y, z):
+    def _lhs(self, op, x, y, z):
         return self.__MUL__(op, x, self.__ADD__(op, y, z))
 
-    def check(self, op, x, y, z):
-        return is_constant(x) and (is_constant(y) or is_constant(z))
-
-    def rewrite(self, op, x, y, z):
+    def _rhs(self, op, x, y, z):
         return self.__ADD__(op, self.__MUL__(op, x, y), self.__MUL__(op, x, z))
+
+    def pattern(self):
+        return [self._lhs, self._rhs]
+
+    def check(self):
+        return [
+            lambda _, x, y, z: \
+                is_constant(x) and (is_constant(y) or is_constant(z)),
+            lambda _, x, y, z: \
+                is_constant(x) and not (is_constant(y) or is_constant(z))
+        ]
+
+    def rewrite(self):
+        return [self._rhs, self._lhs]
+
+
+# # Right-distributivity template: (y + z) * x = y * x + z * x
+# class _DistributiveRhs(Transformation, RewriteRulePass):
+#     __MUL__: callable
+#     __ADD__: callable
+#
+#     def pattern(self, op, x, y, z):
+#         return self.__MUL__(op, self.__ADD__(op, y, z), x)
+#
+#     def check(self, op, x, y, z):
+#         return is_constant(x) and (is_constant(y) or is_constant(z))
+#
+#     def rewrite(self, op, x, y, z):
+#         return self.__ADD__(op, self.__MUL__(op, y, x), self.__MUL__(op, z,x))
 
 
 # Right-distributivity template: (y + z) * x = y * x + z * x
-class _DistributiveRhs(Transformation, RewriteRulePass):
+class _DistributiveRhs(Transformation, RewriteRuleSetPass):
     __MUL__: callable
     __ADD__: callable
 
-    def pattern(self, op, x, y, z):
+    def _lhs(self, op, x, y, z):
         return self.__MUL__(op, self.__ADD__(op, y, z), x)
 
-    def check(self, op, x, y, z):
-        return is_constant(x) and (is_constant(y) or is_constant(z))
-
-    def rewrite(self, op, x, y, z):
+    def _rhs(self, op, x, y, z):
         return self.__ADD__(op, self.__MUL__(op, y, x), self.__MUL__(op, z, x))
+
+    def pattern(self):
+        return [self._lhs, self._rhs]
+
+    def check(self):
+        return [
+            lambda _, x, y, z: \
+                is_constant(x) and (is_constant(y) or is_constant(z)),
+            lambda _, x, y, z: \
+                is_constant(x) and not (is_constant(y) or is_constant(z))
+        ]
+
+    def rewrite(self):
+        return [self._rhs, self._lhs]
 
 
 # For commutative mul-like operation there is no distinction between left- and
@@ -64,77 +116,77 @@ class _Distributive(_DistributiveLhs):
 
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveAddPastMul(_Distributive):
+# class DistributiveMulAdd(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.Mul(x, y)
 #     __ADD__ = lambda _, op, x, y: op.Add(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveOrPastAnd(_Distributive):
+# class DistributiveAndOr(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.And(x, y)
 #     __ADD__ = lambda _, op, x, y: op.Or(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveAndPastOr(_Distributive):
+# class DistributiveOrAnd(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.Or(x, y)
 #     __ADD__ = lambda _, op, x, y: op.And(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveXorPastAnd(_Distributive):
+# class DistributiveAndXor(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.And(x, y)
 #     __ADD__ = lambda _, op, x, y: op.Xor(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveBitwiseOrPastBitwiseAnd(_Distributive):
+# class DistributiveBitwiseAndBitwiseOr(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
 #     __ADD__ = lambda _, op, x, y: op.BitwiseOr(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveBitwiseAndPastBitwiseOr(_Distributive):
+# class DistributiveBitwiseOrBitwiseAnd(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.BitwiseOr(x, y)
 #     __ADD__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveBitwiseXorPastBitwiseAnd(_Distributive):
+# class DistributiveBitwiseAndBitwiseXor(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
 #     __ADD__ = lambda _, op, x, y: op.BitwiseXor(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveMinPastMax(_Distributive):
+# class DistributiveMaxMin(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.Max(x, y)
 #     __ADD__ = lambda _, op, x, y: op.Min(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveMaxPastMin(_Distributive):
+# class DistributiveMinMax(_Distributive):
 #     __MUL__ = lambda _, op, x, y: op.Min(x, y)
 #     __ADD__ = lambda _, op, x, y: op.Max(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveAddPastMatMulLhs(_DistributiveLhs):
+# class DistributiveMatMulAddLhs(_DistributiveLhs):
 #     __MUL__ = lambda _, op, x, y: op.MatMul(x, y)
 #     __ADD__ = lambda _, op, x, y: op.Add(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
-# class MoveAddPastMatMulRhs(_DistributiveRhs):
+# class DistributiveMatMulAddRhs(_DistributiveRhs):
 #     __MUL__ = lambda _, op, x, y: op.MatMul(x, y)
 #     __ADD__ = lambda _, op, x, y: op.Add(x, y)
 
@@ -370,22 +422,22 @@ class _Absorption(Transformation, RewriteRuleSetPass):
 # @passes.verify.tolerance
 # @passes.register("algebraic")
 # class EliminateAbsorptionBoolean(_Absorption, _Commutative):
-#     __OP1__ = lambda op, x, y: op.And(x, y)
-#     __OP2__ = lambda op, x, y: op.Or(x, y)
+#     __OP1__ = lambda _, op, x, y: op.And(x, y)
+#     __OP2__ = lambda _, op, x, y: op.Or(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
 # class EliminateAbsorptionBitwise(_Absorption, _Commutative):
-#     __OP1__ = lambda op, x, y: op.BitwiseAnd(x, y)
-#     __OP2__ = lambda op, x, y: op.BitwiseOr(x, y)
+#     __OP1__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
+#     __OP2__ = lambda _, op, x, y: op.BitwiseOr(x, y)
 #
 #
 # @passes.verify.tolerance
 # @passes.register("algebraic")
 # class EliminateAbsorptionMinMax(_Absorption, _Commutative):
-#     __OP1__ = lambda op, x, y: op.Min(x, y)
-#     __OP2__ = lambda op, x, y: op.Max(x, y)
+#     __OP1__ = lambda _, op, x, y: op.Min(x, y)
+#     __OP2__ = lambda _, op, x, y: op.Max(x, y)
 
 
 # Annihilator template: f(x, a) = a for some constant a
