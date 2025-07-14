@@ -4,6 +4,13 @@ import onnx_ir as ir
 # Matching against one value pattern from a selection of alternative patterns
 from onnxscript.rewriter.pattern import OrValue
 
+# Algebraic properties as transformation templates
+from onnx_passes.passes.streamline.algebraic._properties import (
+    _Associative,
+    _DistributiveLhs,
+    _DistributiveRhs,
+)
+
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
 import onnx_passes.passes as passes
@@ -32,64 +39,24 @@ from onnx_passes.passes.util import identical_constants, is_constant, is_scalar
 # transformations must be tagged @passes.verify.tolerance instead of equality.
 # ==============================================================================
 
-# Associative property: (x @ a) @ b = x @ (a @ b), grouping constants a and b to
-# enable constant propagation and fusion
 @passes.verify.tolerance
 @passes.register("algebraic")
-class GroupConstantMatMul(Transformation, RewriteRulePass):
-    def pattern(self, op, x, a, b):
-        return op.MatMul(op.MatMul(x, a), b)
-
-    def check(self, op, x, a, b):
-        return is_constant(a) and is_constant(b)
-
-    def rewrite(self, op, x, a, b):
-        return op.MatMul(x, op.MatMul(a, b))
+class GroupMatMul(_Associative):
+    __OP__ = lambda _, op, x, y: op.MatMul(x, y)
 
 
-# Associative property: (x @ a) @ y = (x @ y) @ a, grouping non-constants x and
-# y to enable constant propagation and fusion for constant a
 @passes.verify.tolerance
 @passes.register("algebraic")
-class GroupNonConstantMatMul(Transformation, RewriteRulePass):
-    def pattern(self, op, x, y, a):
-        return op.MatMul(op.MatMul(x, a), y)
-
-    def check(self, op, x, y, a):
-        return is_constant(a) and not is_constant(x) and not is_constant(y)
-
-    def rewrite(self, op, x, y, a):
-        return op.MatMul(op.MatMul(x, y), a)
+class DistributiveMatMulAddLhs(_DistributiveLhs):
+    __MUL__ = lambda _, op, x, y: op.MatMul(x, y)
+    __ADD__ = lambda _, op, x, y: op.Add(x, y)
 
 
-# Distributive property: xa + yb = x(a + b) if x = y, reduces multiplications
-# and, if a and b are constants, allows for further constant propagation/fusion.
 @passes.verify.tolerance
 @passes.register("algebraic")
-class MoveMatMulPastAddLhs(Transformation, RewriteRulePass):
-    def pattern(self, op, x, y, a, b):
-        return op.Add(op.MatMul(x, a), op.MatMul(y, b))
-
-    def check(self, op, x, y, a, b):
-        return x == y or identical_constants(x, y)
-
-    def rewrite(self, op, x, y, a, b):
-        return op.MatMul(x, op.Add(a, b))
-
-
-# Distributive property: ax + by = (a + b)x if x = y, reduces multiplications
-# and, if a and b are constants, allows for further constant propagation/fusion.
-@passes.verify.tolerance
-@passes.register("algebraic")
-class MoveMatMulPastAddRhs(Transformation, RewriteRulePass):
-    def pattern(self, op, x, y, a, b):
-        return op.Add(op.MatMul(a, x), op.MatMul(b, y))
-
-    def check(self, op, x, y, a, b):
-        return x == y or identical_constants(x, y)
-
-    def rewrite(self, op, x, y, a, b):
-        return op.MatMul(op.Add(a, b), x)
+class DistributiveMatMulAddRhs(_DistributiveRhs):
+    __MUL__ = lambda _, op, x, y: op.MatMul(x, y)
+    __ADD__ = lambda _, op, x, y: op.Add(x, y)
 
 
 # Commutativity of scalar multiplication for numeric tensors combined with
@@ -191,7 +158,6 @@ class MoveTransposePastMatMul(Transformation, RewriteRulePass):
         return op.Transpose(
             op.MatMul(y, x), perm=perms[len(y.shape) >= len(x.shape)]
         )
-
 
 # TODO: Consider adding a MoveMatMulPastTranspose matching on constant inputs to
 #  the MatMul which could be constant-folded with the Transpose
