@@ -63,6 +63,8 @@ def evaluate_model(model: ir.Model, inputs: list,
     sess_options.graph_optimization_level = (
         onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
     )
+    # Only show error and fatal messages
+    sess_options.log_severity_level = 3
 
     # Path to custom operators provided by ONNX Runtime Extensions
     extensions_library_path = onnxruntime_extensions.get_library_path()
