@@ -31,7 +31,7 @@ class EliminateIdentityMul(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all bitwise-and without effect from the graph, i.e., x & 11...1 = x
@@ -52,7 +52,7 @@ class EliminateIdentityBitwiseAnd(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all logical-and without effect from the graph, i.e., x and True = x
@@ -73,7 +73,7 @@ class EliminateIdentityAnd(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all additions without effect from the graph, i.e., x + 0 = x
@@ -94,7 +94,7 @@ class EliminateIdentityAdd(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all bitwise-or without effect from the graph, i.e., x | 0 = x
@@ -115,7 +115,7 @@ class EliminateIdentityBitwiseOr(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all logical-or without effect from the graph, i.e., x or False = x
@@ -136,7 +136,7 @@ class EliminateIdentityOr(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all bitwise-xor without effect from the graph, i.e., x ^ 0 = x
@@ -157,7 +157,7 @@ class EliminateIdentityBitwiseXor(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all logical-xor without effect from the graph, i.e., x != False = x
@@ -178,7 +178,7 @@ class EliminateIdentityXor(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Removes all bit-shifts without effect from the graph, i.e., x << 0 (>> 0) = x
@@ -199,7 +199,7 @@ class EliminateIdentityBitShift(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, x, a):
-        return x
+        return op.Identity(x)
 
 
 # Checks for matrix eye being a valid identity matrix to be multiplied with
@@ -236,7 +236,7 @@ class EliminateIdentityMatMulLhs(Transformation, RewriteRulePass):
         return check_identity_matmul(x, eye)
 
     def rewrite(self, op, x, eye):
-        return x
+        return op.Identity(x)
 
 
 # Eliminates constant matrix multiplications without effect, i.e.,
@@ -252,7 +252,7 @@ class EliminateIdentityMatMulRhs(Transformation, RewriteRulePass):
         return check_identity_matmul(x, eye)
 
     def rewrite(self, op, x, eye):
-        return x
+        return op.Identity(x)
 
 
 # Eliminates Where operators if the condition is a constant and always chooses
@@ -270,7 +270,7 @@ class EliminateWhereLhs(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, condition, lhs, rhs):
-        return lhs
+        return op.Identity(lhs)
 
 
 # Eliminates Where operators if the condition is a constant and always chooses
@@ -288,7 +288,7 @@ class EliminateWhereRhs(Transformation, RewriteRulePass):
         return False
 
     def rewrite(self, op, condition, lhs, rhs):
-        return rhs
+        return op.Identity(rhs)
 
 
 # Eliminates type-casts where the target type is known and the same as the type
@@ -304,7 +304,7 @@ class EliminateIdentityCast(Transformation, RewriteRulePass):
         return x.dtype == to.as_int()
 
     def rewrite(self, op, x, to):
-        return x
+        return op.Identity(x)
 
 
 # Eliminates type-casts where the target type is known and the same as the type
@@ -321,4 +321,4 @@ class EliminateIdentityCastLike(Transformation, RewriteRulePass):
         return x.dtype == y.dtype
 
     def rewrite(self, op, x, y):
-        return x
+        return op.Identity(x)
