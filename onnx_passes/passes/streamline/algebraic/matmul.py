@@ -81,7 +81,7 @@ class MoveMulPastMatMulLhs(Transformation, RewriteRulePass):
 
 
 # Commutativity of scalar multiplication for numeric tensors combined with
-# associativity of matrix multiplication: x @ (by) = b(x @ y)
+# associativity of matrix multiplication: x @ (ay) = a(x @ y)
 @passes.verify.tolerance
 @passes.register("algebraic")
 class MoveMulPastMatMulRhs(Transformation, RewriteRulePass):

@@ -24,78 +24,78 @@ import onnx_passes.passes as passes
 # properties relating boolean and, or, xor and negation
 # ==============================================================================
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupOr(_Associative, _Commutative):
     __OP__ = lambda _, op, x, y: op.Or(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupAnd(_Associative, _Commutative):
     __OP__ = lambda _, op, x, y: op.And(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupXor(_Associative, _Commutative):
     __OP__ = lambda _, op, x, y: op.Xor(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DistributiveAndOr(_Distributive):
     __MUL__ = lambda _, op, x, y: op.And(x, y)
     __ADD__ = lambda _, op, x, y: op.Or(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DistributiveOrAnd(_Distributive):
     __MUL__ = lambda _, op, x, y: op.Or(x, y)
     __ADD__ = lambda _, op, x, y: op.And(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DistributiveAndXor(_Distributive):
     __MUL__ = lambda _, op, x, y: op.And(x, y)
     __ADD__ = lambda _, op, x, y: op.Xor(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateNot(_Involution):
     __OP__ = lambda _, op, x: op.Not(x)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAnd(_Idempotence):
     __OP__ = lambda _, op, x, y: op.And(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateOr(_Idempotence):
     __OP__ = lambda _, op, x, y: op.Or(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAbsorption(_Absorption, _Commutative):
     __OP1__ = lambda _, op, x, y: op.And(x, y)
     __OP2__ = lambda _, op, x, y: op.Or(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAnnihilatorAnd(_Annihilator, _Commutative):
     __OP__ = lambda _, op, x, y: op.And(x, y)
     __ANNIHILATOR__ = 0
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAnnihilatorOr(_Annihilator, _Commutative):
     __OP__ = lambda _, op, x, y: op.Or(x, y)
@@ -110,7 +110,7 @@ class EliminateAnnihilatorOr(_Annihilator, _Commutative):
 # TODO: Extract a _Complementation template from the transformations below which
 #  could also be shared by numeric and bitwise transformations
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateComplementationAnd(Transformation, RewriteRulePass):
     @property
@@ -124,7 +124,7 @@ class EliminateComplementationAnd(Transformation, RewriteRulePass):
         return op.Expand(op.CastLike(op.Constant(value_int=0), x), op.Shape(x))
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateComplementationOr(Transformation, RewriteRulePass):
     @property

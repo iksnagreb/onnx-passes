@@ -24,78 +24,78 @@ import onnx_passes.passes as passes
 # properties relating bitwise and, or, xor and negation
 # ==============================================================================
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupBitwiseOr(_Associative, _Commutative):
     __OP__ = lambda _, op, x, y: op.BitwiseOr(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupBitwiseAnd(_Associative, _Commutative):
     __OP__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class GroupBitwiseXor(_Associative, _Commutative):
     __OP__ = lambda _, op, x, y: op.BitwiseXor(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DistributiveBitwiseAndBitwiseOr(_Distributive):
     __MUL__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
     __ADD__ = lambda _, op, x, y: op.BitwiseOr(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DistributiveBitwiseOrBitwiseAnd(_Distributive):
     __MUL__ = lambda _, op, x, y: op.BitwiseOr(x, y)
     __ADD__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class DistributiveBitwiseAndBitwiseXor(_Distributive):
     __MUL__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
     __ADD__ = lambda _, op, x, y: op.BitwiseXor(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateBitwiseNot(_Involution):
     __OP__ = lambda _, op, x: op.BitwiseNot(x)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateBitwiseAnd(_Idempotence):
     __OP__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateBitwiseOr(_Idempotence):
     __OP__ = lambda _, op, x, y: op.BitwiseOr(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAbsorptionBitwise(_Absorption, _Commutative):
     __OP1__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
     __OP2__ = lambda _, op, x, y: op.BitwiseOr(x, y)
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAnnihilatorBitwiseAnd(_Annihilator, _Commutative):
     __OP__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
     __ANNIHILATOR__ = 0
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateAnnihilatorBitwiseOr(_Annihilator, _Commutative):
     __OP__ = lambda _, op, x, y: op.BitwiseOr(x, y)
@@ -110,7 +110,7 @@ class EliminateAnnihilatorBitwiseOr(_Annihilator, _Commutative):
 # TODO: Extract a _Complementation template from the transformations below which
 #  could also be shared by numeric and boolean transformations
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateComplementationBitwiseAnd(Transformation, RewriteRulePass):
     @property
@@ -124,7 +124,7 @@ class EliminateComplementationBitwiseAnd(Transformation, RewriteRulePass):
         return op.Expand(op.CastLike(op.Constant(value_int=0), x), op.Shape(x))
 
 
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("algebraic")
 class EliminateComplementationBitwiseOr(Transformation, RewriteRulePass):
     @property
