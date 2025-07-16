@@ -12,6 +12,10 @@ from onnx_passes.passes.base import Transformation, RewriteRulePass
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 
+# NumPy used during match condition checks to operate on shapes and constant
+# tensors or attributes
+import numpy as np
+
 
 # Inlines QONNX Quant custom operator nodes from the CUSTOM_DOMAIN into the
 # graph as a pattern of standard ONNX operators
@@ -27,6 +31,13 @@ class InlineQONNXQuant(Transformation, RewriteRulePass):
             x, scale, zeropoint, bitwidth, signed=signed, narrow=narrow,
             rounding_mode=mode, _domain=CUSTOM_DOMAIN
         )
+
+    # Do not apply this to all constant inputs: constant folding version below
+    def check(self, op, x, scale, zeropoint, bitwidth, signed, narrow, mode):
+        for value in {x, scale, zeropoint, bitwidth}:
+            if ir.convenience.get_const_tensor(value) is None:
+                return True
+        return False
 
     def rewrite(self, op, x, scale, zeropoint, bitwidth, signed, narrow, mode):
         # Signedness and narrow range attributes are integers but are
@@ -90,6 +101,72 @@ class InlineQONNXQuant(Transformation, RewriteRulePass):
             # the rounding mode while ensuring the data type to stay the same
             rounding_fxs[rounding_mode](op.CastLike(op.Clip(q, _min, _max), q))
         )
+
+        # Scale and zero point: Integer to Float
+        return op.Mul(op.Sub(q, zeropoint), scale)
+
+
+# Inlines QONNX Quant custom operator nodes from the CUSTOM_DOMAIN into the
+# graph as a pattern of standard ONNX operators - constant folds the integer
+# part, i.e., up to the rounding function if applicable.
+@passes.verify.equality
+@passes.register("inline-qonnx")
+class FoldConstantQONNXQuant(Transformation, RewriteRulePass):
+    def pattern(self, op, x, scale, zeropoint, bitwidth, signed, narrow, mode):
+        return op.Quant(
+            x, scale, zeropoint, bitwidth, signed=signed, narrow=narrow,
+            rounding_mode=mode, _domain=CUSTOM_DOMAIN
+        )
+
+    def check(self, op, x, scale, zeropoint, bitwidth, signed, narrow, mode):
+        for value in {x, scale, zeropoint, bitwidth}:
+            if ir.convenience.get_const_tensor(value) is None:
+                return False
+        return True
+
+    def rewrite(self, op, x, scale, zeropoint, bitwidth, signed, narrow, mode):
+        # Signedness and narrow range attributes are integers but are required
+        # as floats for calculations below
+        signed = float(signed.as_int())
+        narrow = float(narrow.as_int())
+
+        # Get the actual string out of the attribute
+        rounding_mode = mode.as_string()
+
+        # Get the constant inputs as numpy arrays
+        x = ir.convenience.get_const_tensor(x).numpy()
+        scale = ir.convenience.get_const_tensor(scale).numpy()
+        zeropoint = ir.convenience.get_const_tensor(zeropoint).numpy()
+        bitwidth = ir.convenience.get_const_tensor(bitwidth).numpy()
+
+        # Resolve rounding modes from string identifiers
+        rounding_fxs = {
+            "ROUND": np.round, "CEIL": np.ceil, "FLOOR": np.floor,
+            "ROUND_TO_ZERO": lambda v: np.sign(v) * np.floor(np.abs(v))
+        }
+
+        # Scale and zero point: Float to Integer
+        q = (x / scale) + zeropoint  # noqa: Duplicate of onnx_passes.ops.qonnx
+
+        # Encode signed 1 bit quantization as bipolar values
+        if bitwidth == 1 and signed:
+            q = np.where(q >= 0, +1, -1)
+        # For all bitwidth larger than 1 clip and round the integer to the range
+        # of valid values
+        else:
+            # Minimum and maximum integer value for the bitwidth, signedness and
+            # narrow range combination
+            _min = signed * (- 2 ** (bitwidth - signed) + narrow)
+            _max = + 2 ** (bitwidth - signed) - 1 - narrow * (1 - signed)
+            # Clip the integer to the range and round according tot eh rounding
+            # mode while ensuring the data type to stay the same
+            q = rounding_fxs[rounding_mode](
+                np.clip(q, _min, _max, dtype=q.dtype))
+
+        # Convert numpy arrays back to ONNX constants
+        q = op.Constant(value=ir.tensor(q))
+        zeropoint = op.Constant(value=ir.tensor(zeropoint))
+        scale = op.Constant(value=ir.tensor(scale))
 
         # Scale and zero point: Integer to Float
         return op.Mul(op.Sub(q, zeropoint), scale)
