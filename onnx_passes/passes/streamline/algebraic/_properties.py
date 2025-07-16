@@ -40,29 +40,15 @@ import numpy as np
 
 
 # Left-distributivity template: x * (y + z) = x * y + x * z
-class _DistributiveLhs(Transformation, RewriteRuleSetPass):
+class _DistributiveLhs(Transformation, RewriteRulePass):
     __MUL__: callable
     __ADD__: callable
 
-    def _lhs(self, op, x, y, z):
+    def rewrite(self, op, x, y, z):
         return self.__MUL__(op, x, self.__ADD__(op, y, z))
 
-    def _rhs(self, op, x, y, z):
+    def pattern(self, op, x, y, z):
         return self.__ADD__(op, self.__MUL__(op, x, y), self.__MUL__(op, x, z))
-
-    def pattern(self):
-        return self._lhs, self._rhs
-
-    def check(self):
-        return [
-            lambda _, x, y, z: \
-                is_constant(x) and (is_constant(y) or is_constant(z)),
-            lambda _, x, y, z: \
-                is_constant(x) and not (is_constant(y) or is_constant(z))
-        ]
-
-    def rewrite(self):
-        return self._rhs, self._lhs
 
 
 # # Right-distributivity template: (y + z) * x = y * x + z * x
@@ -81,29 +67,15 @@ class _DistributiveLhs(Transformation, RewriteRuleSetPass):
 
 
 # Right-distributivity template: (y + z) * x = y * x + z * x
-class _DistributiveRhs(Transformation, RewriteRuleSetPass):
+class _DistributiveRhs(Transformation, RewriteRulePass):
     __MUL__: callable
     __ADD__: callable
 
-    def _lhs(self, op, x, y, z):
+    def rewrite(self, op, x, y, z):
         return self.__MUL__(op, self.__ADD__(op, y, z), x)
 
-    def _rhs(self, op, x, y, z):
+    def pattern(self, op, x, y, z):
         return self.__ADD__(op, self.__MUL__(op, y, x), self.__MUL__(op, z, x))
-
-    def pattern(self):
-        return self._lhs, self._rhs
-
-    def check(self):
-        return [
-            lambda _, x, y, z: \
-                is_constant(x) and (is_constant(y) or is_constant(z)),
-            lambda _, x, y, z: \
-                is_constant(x) and not (is_constant(y) or is_constant(z))
-        ]
-
-    def rewrite(self):
-        return self._rhs, self._lhs
 
 
 # For commutative mul-like operation there is no distinction between left- and
