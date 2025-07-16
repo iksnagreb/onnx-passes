@@ -16,6 +16,9 @@ from onnx_passes.passes.streamline.algebraic._properties import (
 # rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
+# Checking ir.Value for being constants
+from onnx_passes.passes.util import is_constant
+
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
 import onnx_passes.passes as passes
@@ -53,7 +56,6 @@ class GroupMin(_Associative, _Commutative):
     __OP__ = lambda _, op, x, y: op.Min(x, y)
 
 
-# TODO: Bring back special cases of implicitly 1 constant multiplications...
 @passes.verify.tolerance
 @passes.register("algebraic")
 class DistributiveMulAdd(_Distributive):
@@ -140,6 +142,60 @@ class SwapAntiCommutativeSub(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y):
         return op.Sub(y, x)
+
+
+# Matching against one value pattern from a selection of alternative patterns
+from onnxscript.rewriter.pattern import OrValue
+
+
+# Extra property: ax + b = a(x + b/a) for constant a and b, combination of
+# distributive, commutative and multiplicative inverse property to swap the
+# order of constant-Mul followed by constant-Add
+@passes.verify.tolerance
+@passes.register("algebraic")
+class MoveMulPastAdd(Transformation, RewriteRulePass):
+    @property
+    def commute(self):
+        return True
+
+    def pattern(self, op, a, x, b):
+        return op.Add(op.Mul(a, x), b)
+
+    def check(self, op, a, x, b):
+        if b.dtype is not None and b.dtype.is_floating_point():
+            return is_constant(a) and is_constant(b) and not is_constant(x)
+        return False
+
+    def rewrite(self, op, a, x, b):
+        return op.Mul(a, op.Add(x, op.Div(b, a)))
+
+
+# Extra property: ax + bx = (a + b)x for constant a and b, combination of
+# distributivity and commutativity and implicitly constant 1 turning repeated
+# addition into multiplication
+@passes.verify.tolerance
+@passes.register("algebraic")
+class ConvertAddToMul(Transformation, RewriteRulePass):
+    @property
+    def commute(self):
+        return True
+
+    def pattern(self, op, a, x, b):
+        return op.Add(
+            OrValue([op.Mul(a, x), x], tag_var="lhs"),
+            OrValue([op.Mul(b, x), x], tag_var="rhs")
+        )
+
+    def check(self, op, a, x, b, **_):
+        return (a is None or is_constant(a)) and (b is None or is_constant(b))
+
+    def rewrite(self, op, a, x, b, **_):
+        return op.Mul(
+            x, op.Add(
+                [a, op.CastLike(op.Constant(value_int=1), x)][a is None],
+                [b, op.CastLike(op.Constant(value_int=1), x)][b is None]
+            )
+        )
 
 
 @passes.verify.tolerance
