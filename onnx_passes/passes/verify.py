@@ -41,11 +41,13 @@ def equality(cls: type[Pass]):
         if not self.config.setdefault("verify", {}):
             return
 
+        # Load ONNX Runtime configuration
+        onnxruntime = self.config.setdefault("onnxruntime", {})
+
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs,
-                                           **self.config["onnxruntime"])
+        produced, context = evaluate_model(model, inputs, **onnxruntime)
         # Set the produced output as the expectation checked against as the
         # post-condition
         self.expected = produced
@@ -58,11 +60,13 @@ def equality(cls: type[Pass]):
         if not self.config.setdefault("verify", {}):
             return
 
+        # Load ONNX Runtime configuration
+        onnxruntime = self.config.setdefault("onnxruntime", {})
+
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs,
-                                           **self.config["onnxruntime"])
+        produced, context = evaluate_model(model, inputs, **onnxruntime)
 
         # Prepare logging verification results to the state dictionary
         self.state_dict.setdefault("verify", {})
@@ -111,11 +115,13 @@ def tolerance(cls: type[Pass]):
         if not self.config.setdefault("verify", {}):
             return
 
+        # Load ONNX Runtime configuration
+        onnxruntime = self.config.setdefault("onnxruntime", {})
+
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs,
-                                           **self.config["onnxruntime"])
+        produced, context = evaluate_model(model, inputs, **onnxruntime)
         # Set the produced output as the expectation checked against as the
         # post-condition
         self.expected = produced
@@ -128,11 +134,13 @@ def tolerance(cls: type[Pass]):
         if not self.config.setdefault("verify", {}):
             return
 
+        # Load ONNX Runtime configuration
+        onnxruntime = self.config.setdefault("onnxruntime", {})
+
         # Load reference input data for verification
         inputs, _ = load_reference_data(self)
         # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs,
-                                           **self.config["onnxruntime"])
+        produced, context = evaluate_model(model, inputs, **onnxruntime)
 
         # Prepare logging of the error to the state dictionary to track model
         # degradation
@@ -193,7 +201,7 @@ def metric(cls: type[Pass]):
 
         # Metric-based verification requires as section configuring how to
         # calculate metrics and the range of acceptable results: Assume empty...
-        self.config["verify"].setdefault("metrics", [])
+        self.config["verify"].setdefault("metrics", {})
 
     # Post-condition comparing model outputs to a reference via a task-specific
     # metric - fails raising VerificationError if the output does not match
@@ -211,9 +219,11 @@ def metric(cls: type[Pass]):
         if not expected:
             return
 
+        # Load ONNX Runtime configuration
+        onnxruntime = self.config.setdefault("onnxruntime", {})
+
         # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs,
-                                           **self.config["onnxruntime"])
+        produced, context = evaluate_model(model, inputs, **onnxruntime)
 
         # Metric-based verification requires as section configuring how to
         # calculate metrics and the range of acceptable results
