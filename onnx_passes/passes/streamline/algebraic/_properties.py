@@ -122,7 +122,7 @@ class _Involution(Transformation, RewriteRulePass):
         return self.__OP__(op, self.__OP__(op, x))
 
     def rewrite(self, op, x):
-        return x
+        return op.Identity(x)
 
 
 # Idempotence template (repeated application has no effect) - there are two
@@ -144,7 +144,7 @@ class _Idempotence(Transformation, RewriteRulePass):
     def rewrite(self, op, x):
         if self.arity == 1:
             return self.__OP__(op, x)
-        return x
+        return op.Identity(x)
 
 
 # # Idempotence binary operator template: f(x, x) = x
@@ -171,8 +171,8 @@ class _Absorption(Transformation, RewriteRuleSetPass):
 
     def rewrite(self):
         return [
-            lambda op, x, y: x,
-            lambda op, x, y: x,
+            lambda op, x, y: op.Identity(x),
+            lambda op, x, y: op.Identity(x),
         ]
 
 

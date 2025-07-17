@@ -67,7 +67,7 @@ class EliminateIdentityTranspose(Transformation, RewriteRulePass):
         return np.all(perm.as_ints() == list(range(len(perm.as_ints()))))
 
     def rewrite(self, op, x, perm):
-        return x
+        return op.Identity(x)
 
 
 # ==============================================================================
