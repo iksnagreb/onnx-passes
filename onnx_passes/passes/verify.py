@@ -38,7 +38,7 @@ def equality(cls: type[Pass]):
     def requires(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {True: True}):
+        if not self.config.setdefault("verify", {}):
             return
 
         # Load reference input data for verification
@@ -55,7 +55,7 @@ def equality(cls: type[Pass]):
     def ensures(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {True: True}):
+        if not self.config.setdefault("verify", {}):
             return
 
         # Load reference input data for verification
@@ -108,7 +108,7 @@ def tolerance(cls: type[Pass]):
     def requires(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {True: True}):
+        if not self.config.setdefault("verify", {}):
             return
 
         # Load reference input data for verification
@@ -125,7 +125,7 @@ def tolerance(cls: type[Pass]):
     def ensures(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {True: True}):
+        if not self.config.setdefault("verify", {}):
             return
 
         # Load reference input data for verification
@@ -188,7 +188,7 @@ def metric(cls: type[Pass]):
     def requires(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {True: True}):
+        if not self.config.setdefault("verify", {}):
             return
 
         # Metric-based verification requires as section configuring how to
@@ -200,7 +200,7 @@ def metric(cls: type[Pass]):
     def ensures(self: Pass, model: ir.Model) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {True: True}):
+        if not self.config.setdefault("verify", {}):
             return
 
         # Load reference input and output data for verification
