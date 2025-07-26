@@ -30,6 +30,36 @@ def max_abs_error(produced: list, expected: list) -> float:
     return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
 
 
+# Calculates the classification accuracy by interpreting the list of produced
+# outputs as a single tensor of class probabilities and the expected as a single
+# tensor of matching expected classes
+def accuracy(produced: list, expected: list) -> float:
+    # Unwrap the single probability and expected classes tensors
+    probabilities, classes = produced[0], expected[0]
+    # Get predicted classes by taking the top-1 probability prediction
+    predictions = probabilities.argmax(axis=-1)
+    # Total number of predictions: Expected number of class predictions
+    total = classes.size
+    # Classification accuracy is the fraction of correct classifications
+    return float(sum(predictions == classes) / total)  # noqa: sum(bool...)
+
+
+# Calculates the top-5 classification accuracy by interpreting the list of
+# produced outputs as a single tensor of class probabilities and the expected as
+# a single tensor of matching expected classes
+def top_5_accuracy(produced: list, expected: list) -> float:
+    # Unwrap the single probability and expected classes tensors
+    probabilities, classes = produced[0], expected[0]
+    # Get predicted classes by taking the top-1 probability prediction
+    predictions = probabilities.argsort(axis=-1)[:, -5:]
+    # Add broadcastable dimensions matching the top-5 to the classes
+    classes = classes[:, None]
+    # Total number of predictions: Expected number of class predictions
+    total = classes.size
+    # Classification accuracy is the fraction of correct classifications
+    return float(sum((predictions == classes).any(axis=-1)) / total)  # noqa
+
+
 # Injects equality-based verification into an ONNX IR pass by checking if the
 # model output on some reference is equal to the known expected output
 def equality(cls: type[Pass]):
