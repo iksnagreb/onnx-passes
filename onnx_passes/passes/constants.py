@@ -18,6 +18,13 @@ from onnx_passes.passes.base import Transformation, RewriteRulePass
 # NumPy used to operate on shapes and constant tensors
 import numpy as np
 
+# Operators which should always be constant folded
+ALWAYS_FOLD_OPS = {
+    "always_fold_ops": {
+        "Transpose", "Constant", "ConstantOfShape"
+    }
+}
+
 
 # Performs constant folding on the entire model graph
 @passes.verify.equality
@@ -30,7 +37,7 @@ class FoldConstants(Transformation):
         # operate in-place
         model = ir.from_proto(ir.to_proto(model))
         # Run in-place constant folding on deep copy - yields PassResult
-        modified = fold_constants(model).modified
+        modified = fold_constants(model, **ALWAYS_FOLD_OPS).modified
         # Constant folding might leave unused initializer nodes in the graph
         # which can be removed in-place
         result = RemoveUnusedNodesPass()(model)
