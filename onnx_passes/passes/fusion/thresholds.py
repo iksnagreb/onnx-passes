@@ -1,3 +1,6 @@
+# ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
+import onnx_ir as ir
+
 # Matching against one value pattern from a selection of alternative patterns
 from onnxscript.rewriter.pattern import OrValue
 
@@ -23,12 +26,14 @@ class FuseThresholds(Transformation, RewriteRulePass):
     def commute(self):
         return True
 
-    def pattern(self, op, x, thresholds, weights, shape, axes):
+    def pattern(self, op, x, thresholds, weights, shape, axes, allowzero):
         # Comparison of inputs and all corresponding thresholds: Expand input
         # dimensions to match the threshold parameter shape via broadcasting
-        steps = op.LessOrEqual(thresholds, op.Reshape(x, shape, allowzero=0))
+        steps = op.GreaterOrEqual(
+            op.Reshape(x, shape, allowzero=allowzero), thresholds
+        )
 
-        # Type-casing turns boolean unit steps to reducible floats followed by
+        # Type-casting turns boolean unit steps to reducible floats followed by
         # weighting for non-unit steps or non-monotonicity
         steps = OrValue([steps, op.Cast(steps)], tag_var="cast")
         steps = OrValue([steps, op.Mul(steps, weights)], tag_var="weighted")
@@ -37,10 +42,10 @@ class FuseThresholds(Transformation, RewriteRulePass):
         # previously expanded dimension
         return op.ReduceSum(steps, axes, keepdims=0)
 
-    def check(self, op, x, shape, axes, **kwargs):
+    def check(self, op, x, shape, axes, allowzero, **kwargs):
         # The expansion shape must be constant and match the input except for
         # the expanded dimension, which must be 1
-        if not constant_match(shape, [*x.shape, 1]):
+        if not allowzero and not constant_match(shape, [*x.shape, 1]):
             return False
 
         # The sum-reduction must operate on this expanded final axis and
@@ -57,7 +62,10 @@ class FuseThresholds(Transformation, RewriteRulePass):
     def rewrite(self, op, x, thresholds, weights, weighted, **kwargs):
         # Positive unit step thresholds: No weights or all weights detected to
         # be constant one
-        # if not weighted or constant_match(weights, 1):
-        #     return op.MultiThreshold(x, thresholds, _domain=custom)
+        if not weighted or constant_match(weights, 1):
+            # Generate a set of unit step weight matching the thresholds
+            weights = op.ConstantOfShape(
+                op.Shape(thresholds), value=ir.tensor([1.0])
+            )
         # Weighted, potentially non-monotonic multi-threshold function
         return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)

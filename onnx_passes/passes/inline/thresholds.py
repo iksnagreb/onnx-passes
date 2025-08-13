@@ -25,7 +25,7 @@ class InlineThresholds(Transformation, RewriteRulePass):
         # Comparison of inputs and all corresponding thresholds: Expand input
         # dimensions to match the threshold parameter shape via broadcasting
         shape = op.Constant(value=ir.tensor([*x.shape, 1], name="shape"))
-        steps = op.LessOrEqual(thresholds, op.Reshape(x, shape, allowzero=0))
+        steps = op.GreaterOrEqual(op.Reshape(x, shape, allowzero=0), thresholds)
 
         # Type-casing turns boolean unit steps to reducible floats followed by
         # weighting for non-unit steps or non-monotonicity
@@ -50,7 +50,7 @@ class InlineUnitThresholds(Transformation, RewriteRulePass):
         # Comparison of inputs and all corresponding thresholds: Expand input
         # dimensions to match the threshold parameter shape via broadcasting
         shape = op.Constant(value=ir.tensor([*x.shape, 1], name="shape"))
-        steps = op.LessOrEqual(thresholds, op.Reshape(x, shape, allowzero=0))
+        steps = op.GreaterOrEqual(op.Reshape(x, shape, allowzero=0), thresholds)
 
         # Type-casing turns boolean unit steps to reducible floats
         steps = op.Cast(steps, to=ir.DataType.FLOAT)
