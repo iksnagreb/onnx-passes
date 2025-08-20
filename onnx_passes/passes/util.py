@@ -8,6 +8,16 @@ import numpy as np
 from onnx_passes.passes.base import Pass
 
 
+# Collects attributes of a Node into a dictionary inserting defaults if the
+# attribute is not present
+def collect_attrs(node: ir.Node, attrs: dict):
+    for key, (_type, default) in attrs.items():
+        if not (attr := node.attributes.get(key, None)):
+            attr = ir.Attr(key, _type, default)
+        attrs[key] = attr
+    return attrs
+
+
 # Checks whether the ir.DataType is considered a signed data type: These are all
 # signed integers as well as floating-point datatypes
 # TODO: Replace all uses by data_type.is_signed() once available via ONNX IR,
