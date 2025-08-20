@@ -28,7 +28,15 @@ def evaluate_model(model: ir.Model, inputs: list,
         kwargs["providers"] = [_sanitize(args) for args in kwargs["providers"]]
 
     # Load DLLs to make the CUDA execution provider available
-    onnxruntime.preload_dlls()
+    try:
+        onnxruntime.preload_dlls()  # noqa: Needs onnxruntime-gpu >= 1.21.0
+    except AttributeError:
+        # Try loading DLLs via PyTorch
+        try:
+            import torch  # noqa: Might not be installed...
+        except ModuleNotFoundError:
+            # Finally just accept running without GPU/CUDA support...
+            pass
 
     # Make a deep copy of the model to not mess up the graph by executing it...
     model = ir.from_proto(ir.to_proto(model))
