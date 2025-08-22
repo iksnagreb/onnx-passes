@@ -11,6 +11,7 @@ from onnx_passes.passes.base import Pass
 # Collects attributes of a Node into a dictionary inserting defaults if the
 # attribute is not present
 def collect_attrs(node: ir.Node, attrs: dict):
+    attrs = attrs.copy()
     for key, (_type, default) in attrs.items():
         if not (attr := node.attributes.get(key, None)):
             attr = ir.Attr(key, _type, default)
