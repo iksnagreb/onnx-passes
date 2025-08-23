@@ -1,4 +1,4 @@
-# Multi-Threshold function custom operator is implemented using NumPy
+# Quantizer custom operator is implemented using NumPy
 import numpy as np
 
 # Registers a python function as implementing a custom ONNX operator
