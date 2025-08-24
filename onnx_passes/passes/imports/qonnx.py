@@ -6,8 +6,6 @@ import onnx_passes.passes as passes
 # rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
-# Domain used by custom operators implemented with this library
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 # Domain used by QONNX operators which are to be transplanted into CUSTOM_DOMAIN
 from onnx_passes.ops.qonnx import DOMAIN as QONNX_DOMAIN, BREVITAS_DOMAIN
 
@@ -25,7 +23,7 @@ class ImportQONNXQuant(Transformation, RewriteRulePass):
     def rewrite(self, op, x, scale, zeropoint, bitwidth, signed, narrow, mode):
         return op.Quant(
             x, scale, zeropoint, bitwidth, signed=signed, narrow=narrow,
-            rounding_mode=mode, _domain=CUSTOM_DOMAIN
+            rounding_mode=mode, _domain="ai.onnx.contrib"
         )
 
 # Imports Brevitas Quant custom operator nodes from the Brevitas domain into the
@@ -42,7 +40,7 @@ class ImportBrevitasQuant(Transformation, RewriteRulePass):
     def rewrite(self, op, x, scale, zeropoint, bitwidth, signed, narrow, mode):
         return op.Quant(
             x, scale, zeropoint, bitwidth, signed=signed, narrow=narrow,
-            rounding_mode=mode, _domain=CUSTOM_DOMAIN
+            rounding_mode=mode, _domain="ai.onnx.contrib"
         )
 
 

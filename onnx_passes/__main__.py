@@ -20,6 +20,8 @@ import onnx_ir as ir
 
 # Collect custom ONNX IR passes from the library by name
 from onnx_passes.passes import collect
+# Inject custom operator definitions into the model for ONNX runtime execution
+from onnx_passes.ops import inject_custom_ops
 
 
 # Main function called from the entrypoint below. Applies a sequence of ONNX IR
@@ -85,7 +87,7 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
         try:
             # Load ONNX IR to modify/analyze from the model file - format should
             # be inferred and apply the sequence of passes
-            result = passes(ir.load(model))
+            result = passes(inject_custom_ops(ir.load(model)))
             # If the composed pass is marked exhaustive, apply the sequence of
             # passes as long as there are changes to the model
             while _config.setdefault("exhaustive", False) and result.modified:

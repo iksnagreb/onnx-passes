@@ -1,10 +1,17 @@
-# Multi-Threshold function custom operator is implemented using NumPy
-import numpy as np
+# Datatype annotations ir.DataType.FLOAT
+import onnx_ir as ir
 
-# Registers a python function as implementing a custom ONNX operator
-from onnx_passes.ops import register_op, FLOAT
+# Custom operator function registry
+from onnx_passes.ops import register, op
 
 
-@register_op(op_type="MultiThreshold")
-def multithreshold(x: FLOAT, thresholds: FLOAT, weights: FLOAT) -> FLOAT:
-    return np.sum(weights * (x.reshape(*x.shape, 1) >= thresholds), axis=-1)
+@register
+def MultiThreshold(x, thresholds, weights):  # noqa: Operator name is uppercase
+    # Comparison of inputs and all corresponding thresholds: Expand input
+    # dimensions to match the threshold parameter shape via broadcasting
+    steps = op.GreaterOrEqual(op.Unsqueeze(x, axes=[-1]), thresholds)
+    # Type-casing turns boolean unit steps to reducible floats
+    steps = op.Cast(steps, to=ir.DataType.FLOAT)
+    # Finally the multi-threshold output reduces over all steps removing the
+    # previously expanded dimension
+    return op.ReduceSum(weights * steps, [-1], keepdims=0)

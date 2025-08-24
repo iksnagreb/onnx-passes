@@ -11,6 +11,9 @@ from onnx_passes.passes.base import Transformation, RewriteRuleSetPass
 # Collecting node attributes with optional defaults
 from onnx_passes.passes.util import collect_attrs
 
+# Domain used by custom operators implemented with this library
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+
 # Numpy for index and shape calculations
 import numpy as np
 
@@ -257,14 +260,13 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
                 #     )
                 # )
 
-                # In pure ONNX lower the convolution input generator Im2Col as
-                # gathering from the flattened input at precomputed indices
-                im2col = op.Gather(
-                    op.Flatten(x), op.Constant(value=ir.tensor(j)), axis=1
-                )
-
-                # TODO: Alternative pattern inserting the custom Im2Col operator
-                # im2col = op.Im2Col(x, **attributes, _domain=CUSTOM_DOMAIN)
+                # Insert precomputed indices as a constant into the graph
+                j = op.Constant(value=ir.tensor(j))
+                # Im2Col receives both attributes and precomputed indices: Pure
+                # ONNX uses the precomputed indices to gather the sliding window
+                # while downstream transformations could operate on the
+                # attributes
+                im2col = op.Im2Col(x, j, **attributes, _domain=CUSTOM_DOMAIN)
 
                 # Replace each convolution by input generator followed by MatMul
                 ys.append(op.MatMul(im2col, weight))

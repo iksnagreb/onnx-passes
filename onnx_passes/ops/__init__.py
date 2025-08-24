@@ -1,60 +1,56 @@
-# Inspecting python objects: Used to get function signature for extracting type
-# annotations
-import inspect
+# Type annotation for callables
+from typing import Callable
 
-# Implementing and registering custom operators with the ai.onnx.contrib domain
-from onnxruntime_extensions import onnx_op, PyOp, default_opset_domain
+# ir.Model, ir.Value, ir.Attr, ir.tensor
+import onnx_ir as ir
 
-# Create some readable aliases to the PyOp type definitions resembling the ONNX
-# Script annotations
-# TODO: Extend this list or find some other mechanism...
-FLOAT = PyOp.dt_float
-INT32 = PyOp.dt_int32
-INT64 = PyOp.dt_int64
-STRING = PyOp.dt_string
-BOOL = PyOp.dt_bool
+# Declaring a custom ONNX opset with name and version
+from onnxscript.values import Opset
+# Use onnxscript scripts for authoring custom operators as model local functions
+from onnxscript import script, opset18 as op
 
-# The domain of custom operators registered with onnxruntime_extensions PyOp
-DOMAIN = default_opset_domain()
+# Custom operator domain for all operator defined in this package
+domain, DOMAIN = Opset("onnx_passes.ops", 1), "onnx_passes.ops"
+
+# Registry of custom operators defined with the onnx-passes package
+_registry = {}
 
 
-# Registers a pyton function as implementation of a custom ONNX operator op_type
-def register_op(op_type: str | None = None, attrs: set | list | tuple = ()):
-    # Assume FLOAT types if no type annotation is present
-    def default_float(annotation: inspect.Parameter):
-        return annotation if annotation != inspect.Parameter.empty else FLOAT
+# Registers a custom operator defined via ONNX Script into the custom domain
+# and injects this into any model for ONNX Runtime execution
+def register(f: Callable):
+    # Wrap the function as an OnnxFunction
+    f = script(domain, default_opset=op)(f)
+    # Add this function to the registry
+    _registry[f.name] = f
+    # Return the decorated function for chaining decorators
+    return f
 
-    # Inner decorator actually registering the wrapped function
-    def inner(f: callable):
-        # Inspect the function signature for input and output type annotations
-        signature = inspect.signature(f)
-        # Collect all function parameters with optional annotations
-        inputs = signature.parameters
 
-        # First extract attribute annotations from the explicitly specified list
-        # of named attributes
-        attributes = {attr: inputs[attr].annotation for attr in attrs}
+# Injects all registered custom operators into the model as model local
+# functions
+def inject_custom_ops(model: ir.Model):
+    # Convert from ONNX IR representation to proto representation which offers
+    # access to the list of local functions
+    model = ir.to_proto(model)
+    # Add all registered function to the model
+    model.functions.extend([f.to_function_proto() for f in _registry.values()])
+    # Convert back to ONNX IR representation
+    return ir.from_proto(model)
 
-        # Collect all inputs which are not already covered by named attributes
-        inputs = inputs.values()
-        inputs = [param for param in inputs if param.name not in attrs]
-        # Turn missing input type annotations to FLOAT by default
-        inputs = [default_float(param.annotation) for param in inputs]
 
-        # Outputs must always be wrapped as lists or tuples
-        if not isinstance(outputs := signature.return_annotation, tuple):
-            outputs = [outputs]
-        # Turn missing output type annotations to FLOAT by default
-        outputs = [default_float(annotation) for annotation in outputs]
+# Need to import the passes module to set up the registry and make the
+# @passes.register decorator work
+import onnx_passes.passes as passes
 
-        # Default to the function name if no op_type is given
-        name = op_type if op_type is not None else f.__name__
+# Inserting custom ops is considered as an annotation pass as it does not really
+# modify the model graph structure or values
+from onnx_passes.passes.base import Annotation
 
-        # Instantiate the ONNX Runtime Extension decorator for registering the
-        # wrapped function
-        return onnx_op(
-            op_type=name, inputs=inputs, outputs=outputs, attrs=attributes
-        )(f)
 
-    # Inner decorator wrapping the custom operator function
-    return inner
+# Annotation pass inserting custom operator functions into the model
+@passes.register("inject-ops")
+@passes.verify.equality
+class InjectCustomOps(Annotation):
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        return ir.passes.PassResult(inject_custom_ops(model), False)
