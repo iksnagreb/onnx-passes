@@ -17,6 +17,6 @@ the unmatched transpose following the Gelu remain and propagates to the end of
 the graph:
 ```bash
 onnx-passes -c cfg.yaml -o out.onnx model.onnx \
- streamline-shapes shape-inference fold-constants cleanup
+ streamline-shapes shape-inference fold-constants cleanup checker verify
 netron --browse out.onnx
 ```

@@ -13,5 +13,25 @@ import onnx_passes.passes.streamline.transpose
 @passes.verify.tolerance
 @passes.register("streamline")
 class Streamline(passes.compose.ComposePass, passes.base.Transformation):
-    __passes__ = ["algebraic", "shape-inference", "fold-constants", "cleanup"]
+    # Ordered sequence of passes and pass collections to be applied for each
+    # iteration of streamlining
+    __passes__ = [
+        # Core of streamlining: Rearranging operators and grouping constants and
+        # non-constants, such as scales and biases
+        "algebraic",
+        # After rearranging the graph, make sure everything is properly
+        # annotated with shapes
+        "shape-inference",
+        # After grouping constants, more of them should be foldable into
+        # Constant operators
+        "fold-constants",
+        # Now there could be constants and identities to get rid of, such as
+        # adding a zero tensor
+        "eliminate",
+        # Finally cleanup the graph by removing nodes, constants, attributes,
+        # etc. no longer needed and bringing it into an ordered state
+        "cleanup"
+    ]
+
+    # Keep iterating the streamlining passes until the model stops changing
     __exhaustive__ = True

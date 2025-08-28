@@ -17,7 +17,7 @@ into a standalone `Pad` operator at the input. While `Conv` operates in
 channels-first layout, the lowered pattern is transposed into channels-last
 layout to align with the `MatMul` axes.
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx \
- fold-constants shape-inference lower-conv
+onnx-passes -c cfg.yaml -o out.onnx model.onnx shape-inference fold-constants \
+ lower-conv shape-inference fold-constants checker verify
 netron --browse out.onnx
 ```
