@@ -236,6 +236,9 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
             # input tensor expands to the expected shape without extra Reshape.
             j = np.ravel_multi_index(j, [*Is, c]).reshape([*Os, prod(*Ks, c)])
 
+            # Insert precomputed indices as a constant into the graph
+            j = op.Constant(value=ir.tensor(j))
+
             # Collect replacement patterns for parallel branches of convolution
             # groups
             ys = []
@@ -260,8 +263,6 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
                 #     )
                 # )
 
-                # Insert precomputed indices as a constant into the graph
-                j = op.Constant(value=ir.tensor(j))
                 # Im2Col receives both attributes and precomputed indices: Pure
                 # ONNX uses the precomputed indices to gather the sliding window
                 # while downstream transformations could operate on the
