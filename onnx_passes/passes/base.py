@@ -130,7 +130,7 @@ from onnxscript.optimizer import remove_unused_nodes
 class Transformation(Pass, FunctionalPass, abc.ABC):
     # There might be unused nodes after transforming parts of the graph, always
     # make sure to remove those before checking any other post-conditions - this
-    # mostly prevents th output to be spammed with warning messages...
+    # mostly prevents the output to be spammed with warning messages...
     def ensures(self, model: ir.Model) -> None:
         super().ensures(model), remove_unused_nodes(model)
 
