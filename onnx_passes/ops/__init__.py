@@ -7,7 +7,7 @@ import onnx_ir as ir
 # Declaring a custom ONNX opset with name and version
 from onnxscript.values import Opset
 # Use onnxscript scripts for authoring custom operators as model local functions
-from onnxscript import script, opset18 as op
+from onnxscript import script, opset19 as op
 
 # Custom operator domain for all operator defined in this package
 domain, DOMAIN = Opset("onnx_passes.ops", 1), "onnx_passes.ops"
@@ -50,7 +50,6 @@ from onnx_passes.passes.base import Annotation
 
 # Annotation pass inserting custom operator functions into the model
 @passes.register("inject-ops")
-@passes.verify.equality
 class InjectCustomOps(Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.PassResult(inject_custom_ops(model), False)

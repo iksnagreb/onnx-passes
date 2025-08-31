@@ -3,7 +3,6 @@
 imports:
   - onnx_passes.passes.imports.qonnx
   - onnx_passes.passes.inline.qonnx
-  - onnx_passes.ops.qonnx
 # Reference data for verification and analysis: Inputs, expected outputs, ...
 reference:
   inp: [ inp.npy ]
@@ -43,4 +42,4 @@ logging:
   # Keeps intermediate models after each pass - path to some logging directory
   keep_intermediates: false
 # Keep applying the passes exhaustively until the model stops changing
-exhaustive: true
+exhaustive: false

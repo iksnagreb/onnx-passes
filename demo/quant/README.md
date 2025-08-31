@@ -26,6 +26,6 @@ quantization operation as a chain of scaling, clipping, rounding and scaling
 operations from the standard ONNX opset.
 ```bash
 onnx-passes -c cfg.yaml -o out.onnx model.onnx import-qonnx \
- inline-qonnx shape-inference fold-constants streamline eliminate cleanup
+ inline-qonnx streamline checker verify
 netron --browse out.onnx
 ```
