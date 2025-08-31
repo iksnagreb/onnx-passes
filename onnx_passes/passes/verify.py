@@ -27,7 +27,13 @@ class VerificationError(Exception):
 
 # Calculates the maximum absolute error between all outputs and expected outputs
 def max_abs_error(produced: list, expected: list) -> float:
-    return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
+    try:
+        return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
+    except TypeError:
+        # Try fallback interpreting all values as 32-bit floats
+        produced = [x.astype(np.float32) for x in produced]
+        expected = [y.astype(np.float32) for y in expected]
+        return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
 
 
 # Calculates the classification accuracy by interpreting the list of produced
