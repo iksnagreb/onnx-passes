@@ -193,3 +193,16 @@ class _Annihilator(Transformation, RewriteRulePass):
         return op.Expand(
             a, op.Constant(value_ints=np.broadcast_shapes(x.shape, a.shape))
         )
+
+
+# Converse relation template: f(x, y) = c(y, x), where c is the converse of f
+#   Example: x > y <=> y < x
+class _Converse(Transformation, RewriteRulePass):
+    __OP__: callable
+    __CONVERSE__: callable
+
+    def pattern(self, op, x, y):
+        return self.__OP__(op, x, y)
+
+    def rewrite(self, op, x, y):
+        return self.__CONVERSE__(op, y, x)

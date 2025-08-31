@@ -21,7 +21,7 @@ import numpy as np
 # Operators which should always be constant folded
 ALWAYS_FOLD_OPS = {
     "always_fold_ops": {
-        "Transpose", "Constant", "ConstantOfShape", "Reshape"
+        "Transpose", "Constant", "ConstantOfShape", "Reshape", "Not"
     }
 }
 
