@@ -133,3 +133,27 @@ def load_reference_data(p: Pass) -> tuple[list, list]:
     # If the "references" section is not present, we might end up here
     except (AttributeError, TypeError):
         return [], []
+
+
+# Expands a constant of True to the shape of the input x
+def true_like(op, x):
+    return op.Expand(
+        op.Cast(op.Constant(value_int=1), to=ir.DataType.BOOL), op.Shape(x)
+    )
+
+
+# Expands a constant of 1 to the shape of the input x
+def ones_like(op, x):
+    return op.Expand(op.CastLike(op.Constant(value_int=1), x), op.Shape(x))
+
+
+# Expands a constant of False to the shape of the input x
+def false_like(op, x):
+    return op.Expand(
+        op.Cast(op.Constant(value_int=0), to=ir.DataType.BOOL), op.Shape(x)
+    )
+
+
+# Expands a constant of 0 to the shape of the input x
+def zeros_like(op, x):
+    return op.Expand(op.CastLike(op.Constant(value_int=0), x), op.Shape(x))
