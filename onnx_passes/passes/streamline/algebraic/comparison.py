@@ -8,7 +8,9 @@ from onnx_passes.passes.streamline.algebraic._properties import _Converse
 # rules
 from onnx_passes.passes.base import Transformation, RewriteRuleSetPass
 # Checking ir.Value for being constants and comparing constants to be identical
-from onnx_passes.passes.util import is_constant, true_like, false_like
+from onnx_passes.passes.util import (
+    is_constant, true_like, false_like, zeros_like, ones_like
+)
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
@@ -18,6 +20,11 @@ import onnx_passes.passes as passes
 # mechanism inserting operators into a pattern template
 from functools import partial
 
+# Type hinting: Mark template arguments in Transformations templates as Callable
+from collections.abc import Callable
+
+# Working with constant tensors/values, and inserting constants such as infinity
+import numpy as np
 
 
 # ==============================================================================
@@ -290,3 +297,219 @@ class GroupAddComparison(Transformation, RewriteRuleSetPass):
 #             # Fix the template parameter __OP__
 #             yield partial(_rewrite_lhs, __OP__)
 #             yield partial(_rewrite_rhs, __OP__)
+
+
+# Expands a constant of minimum values to the shape and type of the input x
+def min_like(op, x):
+    # TODO: Actually make use of the minimum of the type...
+    return op.CastLike(op.Constant(value_float=-np.inf), x)
+
+
+# Expands a constant of maximum values to the shape and type of the input x
+def max_like(op, x):
+    # TODO: Actually make use of the maximum of the type...
+    return op.CastLike(op.Constant(value_float=+np.inf), x)
+
+
+# Absorbs Clip operators into the constant side of a comparison operator by
+# applying a generalized inverse of Clip s.t.
+#   Clip(x, min, max) == a <=> x == Clip^-1(x, min, max)
+@passes.verify.equality
+@passes.register()
+class AbsorbClipIntoComparison(Transformation, RewriteRuleSetPass):
+    # Generalized inverse of clipping: Pushes out of bounds inputs to the
+    # infinities
+    @staticmethod
+    def __INVERSE__(op, x, _min, _max):
+        return op.Where(
+            # Within bounds: min <= x <= max
+            op.And(op.LessOrEqual(_min, x), op.LessOrEqual(x, _max)),
+            # Pass through the within bounds input
+            x,
+            # Out of bounds: x < min -> -inf, x > max -> +inf
+            op.Where(op.Less(x, _min), min_like(op, x), max_like(op, x))
+        )
+
+    __OPS__ = [
+        lambda op: op.Equal,
+        lambda op: op.Less,
+        lambda op: op.LessOrEqual,
+        lambda op: op.Greater,
+        lambda op: op.GreaterOrEqual
+    ]
+
+    def pattern(self):
+        # Pattern template matches the function applied to the left hand side
+        def _pattern_lhs(__op__, op, x, a, _min, _max):
+            return __op__(op)(op.Clip(x, _min, _max), a)
+
+        # Pattern template matches the function applied to the left hand side
+        def _pattern_rhs(__op__, op, x, a, _min, _max):
+            return __op__(op)(a, op.Clip(x, _min, _max))
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_pattern_lhs, __OP__)
+            yield partial(_pattern_rhs, __OP__)
+
+    def check(self):
+        # Only rewrite if the graph actually gets simplified, i.e., the right
+        # hand side is constant
+        def _check_lhs(__op__, op, x, a, _min, _max):
+            return (not is_constant(x) and is_constant(a)
+                    and is_constant(_min) and is_constant(_max))
+
+        # Only rewrite if the graph actually gets simplified, i.e., the right
+        # hand side is constant
+        def _check_rhs(__op__, op, x, a, _min, _max):
+            return (not is_constant(x) and is_constant(a)
+                    and is_constant(_min) and is_constant(_max))
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_check_lhs, __OP__)
+            yield partial(_check_rhs, __OP__)
+
+    def rewrite(self):
+        # Rewrite by applying the inverse function to the right hand side and
+        # dropping the original function from the left hand side
+        def _rewrite_lhs(__op__, op, x, a, _min, _max):
+            return __op__(op)(x, self.__INVERSE__(op, a, _min, _max))
+
+        # Rewrite by applying the inverse function to the left hand side and
+        # dropping the original function from the right hand side
+        def _rewrite_rhs(__op__, op, x, a, _min, _max):
+            return __op__(op)(self.__INVERSE__(op, a, _min, _max), x)
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_rewrite_lhs, __OP__)
+            yield partial(_rewrite_rhs, __OP__)
+
+
+# Absorbs a function into the constant side of a comparison operator: This
+# requires a generalized inverse of the function s.t. f(x) == a <=> x == f^-1(a)
+class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
+    __FUNCTION__: Callable
+    __INVERSE__: Callable
+
+    __OPS__ = [
+        lambda op: op.Equal,
+        lambda op: op.Less,
+        lambda op: op.LessOrEqual,
+        lambda op: op.Greater,
+        lambda op: op.GreaterOrEqual
+    ]
+
+    def pattern(self):
+        # Pattern template matches the function applied to the left hand side
+        def _pattern_lhs(__op__, op, x, a):
+            return __op__(op)(self.__FUNCTION__(op, x), a)
+
+        # Pattern template matches the function applied to the left hand side
+        def _pattern_rhs(__op__, op, x, a):
+            return __op__(op)(a, self.__FUNCTION__(op, x))
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_pattern_lhs, __OP__)
+            yield partial(_pattern_rhs, __OP__)
+
+    def check(self):
+        # Only rewrite if the graph actually gets simplified, i.e., the right
+        # hand side is constant
+        def _check_lhs(__op__, op, x, a):
+            return not is_constant(x) and is_constant(a)
+
+        # Only rewrite if the graph actually gets simplified, i.e., the right
+        # hand side is constant
+        def _check_rhs(__op__, op, x, a):
+            return not is_constant(x) and is_constant(a)
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_check_lhs, __OP__)
+            yield partial(_check_rhs, __OP__)
+
+    def rewrite(self):
+        # Rewrite by applying the inverse function to the right hand side and
+        # dropping the original function from the left hand side
+        def _rewrite_lhs(__op__, op, x, a):
+            return __op__(op)(x, self.__INVERSE__(op, a))
+
+        # Rewrite by applying the inverse function to the left hand side and
+        # dropping the original function from the right hand side
+        def _rewrite_rhs(__op__, op, x, a):
+            return __op__(op)(self.__INVERSE__(op, a), x)
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_rewrite_lhs, __OP__)
+            yield partial(_rewrite_rhs, __OP__)
+
+
+# TODO: Implement generalized inverse functions as ONNX Script custom operators
+#  to simplify the rule definitions here?
+
+
+@passes.verify.equality
+@passes.register()
+class AbsorbReluIntoComparison(_AbsorbFunctionIntoComparison):
+    __FUNCTION__ = lambda _, op, x: op.Relu(x)
+
+    # Generalized inverse of Relu:
+    #   Relu^-1(x) = {-inf for x < 0, x for x >= 0}
+    @staticmethod
+    def __INVERSE__(op, x):
+        return op.Where(op.Less(x, zeros_like(op, x)), min_like(op, x), x)
+
+
+@passes.verify.equality
+@passes.register()
+class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
+    __FUNCTION__ = lambda _, op, x: op.Sigmoid(x)
+
+    # Generalized inverse of Sigmoid:
+    #   Sigmoid^-1(x) = {-inf for x <= 0, x for 0 < x < 1, +inf for x >= 0}
+    @staticmethod
+    def __INVERSE__(op, x):
+        # Sanitize the input x to not evaluate the logarithm on inputs where it
+        # is not defined: This should not affect the result but prevents parts
+        # of the replacement pattern to be evaluated on illegal inputs
+        sanitized_x = op.Where(
+            # Check for input inside defined range: 0 < x < 0
+            op.And(op.Less(zeros_like(op, x), x), op.Less(x, ones_like(op, x))),
+            # Pass through legal inputs
+            x,
+            # Does not matter, will never actually use the value, just not use
+            # >=1.0, <=0 to avoid illegal values or divide by zero...
+            op.CastLike(op.Constant(value_float=0.5), x)
+        )
+
+        # Select from three cases depending on x: x <= 0, 0 < x < 1, x >= 0
+        return op.Where(
+            # Check for input inside defined range: 0 < x < 1
+            op.And(op.Less(zeros_like(op, x), x), op.Less(x, ones_like(op, x))),
+            # Proper inverse of Sigmoid on 0 < x < 1: log(x / (1 - x))
+            op.Log(
+                op.Div(
+                    sanitized_x, op.Sub(ones_like(op, sanitized_x), sanitized_x)
+                )
+            ),
+            # Select positive of negative infinity depending on the side at
+            # which the input is out of bounds
+            op.Where(
+                # Out of range on the lower bound: x <= 0?
+                op.LessOrEqual(x, zeros_like(op, x)),
+                # Map to negative infinity: -inf for x <= 0
+                min_like(op, x),
+                # Map to positive infinity: +inf for x >= 0
+                max_like(op, x)
+            )
+        )
