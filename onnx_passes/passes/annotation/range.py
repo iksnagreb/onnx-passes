@@ -8,6 +8,14 @@ from onnx_ir.traversal import RecursiveGraphIterator
 # @passes.register decorator work
 import onnx_passes.passes as passes
 
+# JSON for serializing range information to be stored as serializable metadata
+# properties of IR values
+import json
+
+# Ranges are annotated with bounds as numpy arrays and propagate via np.minimum
+# and np.maximum
+import numpy as np
+
 # Range propagation handlers are Callables and the exact type of range info is
 # not known, i.e., can be of Any type
 from typing import Callable, Any
@@ -15,10 +23,6 @@ from typing import Callable, Any
 # When iterating propagated output ranges, missing annotations are filled in via
 # zipping with fallback values
 from itertools import zip_longest
-
-# Ranges are annotated with bounds as numpy arrays and propagate via np.minimum
-# and np.maximum
-import numpy as np
 
 # Registry of per op-type range propagation functions
 _registry = {}
@@ -65,13 +69,35 @@ def _propagate_range(node, *inputs, **attributes):
     return _propagate_f(*inputs, **attributes)
 
 
+# Serializes range information from tuple of numpy arrays (or Nones) to a string
+# representation which can be stored as metadata properties and serialized
+def _serialize_range(_min: Any, _max: Any) -> str:
+    # Numpy arrays cannot be serialized as JSON but python lists can
+    return json.dumps((
+        _min.tolist() if _min is not None else None,
+        _max.tolist() if _max is not None else None
+    ))
+
+
+# Deserializes the range information stored as metadata properties string back
+# to tuple of numpy arrays (or Nones)
+def _deserialize_range(_string: str) -> tuple[Any, Any]:
+    # Deserialize the JSON string back to a tuple of lists (or Nones)
+    _min, _max = json.loads(_string)
+    # Wrap minimum and maximum as numpy arrays if available
+    _min = np.asarray(_min) if _min is not None else None
+    _max = np.asarray(_max) if _max is not None else None
+    # Tuple of numpy arrays or Nones
+    return _min, _max
+
+
 # Collects range information from an ir.Value taking existing annotations, data
 # type bounds and actual value ranges (if value is constant) into account
 def _get_range(value: ir.Value) -> tuple[Any, Any]:
     # First consider existing range annotation for the IR value form the
     # non-persistent metadata store
     try:
-        _min, _max = value.meta["range"]
+        _min, _max = _deserialize_range(value.metadata_props["range"])
     except KeyError:
         _min, _max = None, None
 
@@ -79,7 +105,7 @@ def _get_range(value: ir.Value) -> tuple[Any, Any]:
     try:
         _min = value.dtype.min if _min is None else _min
         _max = value.dtype.max if _max is None else _max
-    except (TypeError, KeyError):
+    except (TypeError, KeyError, AttributeError):
         pass
 
     # If the input is a constant tensor, also consider the
@@ -113,7 +139,7 @@ def _set_range(value: ir.Value, _min: Any = None, _max: Any = None):
     try:
         _min = value.dtype.min if _min is None else _min
         _max = value.dtype.max if _max is None else _max
-    except (TypeError, KeyError):
+    except (TypeError, KeyError, AttributeError):
         pass
 
     # Wrap minimum and maximum as numpy arrays if available
@@ -124,7 +150,7 @@ def _set_range(value: ir.Value, _min: Any = None, _max: Any = None):
     # serialized
     # TODO: This also means the information will be lost after copying the model
     #  by serializing/deserializing to/from protobuf...
-    value.meta["range"] = (_min, _max)
+    value.metadata_props["range"] = _serialize_range(_min, _max)
 
 
 # Annotates reachable (i.e., consumed/produced by some node) value infos with
