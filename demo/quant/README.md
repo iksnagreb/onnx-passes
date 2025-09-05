@@ -11,9 +11,10 @@ netron --browse model.onnx
 
 ## Importing into the Custom Opset Domain
 To make the model executable via ONNX Runtime, the custom Quant operator needs
-to be imported into the opset domain `ai.onnx.contrib` which is the one
-registered via onnxruntime-extensions. This step is necessary and must be done
-first, to enable verification of the model after applying passes.
+to be imported into the custom opset domain `onnx_passes.ops` which is the one
+registered with reference implementations of the QONNX Quant operator in pure
+ONNX via ONNX Script. This step is necessary and must be done first, to enable
+verification of the model after applying passes.
 ```bash
 onnx-passes -c cfg.yaml -o out.onnx model.onnx import-qonnx checker verify
 netron --browse out.onnx
