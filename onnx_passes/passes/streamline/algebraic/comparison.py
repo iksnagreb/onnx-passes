@@ -315,7 +315,7 @@ def max_like(op, x):
 # applying a generalized inverse of Clip s.t.
 #   Clip(x, min, max) == a <=> x == Clip^-1(x, min, max)
 @passes.verify.equality
-@passes.register()
+@passes.register("algebraic")
 class AbsorbClipIntoComparison(Transformation, RewriteRuleSetPass):
     # Generalized inverse of clipping: Pushes out of bounds inputs to the
     # infinities
@@ -459,7 +459,7 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
 
 
 @passes.verify.equality
-@passes.register()
+@passes.register("algebraic")
 class AbsorbReluIntoComparison(_AbsorbFunctionIntoComparison):
     __FUNCTION__ = lambda _, op, x: op.Relu(x)
 
@@ -471,7 +471,7 @@ class AbsorbReluIntoComparison(_AbsorbFunctionIntoComparison):
 
 
 @passes.verify.equality
-@passes.register()
+@passes.register("algebraic")
 class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
     __FUNCTION__ = lambda _, op, x: op.Sigmoid(x)
 
