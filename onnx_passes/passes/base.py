@@ -24,6 +24,7 @@ class Pass(PassBase, abc.ABC):
         # Used by verification to inject expected outputs for post-condition
         self.expected = None
         self._id = None
+        self._modified = False
 
     # Inject generating a unique pass-id available for all pre- and post-
     # conditions, as well as the wrapped __call__ and call methods
@@ -34,7 +35,13 @@ class Pass(PassBase, abc.ABC):
         # Generate a unique pass id valid until the next call to this pass
         self._id = f"{i:08d}-{type(self).__name__}"
         # Now forward all arguments to the base-class __call__ implementation
-        return PassBase.__call__(self, *args, **kwargs)  # noqa: *args, *kwargs
+        result = PassBase.__call__(self, *args, **kwargs) # noqa: args, kwargs
+        # Remember whether the pass modified the model: Can be used by post
+        # conditions
+        self._modified = result.modified
+        # Forward the pass result to the derived implementations (or the caller
+        # if this is the outermost specialization)
+        return result
 
     # Unique pass-id to identify a pass across repeated applications within a
     # sequence of passes
