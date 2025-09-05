@@ -277,5 +277,738 @@ class FuseReshape(Transformation, RewriteRulePass):
         # Fused reshape keeping the allowzero attribute of the second reshape
         return op.Reshape(x, shape, allowzero=allowzero.as_int())
 
-# TODO: Implement reshape propagation through elementwise and MatMul (if
-#  applicable) segments of the graph
+
+# Makes the implicit default attribute allowzero=0 explicit (among other things,
+# this is assumed by threshold fusion)
+@passes.register("streamline-shapes")
+class ExplicitAllowzeroReshape(Transformation, RewriteRulePass):
+    def pattern(self, op, x, shape):
+        return op.Reshape(x, shape, _outputs=["y"])
+
+    def check(self, op, x, shape, y):
+        # Default allowzero according to ONNX operators reference documentation:
+        #   https://onnx.ai/onnx/operators/onnx__Reshape.html
+        return y.producer().attributes.get("allowzero", None) is None
+
+    def rewrite(self, op, x, shape, y):
+        # Insert Reshape with explicitly set allowzero attribute
+        return op.Reshape(x, shape, allowzero=0)
+
+
+# Matching against one value pattern from a selection of alternative patterns,
+# constructing named values and attributes to be matched
+from onnxscript.rewriter._pattern_ir import (  # noqa: Protected module...
+    OrValue, ValuePattern, AttrPattern
+)
+
+# Scalars allow for some simplification, e.g., trivial broadcasting
+from onnx_passes.passes.util import is_scalar
+
+# Type hinting callables as transformation template arguments/placeholders
+from typing import Callable
+
+# Transformation templates are implemented by inspecting the signature of the
+# operator-specializing function
+import inspect
+
+
+# # Transformation template matching elementwise n-ary operators with matching
+# # reshapes at the inputs: The order of reshape and elementwise operators can be
+# # switched whenever all inputs and thus the output of the elementwise operation
+# # have the same shape, i.e., the operation does not broadcast any dimension.
+# #
+# # The template takes care of transferring attributes from the matched to the
+# # replacement elementwise operator.
+# #
+# # Note: In case of unary elementwise operators the match condition is trivially
+# # fulfilled and no extra Reshape is necessary.
+# class _MoveReshapePastElementwise:
+#     # Elementwise operator template to be filled in by the template
+#     # specialization: Callable accepting self, the op, the inputs and **kwargs
+#     __operator__: Callable
+#
+#     # Extracts parameters from the operator template which are supposed to be
+#     # matched to the pattern
+#     @property
+#     def parameters(self):
+#         # Inspect the function signature of the template specialization to
+#         # derive the list of input names
+#         parameters = inspect.signature(self.__operator__).parameters.values()
+#         # Remove all keyword only arguments, these are reserved as auxiliary
+#         # variables during the matching process, i.e., interpretation is up to
+#         # the template specialization
+#         parameters = [param.name for param in parameters if param.kind not in {
+#             inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD
+#         }]
+#         # Drop first two (actually only the first as the method is bound) which
+#         # are always (self, op)
+#         return parameters[1:]
+#
+#     # Extracts parameters from the operator template which are not supposed to
+#     # be matched to the pattern and only serve auxiliary purposes
+#     @property
+#     def auxiliaries(self):
+#         # Inspect the function signature of the template specialization to
+#         # derive the list of input names
+#         parameters = inspect.signature(self.__operator__).parameters.values()
+#         # Keep required keyword only arguments, these are reserved as auxiliary
+#         # variables during the matching process, i.e., interpretation is up to
+#         # the template specialization
+#         return [param.name for param in parameters if param.kind in {
+#             inspect.Parameter.KEYWORD_ONLY
+#         }]
+
+
+# Checks whether the two shapes are related via squeeze/unsqueeze and if so,
+# extracts the squeezed/unsqueezed axes
+def _squeezed_or_unsqueezed(shape, other):
+    # Iteration state: Keeps track of current dimension index in each shape, the
+    # list of squeezed/unsqueezed dimensions and whether this still describes a
+    # valid squeeze/unsqueeze relation between shapes
+    i, j, squeezed, unsqueezed, valid = 0, 0, [], [], True
+
+    # Keep advancing until both shapes are fully processes - indices might
+    # diverge over time, within bounds access is ensured
+    while i < len(shape) or j < len(other):
+        # Both indices still within bounds
+        if i < len(shape) and j < len(other):
+            # If shapes match at these indices, this is a dimension in common,
+            # just advance the indices, this is neither squeezed nor unsqueezed
+            if shape[i] == other[j]:
+                i += 1
+                j += 1
+                # Continue with the next position
+                continue
+
+        # Shape still within bounds
+        if i < len(shape):
+            # Dimensions of size 1 are squeezed (missing from other shape)
+            if shape[i] == 1:
+                # Track squeezed dimensions
+                squeezed.append(i)
+                # Advance index of the processed dimension
+                i += 1
+                # Continue with the next position
+                continue
+
+        # Other shape still within bounds
+        if j < len(other):
+            # Track unsqueezed dimensions
+            unsqueezed.append(j)
+            # Advance index of the processed dimension
+            j += 1
+            # Continue with the next position
+            continue
+
+        # Dimensions did not match (or we are already out of bounds for one of
+        # the shapes) - these shapes are not related via squeeze/unsqueeze
+        valid = False
+        # Break to bot end up in endless loop. Also, once invalid will never be
+        # valid again
+        break
+
+    # A tensor of shape can be transformed into other by successive squeeze and
+    # unsqueeze if valid
+    return squeezed, unsqueezed, valid
+
+
+# Transformation template matching elementwise n-ary operators with matching
+# reshapes at the output: The order of reshape and elementwise operators can be
+# switched whenever all inputs and thus the output of the elementwise operation
+# have the same shape, i.e., the operation does not broadcast any dimension.
+#
+# The template takes care of transferring attributes from the matched to the
+# replacement elementwise operator.
+#
+# Note: In case of unary elementwise operators the match condition is trivially
+# fulfilled and no extra Reshape is necessary.
+class _MoveElementwisePastReshape(Transformation, RewriteRulePass):
+    # Elementwise operator template to be filled in by the template
+    # specialization: Callable accepting self, the op, the inputs and **kwargs
+    __operator__: Callable
+
+    # Extracts parameters from the operator template which are supposed to be
+    # matched to the pattern
+    @property
+    def parameters(self):
+        # Inspect the function signature of the template specialization to
+        # derive the list of input names
+        parameters = inspect.signature(self.__operator__).parameters.values()
+        # Remove all keyword only arguments, these are reserved as auxiliary
+        # variables during the matching process, i.e., interpretation is up to
+        # the template specialization
+        parameters = [param.name for param in parameters if param.kind not in {
+            inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD
+        }]
+        # Drop first two (actually only the first as the method is bound) which
+        # are always (self, op)
+        return parameters[1:]
+
+    # Extracts parameters from the operator template which are not supposed to
+    # be matched to the pattern and only serve auxiliary purposes
+    @property
+    def auxiliaries(self):
+        # Inspect the function signature of the template specialization to
+        # derive the list of input names
+        parameters = inspect.signature(self.__operator__).parameters.values()
+        # Keep required keyword only arguments, these are reserved as auxiliary
+        # variables during the matching process, i.e., interpretation is up to
+        # the template specialization
+        return [param.name for param in parameters if param.kind in {
+            inspect.Parameter.KEYWORD_ONLY
+        }]
+
+    def pattern(self, op, shape):
+        # For each parameter expected by the template specialization create a
+        # matchable input value pattern - these are like dynamic arguments
+        xs = [ValuePattern(x) for x in self.parameters]
+        # Forward all inputs to the template specialization operator
+        return op.Reshape(self.__operator__(op, *xs, _outputs=["_out"]), shape)
+
+    def check(self, op, _out, shape, **kwargs):
+        # The output shape produced by Reshape must be a constant to check for
+        # shape-compatibility
+        if (shape := ir.convenience.get_const_tensor(shape)) is None:
+            return False
+
+        # For each input check for the shape being compatible with the output of
+        # the reshaped elementwise operator
+        for i, x in enumerate(self.parameters):
+            # The input shape must be a constant to check shape-compatibility
+            if kwargs[x].shape is None:
+                return False
+
+            # If the rank of the output is smaller than the rank of the
+            # input, the shape must be the result of squeezing the input
+            #
+            # If the rank of the output is larger than the rank of the
+            # input, the shape must be the result of unsqueezing the input
+            if not _squeezed_or_unsqueezed(kwargs[x].shape, shape.numpy())[-1]:
+                return False
+
+        # All shapes match - accept the pattern for rewrite
+        return True
+
+    def rewrite(self, op, _out, shape, **kwargs):
+        # Constant shape produced by Reshape as numpy array for calculating
+        # squeeze/unsqueeze equivalents on the input size
+        shape = ir.convenience.get_const_tensor(shape).numpy()
+
+        # Collect a list of replacement inputs (generate graph patterns of
+        # Squeeze/Unsqueeze equivalents)
+        xs = []
+
+        # For each of the inputs a new Reshape operation will be inserted in
+        # front of the elementwise operation
+        for x in [kwargs[x] for x in self.parameters]:
+            # If the rank of the output is smaller than the rank of the
+            # input, the shape must be the result of squeezing the input
+            #
+            # If the rank of the output is larger than the rank of the
+            # input, the shape must be the result of unsqueezing the input
+            squeeze, unsqueeze, _ = _squeezed_or_unsqueezed(x.shape, shape)
+
+            # Squeeze must be applied first, do not insert Squeeze operator with
+            # empty axes
+            if squeeze:
+                x = op.Squeeze(x, op.Constant(value_ints=squeeze))
+
+            # Unsqueeze must be applied second, do not insert Unsqueeze operator
+            # with empty axes (scalars are trivial to broadcast and do not need
+            # to be unsqueezed explicitly)
+            if unsqueeze and not is_scalar(x):
+                x = op.Unsqueeze(x, op.Constant(value_ints=unsqueeze))
+
+            # Collect replacement input to be wired up with the elementwise
+            # operator down below
+            xs.append(x)
+
+        # Collect auxiliary arguments used by the template specialization which
+        # are matched by the pattern but not as part of the interface inputs
+        aux = {key: kwargs[key] for key in self.auxiliaries if key in kwargs}
+        # Forward the output capture if the template operator lists this among
+        # the auxiliaries
+        aux = {**aux, **({"_out": _out} if "_out" in self.auxiliaries else {})}
+        # Combine auxiliaries withe attributes transferred from the original
+        # operator of the matched pattern
+        attributes = {**aux, **_out.producer().attributes}
+        # Expand inputs, attributes and auxiliaries into the operator
+        return self.__operator__(op, *xs, **attributes)
+
+
+@passes.verify.equality  # noqa: Seems like duplicate but it is not...
+@passes.register("streamline-shapes")
+class MoveAddPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Add(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSubPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Sub(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveMulPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Mul(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveDivPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Div(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveBitwiseOrPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.BitwiseOr(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveBitwiseAndPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.BitwiseAnd(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveBitwiseXorPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.BitwiseXor(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveBitShiftPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.BitShift(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveOrPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Or(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAndPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.And(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveXorPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Xor(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveEqualPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Equal(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveLessPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Less(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveLessOrEqualPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.LessOrEqual(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveGreaterPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Greater(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveGreaterOrEqualPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.GreaterOrEqual(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveModPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Mod(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MovePowPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.Pow(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MovePReluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, y, **kwargs: \
+        op.PRelu(x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAbsPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Abs(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAcosPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Acos(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAcoshPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Acosh(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAsinPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Asin(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAsinhPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Asinh(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAtanPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Atan(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveAtanhPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Atanh(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveBitwiseNotPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.BitwiseNot(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveCastPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Cast(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveCeilPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Ceil(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveCeluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Celu(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveCosPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Cos(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveCoshPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Cosh(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveEluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Elu(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveErfPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Erf(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveExpPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Exp(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveFloorPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Floor(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveGeluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Gelu(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveHardSigmoidPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.HardSigmoid(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveHardSwishPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.HardSwish(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveIdentityPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Identity(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveIfInfPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.IfInf(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveIsNaNPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.IsNaN(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveLeakyReluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.LeakyRelu(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveLogPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Log(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveMishPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Mish(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveNegPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Neg(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveNotPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Not(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveReciprocalPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Reciprocal(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveReluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Relu(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveRoundPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Round(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSeluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Selu(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveShrinkPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Shrink(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSigmoidPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Sigmoid(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSignPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Sign(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSinPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Sin(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSinhPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Sinh(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSoftplusPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Softplus(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSoftsignPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Softsign(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveSqrtPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Sqrt(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveTanPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Tan(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveTanhPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Tanh(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveThresholdedReluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.ThresholdedRelu(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveWherePastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, condition, x, y, **kwargs: \
+        op.Where(condition, x, y, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveClipPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, _min, _max, **kwargs: \
+        op.Clip(x, _min, _max, **kwargs)
+
+# @passes.verify.equality
+# @passes.register("streamline-shapes")
+# class MoveReluPastReshape(_MoveElementwisePastReshape):
+#     __operator__ = lambda _, op, x, **kwargs: \
+#         op.Relu(x, **kwargs)
+#
+#
+# @passes.verify.equality
+# @passes.register("streamline-shapes")
+# class MoveSigmoidPastReshape(_MoveElementwisePastReshape):
+#     __operator__ = lambda _, op, x, **kwargs: \
+#         op.Sigmoid(x, **kwargs)
+#
+#
+# @passes.verify.equality
+# @passes.register("streamline-shapes")
+# class MoveMulPastReshape(_MoveElementwisePastReshape):
+#     __operator__ = lambda _, op, x, y, **kwargs: \
+#         op.Mul(x, y, **kwargs)
+#
+#
+# @passes.verify.equality
+# @passes.register("streamline-shapes")
+# class MoveClipPastReshape(_MoveElementwisePastReshape):
+#     __operator__ = lambda _, op, x, _min, _max, **kwargs: \
+#         op.Clip(x, _min, _max, **kwargs)
+
+# TODO: Implement reshape MatMul and reduction (if applicable) segments of the
+#  graph

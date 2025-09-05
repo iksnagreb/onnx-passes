@@ -44,7 +44,6 @@ class _StreamlineThresholds(ComposePass, Transformation):
         "inline-thresholds",
         # Conclude with usual streamlining and streamlining of shapes - these
         # are exhaustive and might enable more threshold inference
-        "streamline-shapes",
         "streamline"
     ]
 

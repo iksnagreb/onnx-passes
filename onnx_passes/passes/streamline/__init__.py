@@ -19,6 +19,9 @@ class Streamline(passes.compose.ComposePass, passes.base.Transformation):
         # Core of streamlining: Rearranging operators and grouping constants and
         # non-constants, such as scales and biases
         "algebraic",
+        # Core of streamlining: Rearranging operators related to shape and
+        # layout transformations, such as Reshape and Transpose
+        "streamline-shapes",
         # After rearranging the graph, make sure everything is properly
         # annotated with shapes
         "shape-inference",
