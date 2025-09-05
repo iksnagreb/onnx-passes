@@ -190,7 +190,7 @@ class RangeAnnotation(passes.base.Annotation):
 
         # Annotation passes do not modify the model, but might add metadata or
         # fill the state dictionary (not considered as modified)
-        return ir.passes.PassResult(model, modified=True)
+        return ir.passes.PassResult(model, modified=False)
 
 
 @register("Identity")
