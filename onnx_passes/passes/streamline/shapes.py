@@ -983,32 +983,5 @@ class MoveClipPastReshape(_MoveElementwisePastReshape):
     __operator__ = lambda _, op, x, _min, _max, **kwargs: \
         op.Clip(x, _min, _max, **kwargs)
 
-# @passes.verify.equality
-# @passes.register("streamline-shapes")
-# class MoveReluPastReshape(_MoveElementwisePastReshape):
-#     __operator__ = lambda _, op, x, **kwargs: \
-#         op.Relu(x, **kwargs)
-#
-#
-# @passes.verify.equality
-# @passes.register("streamline-shapes")
-# class MoveSigmoidPastReshape(_MoveElementwisePastReshape):
-#     __operator__ = lambda _, op, x, **kwargs: \
-#         op.Sigmoid(x, **kwargs)
-#
-#
-# @passes.verify.equality
-# @passes.register("streamline-shapes")
-# class MoveMulPastReshape(_MoveElementwisePastReshape):
-#     __operator__ = lambda _, op, x, y, **kwargs: \
-#         op.Mul(x, y, **kwargs)
-#
-#
-# @passes.verify.equality
-# @passes.register("streamline-shapes")
-# class MoveClipPastReshape(_MoveElementwisePastReshape):
-#     __operator__ = lambda _, op, x, _min, _max, **kwargs: \
-#         op.Clip(x, _min, _max, **kwargs)
-
 # TODO: Implement reshape MatMul and reduction (if applicable) segments of the
 #  graph
