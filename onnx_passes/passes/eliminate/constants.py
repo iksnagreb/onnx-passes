@@ -23,15 +23,15 @@ class EliminateIdentityMul(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.Mul(x, a)
+        return op.Mul(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == 1)
+            return _out.shape is not None and np.all(a.numpy() == 1)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all bitwise-and without effect from the graph, i.e., x & 11...1 = x
@@ -44,15 +44,15 @@ class EliminateIdentityBitwiseAnd(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.BitwiseAnd(x, a)
+        return op.BitwiseAnd(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == ~0)
+            return _out.shape is not None and np.all(a.numpy() == ~0)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all logical-and without effect from the graph, i.e., x and True = x
@@ -65,15 +65,15 @@ class EliminateIdentityAnd(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.And(x, a)
+        return op.And(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == True)
+            return _out.shape is not None and np.all(a.numpy() == True)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all additions without effect from the graph, i.e., x + 0 = x
@@ -86,15 +86,15 @@ class EliminateIdentityAdd(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.Add(x, a)
+        return op.Add(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == 0)
+            return _out.shape is not None and np.all(a.numpy() == 0)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all bitwise-or without effect from the graph, i.e., x | 0 = x
@@ -107,15 +107,15 @@ class EliminateIdentityBitwiseOr(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.BitwiseOr(x, a)
+        return op.BitwiseOr(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == 0)
+            return _out.shape is not None and np.all(a.numpy() == 0)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all logical-or without effect from the graph, i.e., x or False = x
@@ -128,15 +128,15 @@ class EliminateIdentityOr(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.Or(x, a)
+        return op.Or(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == False)
+            return _out.shape is not None and np.all(a.numpy() == False)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all bitwise-xor without effect from the graph, i.e., x ^ 0 = x
@@ -149,15 +149,15 @@ class EliminateIdentityBitwiseXor(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.BitwiseXor(x, a)
+        return op.BitwiseXor(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == 0)
+            return _out.shape is not None and np.all(a.numpy() == 0)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all logical-xor without effect from the graph, i.e., x != False = x
@@ -170,15 +170,15 @@ class EliminateIdentityXor(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.Xor(x, a)
+        return op.Xor(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == False)
+            return _out.shape is not None and np.all(a.numpy() == False)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Removes all bit-shifts without effect from the graph, i.e., x << 0 (>> 0) = x
@@ -191,15 +191,15 @@ class EliminateIdentityBitShift(Transformation, RewriteRulePass):
         return True
 
     def pattern(self, op, x, a):
-        return op.BitShift(x, a)
+        return op.BitShift(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a):
+    def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
-            return np.all(a.numpy() == 0)
+            return _out.shape is not None and np.all(a.numpy() == 0)
         return False
 
-    def rewrite(self, op, x, a):
-        return op.Identity(x)
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Checks for matrix eye being a valid identity matrix to be multiplied with
@@ -230,13 +230,13 @@ def check_identity_matmul(x, eye):
 @passes.register("eliminate-identity")
 class EliminateIdentityMatMulLhs(Transformation, RewriteRulePass):
     def pattern(self, op, x, eye):
-        return op.MatMul(eye, x)
+        return op.MatMul(eye, x, _outputs=["_out"])
 
-    def check(self, op, x, eye):
-        return check_identity_matmul(x, eye)
+    def check(self, op, x, eye, _out):
+        return _out.shape is not None and check_identity_matmul(x, eye)
 
-    def rewrite(self, op, x, eye):
-        return op.Identity(x)
+    def rewrite(self, op, x, eye, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Eliminates constant matrix multiplications without effect, i.e.,
@@ -246,13 +246,13 @@ class EliminateIdentityMatMulLhs(Transformation, RewriteRulePass):
 @passes.register("eliminate-identity")
 class EliminateIdentityMatMulRhs(Transformation, RewriteRulePass):
     def pattern(self, op, x, eye):
-        return op.MatMul(x, eye)
+        return op.MatMul(x, eye, _outputs=["_out"])
 
-    def check(self, op, x, eye):
-        return check_identity_matmul(x, eye)
+    def check(self, op, x, eye, _out):
+        return _out.shape is not None and check_identity_matmul(x, eye)
 
-    def rewrite(self, op, x, eye):
-        return op.Identity(x)
+    def rewrite(self, op, x, eye, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
 # Eliminates Where operators if the condition is a constant and always chooses
@@ -262,15 +262,15 @@ class EliminateIdentityMatMulRhs(Transformation, RewriteRulePass):
 @passes.register("eliminate-where")
 class EliminateWhereLhs(Transformation, RewriteRulePass):
     def pattern(self, op, condition, lhs, rhs):
-        return op.Where(condition, lhs, rhs)
+        return op.Where(condition, lhs, rhs, _outputs=["_out"])
 
-    def check(self, op, condition, lhs, rhs):
+    def check(self, op, condition, lhs, rhs, _out):
         if condition := ir.convenience.get_const_tensor(condition):
-            return np.all(condition.numpy())
+            return _out.shape is not None and np.all(condition.numpy())
         return False
 
-    def rewrite(self, op, condition, lhs, rhs):
-        return op.Identity(lhs)
+    def rewrite(self, op, condition, lhs, rhs, _out):
+        return op.Expand(lhs, op.Constant(value_ints=list(_out.shape)))
 
 
 # Eliminates Where operators if the condition is a constant and always chooses
@@ -280,15 +280,15 @@ class EliminateWhereLhs(Transformation, RewriteRulePass):
 @passes.register("eliminate-where")
 class EliminateWhereRhs(Transformation, RewriteRulePass):
     def pattern(self, op, condition, lhs, rhs):
-        return op.Where(condition, lhs, rhs)
+        return op.Where(condition, lhs, rhs, _outputs=["_out"])
 
-    def check(self, op, condition, lhs, rhs):
+    def check(self, op, condition, lhs, rhs, _out):
         if condition := ir.convenience.get_const_tensor(condition):
-            return np.all(condition.numpy() == False)
+            return _out.shape is not None and np.all(condition.numpy() == False)
         return False
 
-    def rewrite(self, op, condition, lhs, rhs):
-        return op.Identity(rhs)
+    def rewrite(self, op, condition, lhs, rhs, _out):
+        return op.Expand(rhs, op.Constant(value_ints=list(_out.shape)))
 
 
 # Eliminates type-casts where the target type is known and the same as the type
