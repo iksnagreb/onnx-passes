@@ -148,8 +148,6 @@ def _set_range(value: ir.Value, _min: Any = None, _max: Any = None):
 
     # Annotate the intermediate metadata store of the IR value, this will not be
     # serialized
-    # TODO: This also means the information will be lost after copying the model
-    #  by serializing/deserializing to/from protobuf...
     value.metadata_props["range"] = _serialize_range(_min, _max)
 
 
