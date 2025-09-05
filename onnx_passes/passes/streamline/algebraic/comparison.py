@@ -299,6 +299,79 @@ class GroupAddComparison(Transformation, RewriteRuleSetPass):
 #             yield partial(_rewrite_rhs, __OP__)
 
 
+# D. Absorb multiplication of a constant value into a comparison with a constant
+# value on either side, if the absorbed constant is positive
+# TODO: Handle more generic case of negative constants which flip the comparison
+#  to its converse
+@passes.verify.equality
+@passes.register("algebraic")
+class AbsorbMulIntoComparison(Transformation, RewriteRuleSetPass):
+    @property
+    def commute(self):
+        return True
+
+    __OPS__ = [
+        lambda op: op.Equal,
+        lambda op: op.Less,
+        lambda op: op.LessOrEqual,
+        lambda op: op.Greater,
+        lambda op: op.GreaterOrEqual
+    ]
+
+    def pattern(self):
+        # Pattern template matching multiplication on the left hand side input
+        # of the comparison
+        def _pattern_lhs(__op__, op, x, a, b):
+            return __op__(op)(op.Mul(x, a), b)
+
+        # Pattern template matching multiplication on the right hand side input
+        # of the comparison
+        def _pattern_rhs(__op__, op, x, a, b):
+            return __op__(op)(a, op.Mul(x, b))
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_pattern_lhs, __OP__)
+            yield partial(_pattern_rhs, __OP__)
+
+    def check(self):
+        def _check_lhs(__op__, op, x, a, b):
+            if is_constant(a) and is_constant(b):
+                if np.all(ir.convenience.get_const_tensor(a).numpy() > 0):
+                    return True
+            return False
+
+        def _check_rhs(__op__, op, x, a, b):
+            if is_constant(a) and is_constant(b):
+                if np.all(ir.convenience.get_const_tensor(b).numpy() > 0):
+                    return True
+            return False
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_check_lhs, __OP__)
+            yield partial(_check_rhs, __OP__)
+
+    def rewrite(self):
+        # Rewrite template absorbs both constants into the right hand side of
+        # the comparison
+        def _rewrite_lhs(__op__, op, x, a, b):
+            return __op__(op)(x, op.Div(b, a))
+
+        # Rewrite template absorbs both constants into the left hand side of
+        # the comparison
+        def _rewrite_rhs(__op__, op, x, a, b):
+            return __op__(op)(op.Div(a, b), x)
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in self.__OPS__:
+            # Fix the template parameter __OP__
+            yield partial(_rewrite_lhs, __OP__)
+            yield partial(_rewrite_rhs, __OP__)
+
+
 # Expands a constant of minimum values to the shape and type of the input x
 def min_like(op, x):
     # TODO: Actually make use of the minimum of the type...
