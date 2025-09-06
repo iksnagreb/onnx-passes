@@ -19,10 +19,12 @@ class InlineBatchNormalization(Transformation, RewriteRulePass):
     def pattern(self, op, x, scale, b, mean, var):
         return op.BatchNormalization(x, scale, b, mean, var, _outputs=["y"]),
 
-    def check(self, op, y, **kwargs):
-        if training := y.producer().attributes.get("training_mode", None):
-            return training.as_int() == 0
-        return True
+    def check(self, op, x, y, **kwargs):
+        if x.shape is not None:
+            if training := y.producer().attributes.get("training_mode", None):
+                return training.as_int() == 0
+            return True
+        return False
 
     def rewrite(self, op, x, scale, b, mean, var, y):
         # Default epsilon according to ONNX operators reference documentation:
