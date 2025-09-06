@@ -24,7 +24,8 @@ if __name__ == "__main__":
     x = torch.rand(1, 1, 28, 28)
     y = model(x)
     torch.onnx.export(
-        model, (x,), "model.onnx", dynamo=True, external_data=False
+        model, (x,), "model.onnx", dynamo=True, external_data=False,
+        opset_version=19
     )
 
     # Save verification input/output pair
