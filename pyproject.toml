@@ -20,19 +20,18 @@ requires-python = ">=3.10"
 # List of project dependencies with pinned versions followig the format of
 # requirements.txt
 dependencies = [
-    "onnx==1.17.0",
+    "onnx>=1.17.0",
     "onnx-ir==0.1.8",
     "onnxruntime-gpu[cuda,cudnn]==1.22.0",
     "onnxscript @ git+https://github.com/microsoft/onnxscript.git@9036fab",
     "netron~=8.5.4",
     "click==8.2.1",
     "PyYAML==6.0.2",
-    "numpy<=1.26.4"
+    "numpy>=1.26.4"
 ]
 
-# Reference to the project websites (GitHub repository)
-
 [project.urls]
+# Reference to the project websites (GitHub repository)
 GitHub = "https://github.com/iksnagreb/onnx-passes"
 # Script entrypoints which should be registered when installing the project
 [project.scripts]
