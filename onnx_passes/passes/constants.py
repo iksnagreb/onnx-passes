@@ -20,10 +20,16 @@ import numpy as np
 
 # Operators which should always be constant folded
 ALWAYS_FOLD_OPS = {
-    "always_fold_ops": {
-        "Transpose", "Constant", "ConstantOfShape", "Reshape", "Not"
-    }
+    "Transpose", "Constant", "ConstantOfShape", "Reshape", "Not", "Split"
 }
+
+
+# TODO: Come up with more clever folding strategies, for now this reproduces the
+#  older behavior.
+def _should_fold(node: ir.Node):
+    if node.op_type in ALWAYS_FOLD_OPS:
+        return True
+    return None
 
 
 # Performs constant folding on the entire model graph
@@ -37,7 +43,7 @@ class FoldConstants(Transformation):
         # operate in-place
         model = ir.from_proto(ir.to_proto(model))
         # Run in-place constant folding on deep copy - yields PassResult
-        modified = fold_constants(model, **ALWAYS_FOLD_OPS).modified
+        modified = fold_constants(model, should_fold=_should_fold).modified
         # Constant folding might leave unused initializer nodes in the graph
         # which can be removed in-place
         result = RemoveUnusedNodesPass()(model)
