@@ -24,7 +24,7 @@ dependencies = [
     "onnx-ir==0.1.8",
     "onnxruntime-gpu[cuda,cudnn]==1.22.0",
     "onnxscript==0.3.2",
-    "netron==8.4.0",
+    "netron~=8.5.4",
     "click==8.2.1",
     "PyYAML==6.0.2",
     "numpy<=1.26.4"
