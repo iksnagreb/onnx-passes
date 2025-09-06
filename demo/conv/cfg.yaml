@@ -1,4 +1,4 @@
-# Import additional python modules dynamically before running the pass manger
+# Import additional python modules dynamically before running the pass manager
 # with the sequence of ONNX IR passes
 imports: [ onnx_passes.ops.im2col ]
 # Reference data for verification and analysis: Inputs, expected outputs, ...

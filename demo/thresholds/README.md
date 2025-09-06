@@ -22,7 +22,7 @@ onnx-passes -c cfg.yaml -o out.onnx model.onnx inline-qonnx inline-batchnorm sha
 netron --browse out.onnx
 ```
 
-# Threshold Conversion and Streamlining the Graph
+## Threshold Conversion and Streamlining the Graph
 After inlining all operators, the graph can be gradually optimized and
 simplified by streamlining: Operators can be reordered and like terms can be
 fused until finally rounding operations (and thus quantization) can be expressed
