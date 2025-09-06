@@ -14,7 +14,7 @@ from onnx_passes.passes.base import Transformation, RewriteRulePass
 # Checking ir.Value for being constants and comparing constants to be identical
 from onnx_passes.passes.util import constant_match
 # Domain used by custom operators implemented with this library
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN, thresholds as THRESHOLDS
 
 
 # Infers a fused multi-threshold function operator from the pattern according to

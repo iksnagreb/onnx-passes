@@ -9,7 +9,7 @@ import onnx_passes.passes as passes
 # rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 # Domain used by custom operators implemented with this library
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN, thresholds as THRESHOLDS
 
 
 # Reverts multi-threshold function operator fusion: Unpacks the operator to the
