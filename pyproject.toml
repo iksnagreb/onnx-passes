@@ -21,7 +21,7 @@ requires-python = ">=3.10"
 # requirements.txt
 dependencies = [
     "onnx==1.17.0",
-    "onnx-ir==0.1.6",
+    "onnx-ir==0.1.8",
     "onnxruntime-gpu[cuda,cudnn]==1.22.0",
     "onnxruntime-extensions==0.14.0",
     "transformers==4.53.0",  # Somehow required by onnxruntime-extensions...
