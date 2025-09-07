@@ -302,7 +302,7 @@ from onnxscript.rewriter._pattern_ir import (  # noqa: Protected module...
 )
 
 # Scalars allow for some simplification, e.g., trivial broadcasting
-from onnx_passes.passes.util import is_scalar
+from onnx_passes.passes.util import is_scalar, is_constant
 
 # Type hinting callables as transformation template arguments/placeholders
 from typing import Callable
@@ -403,7 +403,7 @@ def _squeezed_or_unsqueezed(shape, other):
         # Dimensions did not match (or we are already out of bounds for one of
         # the shapes) - these shapes are not related via squeeze/unsqueeze
         valid = False
-        # Break to bot end up in endless loop. Also, once invalid will never be
+        # Break to not end up in endless loop. Also, once invalid will never be
         # valid again
         break
 
@@ -486,8 +486,9 @@ class _MoveElementwisePastReshape(Transformation, RewriteRulePass):
             if not _squeezed_or_unsqueezed(kwargs[x].shape, shape.numpy())[-1]:
                 return False
 
-        # All shapes match - accept the pattern for rewrite
-        return True
+        # Count the number of constant inputs and reject the transformation if
+        # this would result in more non-constant foldable reshapes
+        return sum(not is_constant(kwargs[x]) for x in self.parameters) <= 1
 
     def rewrite(self, op, _out, shape, **kwargs):
         # Constant shape produced by Reshape as numpy array for calculating
@@ -982,6 +983,72 @@ class MoveWherePastReshape(_MoveElementwisePastReshape):
 class MoveClipPastReshape(_MoveElementwisePastReshape):
     __operator__ = lambda _, op, x, _min, _max, **kwargs: \
         op.Clip(x, _min, _max, **kwargs)
+
+
+# Moves Transpose operations past Reshape operation if the reshape only squeezes
+# or unsqueezes axes -  in these cases, corresponding permutation axes can be
+# inserted or deleted to switch the oder of operations
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveTransposePastReshape(Transformation, RewriteRulePass):
+    def pattern(self, op, x, perm, shape):
+        return op.Reshape(op.Transpose(x, perm=perm, _outputs=["_out"]), shape)
+
+    def check(self, op, x, shape, _out, **kwargs):
+        # The output shape produced by Reshape must be a constant to check for
+        # shape-compatibility
+        if (shape := ir.convenience.get_const_tensor(shape)) is None:
+            return False
+
+        # The input shape must be a constant to check shape-compatibility
+        if _out.shape is None:
+            return False
+
+        # Check whether the reshape is a composition of squeeze and unsqueeze
+        # operations, i.e., only adds and deletes axes of size 1
+        if not _squeezed_or_unsqueezed(_out.shape, shape.numpy())[-1]:
+            return False
+
+        # Shapes are compatible - accept the pattern for rewrite
+        return True
+
+    def rewrite(self, op, x, perm, shape, _out):
+        # Constant shape produced by reshape as numpy array for calculating
+        # squeeze/unsqueeze equivalents
+        shape = ir.convenience.get_const_tensor(shape).numpy()
+
+        # Decompose the reshape operation into the squeezing and unsqueezing
+        # component
+        squeeze, unsqueeze, _ = _squeezed_or_unsqueezed(_out.shape, shape)
+
+        # Squeeze must be applied first, do not insert Squeeze operator with
+        # empty axes
+        if squeeze:
+            x = op.Squeeze(x, op.Constant(value_ints=squeeze))
+
+        # Unsqueeze must be applied second, do not insert Unsqueeze operator
+        # with empty axes
+        if unsqueeze:
+            x = op.Unsqueeze(x, op.Constant(value_ints=unsqueeze))
+
+        # Delete squeezed axes from permutation list without adjusting the index
+        # there might be holes now
+        perm = [i for i in perm.as_ints() if i not in squeeze]
+        # Fill holes in permutation indices be remapping the indices to the new
+        # shorter dimensions
+        perm = [sorted(perm).index(i) for i in perm]
+
+        # Adjust the indices of unsqueezed axes to inert holes to be filled
+        # with new axes
+        for u in unsqueeze:
+            perm = [i if i < u else i + 1 for i in perm]
+
+        # Insert new unsqueezed axes into the holes of the permutation list
+        for u in unsqueeze:
+            perm.insert(u, u)
+
+        # Insert new permutation un squeezed/unsqueezed axes
+        return op.Transpose(x, perm=perm)
 
 # TODO: Implement reshape MatMul and reduction (if applicable) segments of the
 #  graph
