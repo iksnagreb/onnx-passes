@@ -1,3 +1,6 @@
+# ir.Value, ir.convenience.get_const_tensor
+import onnx_ir as ir
+
 # Matching against one value pattern from a selection of alternative patterns,
 # constructing named values and attributes to be matched
 from onnxscript.rewriter._pattern_ir import (  # noqa: Protected module...
@@ -68,6 +71,45 @@ class EliminateIdentityTranspose(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, perm):
         return op.Identity(x)
+
+
+# Moves transpose past reduction operators: Replaces the reduction axes by
+# permuted axes and deletes dimensions from the permutation if keepdims=0
+# TODO: Turn this into a transformation template or RewriteRuleSetPass handling
+#  all types of reduction operators not just sum-reduction...
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class MoveTransposePastReduce(Transformation, RewriteRulePass):
+    def pattern(self, op, x, perm, axes, keepdims):
+        return op.ReduceSum(op.Transpose(x, perm=perm), axes, keepdims=keepdims)
+
+    def check(self, op, x, perm, axes, keepdims):
+        # The reduction axes must be constant to relate them to the permutation
+        # axes which are always constant attributes
+        return is_constant(axes)
+
+    def rewrite(self, op, x, perm, axes, keepdims):
+        # Constant reduction axes to look up the corresponding permuted axes
+        axes = ir.convenience.get_const_tensor(axes).numpy()
+        # Permute the reduction axes, also properly resolves negative axes
+        axes = [perm.as_ints()[i] for i in axes]
+
+        # If Reduce deletes the reduction axes, the transpose permutation must
+        # be adjusted
+        if keepdims.as_int() == 0:
+            # Delete reduced axes from permutation list without adjusting the
+            # index there might be holes now
+            perm = [i for i in perm.as_ints() if i not in axes]
+            # Fill holes in permutation indices be remapping the indices to the
+            # new shorter dimensions
+            perm = [sorted(perm).index(i) for i in perm]
+
+        # Turn axes back into ONNX operators to insert back into the graph as a
+        # constant
+        axes = op.Constant(value_ints=axes)
+
+        # Replacement pattern: reduce first and transpose the result
+        return op.Transpose(op.ReduceSum(x, axes, keepdims=keepdims), perm=perm)
 
 
 # ==============================================================================
