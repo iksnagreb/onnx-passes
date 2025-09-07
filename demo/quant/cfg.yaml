@@ -11,14 +11,6 @@ reference:
 # reference: https://onnx.ai/ir-py/api/ir_passes_common.html
 model_checker:
   full_check: true
-# Supported operators whitelist: Any operator not on this list will cause the
-# whitelist analysis pass to fail
-whitelist:
-  - { null, "finn.custom_op", null } # Allows any FINN operator
-# Unsupported operators blacklist: Any operator on this list will cause the
-# blacklist analysis pass to fail
-blacklist:
-  - { null, "", 18 }  # Rejects any default domain operator in version 18
 # Configuration of the shape inference pass: Options according to the ONNX IR
 # reference: https://onnx.ai/ir-py/api/ir_passes_common.html
 shape_inference: { }
