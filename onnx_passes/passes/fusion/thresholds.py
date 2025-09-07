@@ -50,7 +50,7 @@ class FuseThresholds(Transformation, RewriteRulePass):
 
         # The sum-reduction must operate on this expanded final axis and
         # no other axes
-        if not constant_match(axes, -1):
+        if not (constant_match(axes, -1) or constant_match(axes, len(x.shape))):
             return False
 
         # TODO: It is assumed that the broadcasting of the thresholds, weights
