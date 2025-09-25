@@ -295,6 +295,24 @@ class ExplicitAllowzeroReshape(Transformation, RewriteRulePass):
         return op.Reshape(x, shape, allowzero=0)
 
 
+# Eliminates reshapes without effect from the graph, i.e., those where the
+# output shape is the same as the input shape
+@passes.verify.equality
+@passes.register("streamline-shapes")
+class EliminateIdentityReshape(Transformation, RewriteRulePass):
+    def pattern(self, op, x, shape):
+        return op.Reshape(x, shape, _outputs=["y"])
+
+    def check(self, op, x: ir.Value, shape, y):
+        if x.shape is not None and y.shape is not None:
+            if x.shape.is_static() and y.shape.is_static():
+                return np.all(x.shape.numpy() == y.shape.numpy())
+        return False
+
+    def rewrite(self, op, x, shape, y):
+        return op.Identity(x)
+
+
 # Matching against one value pattern from a selection of alternative patterns,
 # constructing named values and attributes to be matched
 from onnxscript.rewriter._pattern_ir import (  # noqa: Protected module...
