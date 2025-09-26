@@ -303,7 +303,7 @@ class EliminateIdentityReshape(Transformation, RewriteRulePass):
     def pattern(self, op, x, shape):
         return op.Reshape(x, shape, _outputs=["y"])
 
-    def check(self, op, x: ir.Value, shape, y):
+    def check(self, op, x, shape, y):
         if x.shape is not None and y.shape is not None:
             if x.shape.is_static() and y.shape.is_static():
                 return np.all(x.shape.numpy() == y.shape.numpy())
@@ -493,7 +493,7 @@ class _MoveElementwisePastReshape(Transformation, RewriteRulePass):
         # the reshaped elementwise operator
         for i, x in enumerate(self.parameters):
             # The input shape must be a constant to check shape-compatibility
-            if kwargs[x].shape is None:
+            if kwargs[x].shape is None or kwargs[x].shape.is_dynamic():
                 return False
 
             # If the rank of the output is smaller than the rank of the

@@ -53,7 +53,7 @@ def is_constant(v: ir.Value):
 # Checks whether the ir.Value represents a scalar: Either the shape is empty or
 # any dimension is of size 1
 def is_scalar(v: ir.Value):
-    return np.prod(v.shape) == 1
+    return v.shape is not None and v.shape.is_static() and np.prod(v.shape) == 1
 
 
 # Checks whether the two ir.Values are identical constants, i.e., all values are

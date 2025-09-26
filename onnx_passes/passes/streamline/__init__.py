@@ -7,6 +7,7 @@ import onnx_passes.passes.streamline.algebraic
 import onnx_passes.passes.streamline.shapes
 import onnx_passes.passes.streamline.transpose
 import onnx_passes.passes.streamline.thresholds
+import onnx_passes.passes.streamline.slice
 
 
 # Set of so-called "streamlining" transformations: Moves scales and biases
