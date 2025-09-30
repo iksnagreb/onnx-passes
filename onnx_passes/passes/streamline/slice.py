@@ -5,7 +5,7 @@ import onnx_ir as ir
 # @passes.register decorator work
 import onnx_passes.passes as passes
 
-# All algebraic passes are transformations derived from pattern-based rewrite
+# All streamlining passes are transformations derived from pattern-based rewrite
 # rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
