@@ -16,7 +16,7 @@ import numpy as np
 
 # TODO: This could be generalized introducing more granularity, there could be
 #  per-axis common scales for example
-def _pull_out_common_scale(x: ir.Value) -> float:
+def _extract_common_scale(x: ir.Value) -> float:
     # Only constant tensors allow to pull out a common scale factor
     if (x := ir.convenience.get_const_tensor(x)) is not None:
         # Find the smallest absolute non-zero value in the tensor which will set
@@ -33,28 +33,28 @@ def _pull_out_common_scale(x: ir.Value) -> float:
     return 1.0
 
 
-# Pulls out common floating-point factors from constant inputs to matrix
-# multiplication if this results in a single scalar following the MatMul
+# Extracts common floating-point factors from constant inputs to MatMul if this
+# results in a single scalar following the MatMul
 @passes.verify.tolerance
 @passes.register("factorize")
-class FactorizeCommonScaleMatMul(Transformation, RewriteRulePass):
+class ExtractCommonScaleFromMatMul(Transformation, RewriteRulePass):
     def pattern(self, op, x, y):
         return op.MatMul(x, y)
 
     def check(self, op, x, y):
-        return _pull_out_common_scale(x) != 1 or _pull_out_common_scale(y) != 1
+        return _extract_common_scale(x) != 1 or _extract_common_scale(y) != 1
 
     def rewrite(self, op, x, y):
         # Common scales (or 1.0) of each of the two inputs
-        scale_x = op.Constant(value_float=_pull_out_common_scale(x))
-        scale_y = op.Constant(value_float=_pull_out_common_scale(y))
+        scale_x = op.Constant(value_float=_extract_common_scale(x))
+        scale_y = op.Constant(value_float=_extract_common_scale(y))
 
         # Round should not be injected on non factorized and especially not on
         # non-constant inputs
-        if _pull_out_common_scale(x) != 1:
+        if _extract_common_scale(x) != 1:
             x = op.Round(op.Div(x, scale_x))
 
-        if _pull_out_common_scale(y) != 1:
+        if _extract_common_scale(y) != 1:
             y = op.Round(op.Div(y, scale_y))
 
         # Replacement pattern: Divide common scale from inputs to MatMuls on the
