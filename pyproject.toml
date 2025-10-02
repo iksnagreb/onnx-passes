@@ -26,7 +26,7 @@ dependencies = [
     "onnxscript==0.5.3",
     "netron>=8.0.0",
     "click>=8.2.1",
-    "PyYAML==6.0.2",
+    "PyYAML>=6.0.0",
     "numpy>=1.26.4"
 ]
 
