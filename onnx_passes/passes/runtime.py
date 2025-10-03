@@ -4,6 +4,17 @@ import onnx_ir as ir
 # The runtime simply builds a wrapper around ONNX Runtime for model execution
 import onnxruntime
 
+# Load DLLs to make the CUDA execution provider available
+try:
+    # Try loading DLLs via PyTorch
+    import torch  # noqa: Might not be installed...
+except ModuleNotFoundError:
+    try:
+        onnxruntime.preload_dlls()  # noqa: Needs onnxruntime-gpu >= 1.21.0
+    except AttributeError:
+        # Finally just accept running without GPU/CUDA support...
+        pass
+
 
 # Evaluates the model on the inputs via ONNX Runtime inference session
 def evaluate_model(model: ir.Model, inputs: list,
@@ -26,17 +37,6 @@ def evaluate_model(model: ir.Model, inputs: list,
     # have empty arguments
     if not all(isinstance(provider, str) for provider in kwargs["providers"]):
         kwargs["providers"] = [_sanitize(args) for args in kwargs["providers"]]
-
-    # Load DLLs to make the CUDA execution provider available
-    try:
-        onnxruntime.preload_dlls()  # noqa: Needs onnxruntime-gpu >= 1.21.0
-    except AttributeError:
-        # Try loading DLLs via PyTorch
-        try:
-            import torch  # noqa: Might not be installed...
-        except ModuleNotFoundError:
-            # Finally just accept running without GPU/CUDA support...
-            pass
 
     # Make a deep copy of the model to not mess up the graph by executing it...
     model = ir.from_proto(ir.to_proto(model))
