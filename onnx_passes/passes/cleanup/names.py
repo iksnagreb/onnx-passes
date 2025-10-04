@@ -9,19 +9,24 @@ from onnx_ir.traversal import RecursiveGraphIterator
 import onnx_passes.passes as passes
 
 
-# Gives unique names to each node by enumerating nodes per operator type
+# Gives unique and readable names to each node and tensor by deriving the name
+# from the opt-type and the producer node - or the first consumer node if
+# initializers or globals if graph inputs or outputs.
 @passes.verify.equality
 @passes.register("cleanup")
 @passes.register("unique-names")
-class GiveUniqueNodeNames(passes.base.Transformation):
+class GiveUniqueNames(passes.base.Transformation):
     # Applies the transformation to the model graph given as ONNX IR
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         # Track whether any node actually changed
         modified = False
-        # Dictionary tracking the per operator type count
-        counts = {}
         # Modify a deep copy of the original model
         model = ir.from_proto(ir.to_proto(model))
+        # Start counting global inputs and outputs to the graph
+        inputs, outputs = [], []
+
+        # Dictionary tracking the per operator type count
+        counts = {}
 
         # Iterate all nodes in the graph
         for node in RecursiveGraphIterator(model.graph):
@@ -37,26 +42,6 @@ class GiveUniqueNodeNames(passes.base.Transformation):
             # Increment the per operator type count
             counts[node.op_type] += 1
 
-        # We prefer functional passes - return a deep copy to be modified
-        return ir.passes.PassResult(model, modified)
-
-
-# Gives readable names to each tensor by deriving the name from the producer
-# node - or the first consumer node if initializers or globals if graph inputs
-# or outputs.
-@passes.verify.equality
-@passes.register("cleanup")
-@passes.register("unique-names")
-class GiveReadableTensorNames(passes.base.Transformation):
-    # Applies the transformation to the model graph given as ONNX IR
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        # Track whether any node actually changed
-        modified = False
-        # Modify a deep copy of the original model
-        model = ir.from_proto(ir.to_proto(model))
-        # Start counting global inputs and outputs to the graph
-        inputs, outputs = [], []
-
         # Iterate all nodes in the graph - reverse iteration to not overwrite
         # output names by following input names
         for node in RecursiveGraphIterator(model.graph, reverse=True):
@@ -68,8 +53,21 @@ class GiveReadableTensorNames(passes.base.Transformation):
                     if inp.is_graph_input() and not inp.is_initializer():
                         # Collect global inputs to update the name later
                         inputs.append(inp)
+
+                    # Skip renaming inputs if they are produced by some other
+                    # node, these will be named according to their producer
+                    if inp.producer() is not None:
+                        continue
+
                     # Derive a new name by enumerating all inputs to the node
                     name = f"{node.name}_input_{i}"
+
+                    # If there already is an initializer of this name, rename to
+                    # the initializer to avoid a conflict
+                    if name in model.graph.initializers:
+                        model.graph.initializers[name].name = \
+                            f"{name}_initializer"
+
                     # Check whether the value already has this name and consider
                     # the model to have changed if at least one name changes
                     modified = modified or name != node.inputs[i].name  # noqa
