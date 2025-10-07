@@ -120,6 +120,11 @@ class MoveTransposePastReduce(Transformation, RewriteRulePass):
 # ==============================================================================
 
 
+# Finds the inverse permutation of the transpose operation
+def _inverse_perm(perm: list[int]):
+    return [perm.index(i) for i in range(len(perm))]
+
+
 # Transformation template matching elementwise n-ary operators with matching
 # transposes at the inputs: Transpose "respects" these types of operators and
 # the order can be swapped. Constants can be implicitly transposed, i.e., there
@@ -302,7 +307,7 @@ class _MoveTransposePastElementwise(Transformation, RewriteRulePass):
                 # the corresponding input to the elementwise operator
                 if 1 <= rank_x:
                     # Note: Inverse permutation
-                    x = op.Transpose(x, perm=[perm[j] for j in perm])
+                    x = op.Transpose(x, perm=_inverse_perm(perm))
             # Collect all inputs to wire them up later
             xs.append(x)
 
