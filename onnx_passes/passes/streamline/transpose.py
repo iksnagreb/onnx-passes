@@ -301,7 +301,8 @@ class _MoveTransposePastElementwise(Transformation, RewriteRulePass):
                 # Insert a constant-foldable transpose between the constant and
                 # the corresponding input to the elementwise operator
                 if 1 <= rank_x:
-                    x = op.Transpose(x, perm=perm)
+                    # Note: Inverse permutation
+                    x = op.Transpose(x, perm=[perm[j] for j in perm])
             # Collect all inputs to wire them up later
             xs.append(x)
 
