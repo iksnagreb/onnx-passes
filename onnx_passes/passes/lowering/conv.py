@@ -140,7 +140,7 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
             attributes["pads"] = ir.Attr("pads", ir.AttributeType.INTS, pads)
 
             # As padding is now explicit, the attribute can be deleted, there is
-            # now reason to forward this to the input generator
+            # no reason to forward this to the input generator
             del attributes["auto_pad"]
 
             # Insert explicit padding operator at the input of the whole
@@ -154,6 +154,10 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
                 # Padding along spatial axes only
                 op.Constant(value=ir.tensor([i + 2 for i in range(len(Is))]))
             )
+
+            # As padding is inserted as a standalone Pad operator, remove the
+            # padding attribute from the input generator
+            del attributes["pads"]
 
             # Update the input shape after padding as all calculations below
             # assume the padded shape
