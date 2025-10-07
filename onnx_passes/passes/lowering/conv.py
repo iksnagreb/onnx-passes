@@ -144,16 +144,20 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
             del attributes["auto_pad"]
 
             # Insert explicit padding operator at the input of the whole
-            # operator pattern
-            x = op.Pad(
-                x,
-                # Convert the padding per axis from attribute to constant tensor
-                op.Constant(value=ir.tensor(pads)),
-                # Make implicit zero padding explicit
-                op.Constant(value=ir.tensor(0.0, x.dtype)),
-                # Padding along spatial axes only
-                op.Constant(value=ir.tensor([i + 2 for i in range(len(Is))]))
-            )
+            # operator pattern (omit if all paddings are zero)
+            if np.any(pads):
+                x = op.Pad(
+                    x,
+                    # Convert the padding per axis from attribute to constant
+                    # tensor
+                    op.Constant(value=ir.tensor(pads)),
+                    # Make implicit zero padding explicit
+                    op.Constant(value=ir.tensor(0.0, x.dtype)),
+                    # Padding along spatial axes only
+                    op.Constant(
+                        value=ir.tensor([i + 2 for i in range(len(Is))])
+                    )
+                )
 
             # As padding is inserted as a standalone Pad operator, remove the
             # padding attribute from the input generator
@@ -251,21 +255,22 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
             # corresponding split of the input and weights tensor
             for x, weight in zip(xs, ws):
                 # # Insert explicit padding operator at the input of the current
-                # # convolution group
+                # # convolution group (omit if all paddings are zero)
                 # # TODO: Consider inserting padding at the group level? Maybe
                 # #  make this configurable?
-                # x = op.Pad(
-                #     x,
-                #     # Convert the padding per axis from attribute to constant
-                #     # tensor
-                #     op.Constant(value=ir.tensor(pads)),
-                #     # Make implicit zero padding explicit
-                #     op.Constant(value=ir.tensor(0.0, x.dtype)),
-                #     # Padding along spatial axes only
-                #     op.Constant(
-                #         value=ir.tensor([i + 1 for i in range(len(Is))])
+                # if np.any(pads):
+                #     x = op.Pad(
+                #         x,
+                #         # Convert the padding per axis from attribute to
+                #         # constant tensor
+                #         op.Constant(value=ir.tensor(pads)),
+                #         # Make implicit zero padding explicit
+                #         op.Constant(value=ir.tensor(0.0, x.dtype)),
+                #         # Padding along spatial axes only
+                #         op.Constant(
+                #             value=ir.tensor([i + 1 for i in range(len(Is))])
+                #         )
                 #     )
-                # )
 
                 # Im2Col receives both attributes and precomputed indices: Pure
                 # ONNX uses the precomputed indices to gather the sliding window
