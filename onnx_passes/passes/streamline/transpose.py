@@ -37,7 +37,7 @@ class InferTransposePerm(Transformation, RewriteRulePass):
 
     def check(self, op, x, _out):
         if (_ := _out.producer().attributes.get("perm", None)) is None:
-            return x.shape is not None
+            return x.shape is not None and x.shape.is_static()
         return False
 
     def rewrite(self, op, x, _out):
@@ -67,7 +67,9 @@ class EliminateIdentityTranspose(Transformation, RewriteRulePass):
         return op.Transpose(x, perm=perm)
 
     def check(self, op, x, perm):
-        return np.all(perm.as_ints() == tuple(range(len(perm.as_ints()))))
+        if perm is not None and perm.as_ints() is not None:
+            return np.all(perm.as_ints() == tuple(range(len(perm.as_ints()))))
+        return False
 
     def rewrite(self, op, x, perm):
         return op.Identity(x)
