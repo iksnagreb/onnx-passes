@@ -35,7 +35,7 @@ class Pass(PassBase, abc.ABC):
         # Generate a unique pass id valid until the next call to this pass
         self._id = f"{i:08d}-{type(self).__name__}"
         # Now forward all arguments to the base-class __call__ implementation
-        result = PassBase.__call__(self, *args, **kwargs) # noqa: args, kwargs
+        result = PassBase.__call__(self, *args, **kwargs)  # noqa: args, kwargs
         # Remember whether the pass modified the model: Can be used by post
         # conditions
         self._modified = result.modified
@@ -162,9 +162,20 @@ class RewriteRulePass(Pass, abc.ABC):
         # TODO: Verify whether this is indeed the case and if so, whether this
         #  is intended behavior or a bug...
         kwargs = {"verbose": v, "remove_nodes": False}
+
+        # Wrap the check to add extra global conditions which cannot be
+        # overridden
+        def _check(op, *_args, **_kwargs):
+            # Do not apply rewrites inside functions as attribute references
+            # will result in many checks trying to use Nones
+            if isinstance(op.graph_or_function, ir.Function):
+                return False
+            # Use derived class check specialization
+            return self.check(op, *_args, **_kwargs)
+
         # Inject bound(!) methods for detecting and replacing the pattern into
         # the rewrite rule
-        return RewriteRule(self.pattern, self.rewrite, self.check, **kwargs)
+        return RewriteRule(self.pattern, self.rewrite, _check, **kwargs)
 
     @abc.abstractmethod
     def pattern(self, *args, **kwargs):
@@ -192,6 +203,11 @@ class RewriteRulePass(Pass, abc.ABC):
         return RewritePass(rule_set)(ir.from_proto(ir.to_proto(model)))
 
 
+# Partial application of function used to bind match conditions to the wrapper
+# when setting up the rewrite rule set
+from functools import partial
+
+
 # Base class for deriving pattern-based rewrite passes from a set of rewrite
 # rules - when specialized must be mixed with either Annotation or
 # Transformation as needed
@@ -209,9 +225,24 @@ class RewriteRuleSetPass(Pass, abc.ABC):
         # TODO: Verify whether this is indeed the case and if so, whether this
         #  is intended behavior or a bug...
         kwargs = {"verbose": v, "remove_nodes": False}
+
+        # Wrap the check to add extra global conditions which cannot be
+        # overridden
+        def wrapper(check, op, *_args, **_kwargs):
+            # Do not apply rewrites inside functions as attribute references
+            # will result in many checks trying to use Nones
+            if isinstance(op.graph_or_function, ir.Function):
+                return False
+            # Use derived class check specialization
+            return check(op, *_args, **_kwargs)
+
+        # Wrap each match condition: Partially bind the wrapper and collect all
+        # checks as a list - cannot use a generator here
+        _check = [partial(wrapper, check) for check in self.check()]
+
         # Create the list of rules by combining input and output pattern and the
         # condition
-        rules = zip(self.pattern(), self.rewrite(), self.check())
+        rules = zip(self.pattern(), self.rewrite(), _check)
         # Inject methods for detecting and replacing the pattern into the
         # rewrite rule
         return [RewriteRule(*rule, **kwargs) for rule in rules]
