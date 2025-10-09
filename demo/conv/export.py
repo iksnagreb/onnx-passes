@@ -11,7 +11,8 @@ if __name__ == "__main__":
         # input channels and the groups below
         out_channels=6,
         # Configures the sliding window and padding of the feature map
-        kernel_size=(3, 3), padding=(1, 1), stride=(1, 1), dilation=(1, 1),
+        # TODO: Padding disabled to demonstrate layout converter...
+        kernel_size=(3, 3), padding=(0, 0), stride=(1, 1), dilation=(1, 1),
         # Split convolutions into groups along the channel axis (both input and
         # output) - match with channels for depthwise
         groups=1,

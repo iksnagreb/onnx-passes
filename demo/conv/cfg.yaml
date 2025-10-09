@@ -5,6 +5,20 @@ imports: [ onnx_passes.ops.im2col ]
 reference:
   inp: [ inp.npy ]
   out: [ out.npy ]
+# [Experimental] Annotate layout assumptions and permutation/conversion for
+# graph inputs and outputs
+layouts:
+  # Assume the input to be an image in channels-first layout "NCHW" which is
+  # permuted to channels-last layout "NHWC" matching the lowered convolution
+  inp:
+    - { assumes: [ N, C, H, W ], perm: [ 0, 2, 3, 1 ] }
+  # Assume the same on the output, which seems odd, but in this demo case
+  # results in streamlining turning the output layout converter into the inverse
+  # of the input layout converter, which nicely demonstrates as graph segment
+  # sandwiched between matching layout converters and absorbing remaining
+  # transposes from convolution lowering
+  out:
+    - { assumes: [ N, C, H, W ], perm: [ 0, 2, 3, 1 ] }
 # Configuration of the model checker pass: Options according to the ONNX IR
 # reference: https://onnx.ai/ir-py/api/ir_passes_common.html
 model_checker:

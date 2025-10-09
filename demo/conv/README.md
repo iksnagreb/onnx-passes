@@ -21,3 +21,15 @@ onnx-passes -c cfg.yaml -o out.onnx model.onnx shape-inference fold-constants \
  lower-conv shape-inference fold-constants checker verify
 netron --browse out.onnx
 ```
+
+## Input Data Layout Annotation and Conversion
+Convolution, according to the standard, operates in channels-first layout, but
+the lowered pattern is transposed into channels-last layout to align with the
+`MatMul` axes, as described above. This layout conversion can also be explicitly
+inserted at the model input/output, if the necessary information is available,
+see the "layouts" section of [the configuration file](cfg.yaml).
+```bash
+onnx-passes -c cfg.yaml -o out.onnx model.onnx shape-inference fold-constants \
+ lower-conv convert-layouts absorb-layouts shape-inference fold-constants checker verify
+netron --browse out.onnx
+```
