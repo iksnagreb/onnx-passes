@@ -1,7 +1,11 @@
 # ir.Model, ir.Value, ir.convenience.get_const_tensor
 import onnx_ir as ir
+
 # np.load for loading reference data, np.all
 import numpy as np
+
+# Used to remove leading dimensions from array/tensor shapes by condition
+from itertools import dropwhile
 
 # Base class for all custom ONNX IR passes developed in this library - this base
 # class defines the (optional) interface for configuration and state tracking
@@ -157,3 +161,29 @@ def false_like(op, x):
 # Expands a constant of 0 to the shape of the input x
 def zeros_like(op, x):
     return op.Expand(op.CastLike(op.Constant(value_int=0), x), op.Shape(x))
+
+
+# Reverse broadcasting of an array according to NumPy broadcasting semantics and
+# also squeezes all leading dimensions of size 1.
+def unbroadcast(x):
+    # Start collecting a list of slices which can be used to index into the
+    # array to remove repeated dimensions
+    slices = []
+
+    # Check each dimension if it is repeated, i.e., taking the first entry can
+    # be expanded back to match the whole array
+    for i in range(x.ndim):
+        if np.all(x[(*slices, slice(0, 1))] == x):
+            # Select [0,1) from the array, un-broadcasting dimension i
+            slices.append(slice(0, 1))
+        else:
+            # Select all elements from the array
+            slices.append(slice(0, None))
+
+    # Apply un-broadcasting but keep all axes of size 1 for now
+    y = x[(*slices,)]
+
+    # Squeeze leading dimensions of size 1 as these can be restored when using
+    # the array in broadcasting expressions
+    return np.reshape(y, (*dropwhile(lambda size: size == 1, y.shape),))
+

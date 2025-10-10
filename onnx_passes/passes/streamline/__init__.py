@@ -9,6 +9,7 @@ import onnx_passes.passes.streamline.transpose
 import onnx_passes.passes.streamline.thresholds
 import onnx_passes.passes.streamline.slice
 import onnx_passes.passes.streamline.factorize
+import onnx_passes.passes.streamline.unbroadcast
 
 
 # Set of so-called "streamlining" transformations: Moves scales and biases
@@ -25,6 +26,9 @@ class Streamline(passes.compose.ComposePass, passes.base.Transformation):
         # Core of streamlining: Factorization of multiplication-like operators
         # pulling out common scale factors
         "factorize",
+        # Core of streamlining: Remove redundant parameters if they can be
+        # restored via broadcasting rules
+        "unbroadcast",
         # Core of streamlining: Rearranging operators related to shape and
         # layout transformations, such as Reshape and Transpose
         "streamline-shapes",
