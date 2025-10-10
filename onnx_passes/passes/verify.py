@@ -290,7 +290,7 @@ def metric(cls: type[Pass]):
             # Log the full input-output-expectation history for each
             # verification pass
             self.state_dict["verify"].setdefault("history", {})[self.id] = (
-                inputs, produced, self.expected, context
+                inputs, produced, expected, context
             )
 
             # Assemble the potential error message in advance...
