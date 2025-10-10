@@ -99,15 +99,16 @@ def equality(cls: type[Pass]):
         # Verbosity can be enabled globally by setting it to True
         self.config.setdefault("logging", {}).setdefault("verbose", False)
 
-        # Skip evaluating on post-condition if the pass did not modify the model
-        if not self._modified:
-            # Verbosity should now be defined, either defaulting to False or
-            # explicitly
-            if self.config["logging"]["verbose"]:
-                # TODO: Make use of a proper logger...
-                print(f"Skipping verification of {self.__class__.__name__}")
-            # Exit here, skipping running inference
-            return
+        # # Skip evaluating on post-condition if the pass did not modify the
+        # # model
+        # if not self._modified:
+        #     # Verbosity should now be defined, either defaulting to False or
+        #     # explicitly
+        #     if self.config["logging"]["verbose"]:
+        #         # TODO: Make use of a proper logger...
+        #         print(f"Skipping verification of {self.__class__.__name__}")
+        #     # Exit here, skipping running inference
+        #     return
 
         # Load ONNX Runtime configuration
         onnxruntime = self.config.setdefault("onnxruntime", {})
