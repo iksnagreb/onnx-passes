@@ -31,9 +31,11 @@ class Pass(PassBase, abc.ABC):
     def __call__(self, *args, **kwargs):
         # Count the number of passes already applied to the model to derive
         # unique checkpoint filenames
-        i = len(self.state_dict.setdefault("history", []))
+        i = self.state_dict.setdefault("counter", 0)
         # Generate a unique pass id valid until the next call to this pass
         self._id = f"{i:08d}-{type(self).__name__}"
+        # Increment the step counter
+        self.state_dict["counter"] += 1
         # Now forward all arguments to the base-class __call__ implementation
         result = PassBase.__call__(self, *args, **kwargs)  # noqa: args, kwargs
         # Remember whether the pass modified the model: Can be used by post
