@@ -19,21 +19,20 @@ from onnx_passes.passes.base import Transformation, RewriteRulePass
 import numpy as np
 
 # Operators which should always be constant folded
+# TODO: Not used anymore...
 ALWAYS_FOLD_OPS = {
     "Transpose", "Constant", "ConstantOfShape", "Reshape", "Not", "Split"
 }
 
 
-# TODO: Come up with more clever folding strategies, for now this reproduces the
-#  older behavior.
-def _should_fold(node: ir.Node):
-    if node.op_type in ALWAYS_FOLD_OPS:
-        return True
-    return None
+# TODO: Come up with more clever folding strategies, for now this tries to fold
+#  everything, which is probably fine with MatMul scale factor extraction?
+def _should_fold(_: ir.Node):
+    return True
 
 
 # Performs constant folding on the entire model graph
-@passes.verify.equality
+@passes.verify.tolerance
 @passes.register("fold-constants")
 class FoldConstants(Transformation):
     # Applies the built-in ONNX IR constant folding pass on a deep copy of the
@@ -42,8 +41,14 @@ class FoldConstants(Transformation):
         # Make a deep copy of the model on which the constant folding can
         # operate in-place
         model = ir.from_proto(ir.to_proto(model))
+        # Configure constant folding behavior: Size limits of constant foldable
+        # tensors - disable all size limits by default
+        kwargs = self.config.setdefault("fold_constants", {
+            "input_size_limit": np.inf, "output_size_limit": np.inf
+        })
         # Run in-place constant folding on deep copy - yields PassResult
-        modified = fold_constants(model, should_fold=_should_fold).modified
+        modified = fold_constants(model, should_fold=_should_fold,
+                                  **kwargs).modified
         # Constant folding might leave unused initializer nodes in the graph
         # which can be removed in-place
         result = RemoveUnusedNodesPass()(model)
