@@ -30,8 +30,8 @@ class Streamline(passes.compose.ComposePass, passes.base.Transformation):
         # restored via broadcasting rules
         "unbroadcast",
         # Core of streamlining: Rearranging operators related to shape and
-        # layout transformations, such as Reshape and Transpose
-        "streamline-shapes",
+        # layout transformations, such as Reshape, Transpose, Slice, ...
+        "reorder",
         # After rearranging the graph, make sure everything is properly
         # annotated with shapes
         "shape-inference",

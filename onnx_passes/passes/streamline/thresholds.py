@@ -16,8 +16,7 @@ import onnx_passes.passes.fusion.thresholds  # noqa: Used via key
 # representations
 import onnx_passes.passes.annotation.range  # noqa: Used via key
 
-# Make default streamlining passes registered as "streamline" and
-# "streamline-shapes" available
+# Make default streamlining passes registered as "streamline" available
 import onnx_passes.passes.streamline  # noqa: Used via key
 
 

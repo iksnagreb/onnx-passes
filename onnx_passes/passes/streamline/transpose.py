@@ -30,7 +30,7 @@ import numpy as np
 # Turns default permutation attribute which implicitly reverse the dimensions
 # into explicit permutation to reduce the number of rules needed below...
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class InferTransposePerm(Transformation, RewriteRulePass):
     def pattern(self, op, x):
         return op.Transpose(x, _outputs=["_out"])
@@ -47,7 +47,7 @@ class InferTransposePerm(Transformation, RewriteRulePass):
 # Fuses two consecutive transpose operations by applying the second permutation
 # to the first permutation, effectively eliminating a transpose from the graph.
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class FuseTranspose(Transformation, RewriteRulePass):
     def pattern(self, op, x, perm1, perm2):
         return op.Transpose(op.Transpose(x, perm=perm1), perm=perm2)
@@ -61,7 +61,7 @@ class FuseTranspose(Transformation, RewriteRulePass):
 # Eliminates transposes without effect from the graph, i.e., those where the
 # permutation lists the dimensions in order
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class EliminateIdentityTranspose(Transformation, RewriteRulePass):
     def pattern(self, op, x, perm):
         return op.Transpose(x, perm=perm)
@@ -80,7 +80,7 @@ class EliminateIdentityTranspose(Transformation, RewriteRulePass):
 # TODO: Turn this into a transformation template or RewriteRuleSetPass handling
 #  all types of reduction operators not just sum-reduction...
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastReduce(Transformation, RewriteRulePass):
     def pattern(self, op, x, perm, axes, keepdims):
         return op.ReduceSum(op.Transpose(x, perm=perm), axes, keepdims=keepdims)
@@ -341,448 +341,448 @@ class _MoveTransposePastElementwise(Transformation, RewriteRulePass):
 # ==============================================================================
 
 @passes.verify.equality  # noqa: Seems like duplicate but it is not...
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAdd(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Add(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSub(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Sub(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastMul(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Mul(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastDiv(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Div(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastBitwiseOr(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitwiseOr(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastBitwiseAnd(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitwiseAnd(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastBitwiseXor(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitwiseXor(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastBitShift(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitShift(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastOr(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Or(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAnd(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.And(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastXor(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Xor(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastEqual(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Equal(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastLess(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Less(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastLessOrEqual(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.LessOrEqual(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastGreater(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Greater(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastGreaterOrEqual(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.GreaterOrEqual(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastMod(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Mod(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastPow(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Pow(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastPRelu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.PRelu(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAbs(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Abs(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAcos(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Acos(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAcosh(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Acosh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAsin(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Asin(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAsinh(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Asinh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAtan(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Atan(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastAtanh(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Atanh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastBitwiseNot(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.BitwiseNot(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastCast(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Cast(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastCeil(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Ceil(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastCelu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Celu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastCos(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Cos(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastCosh(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Cosh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastElu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Elu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastErf(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Erf(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastExp(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Exp(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastFloor(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Floor(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastGelu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Gelu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastHardSigmoid(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.HardSigmoid(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastHardSwish(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.HardSwish(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastIdentity(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Identity(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastIfInf(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.IfInf(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastIsNaN(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.IsNaN(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastLeakyRelu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.LeakyRelu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastLog(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Log(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastMish(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Mish(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastNeg(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Neg(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastNot(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Not(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastReciprocal(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Reciprocal(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastRelu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Relu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastRound(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Round(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSelu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Selu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastShrink(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Shrink(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSigmoid(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sigmoid(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSign(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sign(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSin(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sin(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSinh(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sinh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSoftplus(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Softplus(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSoftsign(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Softsign(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastSqrt(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sqrt(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastTan(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Tan(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastTanh(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Tanh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastThresholdedRelu(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, **kwargs: \
         op.ThresholdedRelu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastWhere(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, condition, x, y, **kwargs: \
         op.Where(condition, x, y, **kwargs)
 
 
 @passes.verify.equality  # noqa: Seems like duplicate but it is not...
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTransposePastClip(_MoveTransposePastElementwise):
     __operator__ = lambda _, op, x, _min, _max, **kwargs: \
         op.Clip(x, _min, _max, **kwargs)

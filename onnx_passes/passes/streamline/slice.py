@@ -17,7 +17,7 @@ import numpy as np
 # Eliminates slice without effect from the graph, i.e., those where the output
 # shape is the same as the input shape and no dimension is reversed
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class EliminateIdentitySlice(Transformation, RewriteRulePass):
     def pattern(self, op, x, starts, ends, axes, steps):
         return op.Slice(x, starts, ends, axes, steps, _outputs=["y"])
@@ -191,448 +191,448 @@ class _MoveElementwisePastSlice(Transformation, RewriteRulePass):
 
 
 @passes.verify.equality  # noqa: Seems like duplicate but it is not...
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAddPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Add(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSubPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Sub(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveMulPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Mul(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveDivPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Div(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveBitwiseOrPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitwiseOr(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveBitwiseAndPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitwiseAnd(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveBitwiseXorPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitwiseXor(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveBitShiftPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.BitShift(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveOrPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Or(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAndPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.And(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveXorPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Xor(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveEqualPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Equal(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveLessPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Less(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveLessOrEqualPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.LessOrEqual(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveGreaterPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Greater(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveGreaterOrEqualPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.GreaterOrEqual(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveModPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Mod(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MovePowPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Pow(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MovePReluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.PRelu(x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAbsPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Abs(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAcosPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Acos(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAcoshPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Acosh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAsinPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Asin(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAsinhPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Asinh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAtanPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Atan(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveAtanhPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Atanh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveBitwiseNotPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.BitwiseNot(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveCastPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Cast(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveCeilPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Ceil(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveCeluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Celu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveCosPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Cos(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveCoshPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Cosh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveEluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Elu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveErfPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Erf(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveExpPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Exp(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveFloorPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Floor(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveGeluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Gelu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveHardSigmoidPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.HardSigmoid(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveHardSwishPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.HardSwish(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveIdentityPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Identity(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveIfInfPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.IfInf(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveIsNaNPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.IsNaN(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveLeakyReluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.LeakyRelu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveLogPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Log(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveMishPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Mish(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveNegPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Neg(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveNotPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Not(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveReciprocalPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Reciprocal(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveReluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Relu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveRoundPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Round(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSeluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Selu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveShrinkPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Shrink(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSigmoidPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sigmoid(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSignPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sign(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSinPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sin(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSinhPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sinh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSoftplusPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Softplus(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSoftsignPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Softsign(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveSqrtPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Sqrt(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTanPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Tan(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveTanhPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Tanh(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveThresholdedReluPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, **kwargs: \
         op.ThresholdedRelu(x, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveWherePastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, condition, x, y, **kwargs: \
         op.Where(condition, x, y, **kwargs)
 
 
 @passes.verify.equality
-@passes.register("streamline-shapes")
+@passes.register("reorder")
 class MoveClipPastSlice(_MoveElementwisePastSlice):
     __operator__ = lambda _, op, x, _min, _max, **kwargs: \
         op.Clip(x, _min, _max, **kwargs)
