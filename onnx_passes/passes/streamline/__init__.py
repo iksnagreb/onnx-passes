@@ -4,11 +4,8 @@ import onnx_passes.passes as passes
 
 # Include basic streamlining transformations
 import onnx_passes.passes.streamline.algebraic
-import onnx_passes.passes.streamline.shapes
-import onnx_passes.passes.streamline.transpose
+import onnx_passes.passes.streamline.reorder
 import onnx_passes.passes.streamline.thresholds
-import onnx_passes.passes.streamline.slice
-import onnx_passes.passes.streamline.im2col
 import onnx_passes.passes.streamline.factorize
 import onnx_passes.passes.streamline.unbroadcast
 
