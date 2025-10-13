@@ -94,10 +94,8 @@ class FoldConstantSize(Transformation, RewriteRulePass):
 from onnxscript.optimizer._constant_folding import register  # noqa: Protected
 
 
-# Replaces Split operators with all constant inputs by a list of Constant
-# operators
 @register("Split")
-def split(node: ir.Node, op, _):
+def _fold_constants_split(node: ir.Node, op, _):
     # Replace single output split by Identity(x)
     if len(node.outputs) == 1:
         return op.Identity(node.inputs[0])
@@ -133,3 +131,29 @@ def split(node: ir.Node, op, _):
     # Split constant tensor and wrap a list of Constant operators
     splits = np.split(x.numpy(), _split, axis.as_int())
     return [op.Constant(value=ir.tensor(x)) for x in splits]
+
+
+# Domain used by custom operators implemented with this library
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+
+
+@register("Im2Col", domain=CUSTOM_DOMAIN)
+def _fold_constants_im2col(node: ir.Node, op, _):
+    # Skip if there are no exactly two inputs as required by out custom-op
+    # specification (proper input + pre-computed access pattern)
+    if len(node.inputs) != 2:
+        return None
+
+    # Constant folding requires both of these inputs to be constants, otherwise
+    # there is nothing to fold...
+    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    if (indices := ir.convenience.get_const_tensor(node.inputs[1])) is None:
+        return None
+
+    # From Im2Col operator definition, see onnx_passes.ops.im2col, slightly
+    # adjusted from ONNX to NumPy behavior
+    return op.Constant(
+        value=ir.tensor(x.numpy().reshape(x.shape[0], -1)[:, indices.numpy()])
+    )
