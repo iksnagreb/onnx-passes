@@ -139,7 +139,7 @@ from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 
 @register("Im2Col", domain=CUSTOM_DOMAIN)
 def _fold_constants_im2col(node: ir.Node, op, _):
-    # Skip if there are no exactly two inputs as required by out custom-op
+    # Skip if there are not exactly two inputs as required by our custom-op
     # specification (proper input + pre-computed access pattern)
     if len(node.inputs) != 2:
         return None

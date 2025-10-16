@@ -17,7 +17,8 @@ import onnx_passes.passes as passes
 
 # All algebraic passes are transformations derived from pattern-based rewrite
 # rules
-from onnx_passes.passes.base import Transformation, RewriteRulePass
+from onnx_passes.passes.base import Transformation, RewriteRulePass, \
+    RewriteRuleSetPass
 
 # Checking ir.Value for being constants and comparing constants to be identical
 from onnx_passes.passes.util import identical_constants, is_constant, is_scalar
@@ -99,6 +100,96 @@ class MoveMulPastMatMulRhs(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y, a):
         return op.Mul(a, op.MatMul(x, y))
+
+
+# Moves elementwise addition past matrix multiplication: Distributivity... but
+# reversed direction - this only makes sense with two constant inputs.
+#
+# This transforms (x + b) @ w => x @ w + b @ w where b and w hint at the usual
+# interpretation of constant bias and weight tensors. Also handles the case
+# where w is on the left (MatMul is non-commutative!) via a rewrite rule set.
+#
+# Note: Should be followed by un-broadcasting optimization to reduce potential
+# parameter tensor size increase due to broadcasting required to have valid
+# shapes after reordering.
+@passes.verify.tolerance
+@passes.register("algebraic")
+class MoveAddPastMatMul(Transformation, RewriteRuleSetPass):
+    # Commutativity here applies to the scalar addition, i.e., op.Add, not
+    # the matrix multiplication
+    @property
+    def commute(self):
+        return True
+
+    def pattern(self):
+        return [
+            lambda op, x, w, b: op.MatMul(op.Add(x, b), w),
+            lambda op, x, w, b: op.MatMul(w, op.Add(x, b)),
+        ]
+
+    def check(self):
+        return [
+            lambda op, x, w, b: is_constant(w) and is_constant(b),
+            lambda op, x, w, b: is_constant(w) and is_constant(b)
+        ]
+
+    def rewrite(self):
+        # Explicitly expand the constant addition input to valid broadcasting,
+        # matching the matrix multiplication input
+        return [
+            lambda op, x, w, b: op.Add(
+                op.MatMul(x, w),
+                op.MatMul(op.Expand(b, op.Shape(op.Add(x, b))), w)
+            ),
+            lambda op, x, w, b: op.Add(
+                op.MatMul(w, x),
+                op.MatMul(w, op.Expand(b, op.Shape(op.Add(x, b))))
+            )
+        ]
+
+
+# Commutativity of scalar multiplication: If the rank of the multiplication
+# input is 1, i.e., acting along the last axis, and these scales as well as the
+# other input to the matrix multiplication are constant, simplify by absorbing
+# the scales into the matrix multiplication.
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbMulIntoMatMul(Transformation, RewriteRuleSetPass):
+    # Commutativity here applies to the scalar multiplication, i.e., op.Mul, not
+    # the matrix multiplication
+    @property
+    def commute(self):
+        return True
+    
+    def pattern(self):
+        return [
+            lambda op, x, a, b: op.MatMul(op.Mul(a, x), b),
+            lambda op, x, a, b: op.MatMul(b, op.Mul(a, x)),
+        ]
+
+    def check(self):
+        # Scales must have static shape of rank 1 or less, scales and other
+        # MatMul input must be constants
+        def _check(op, x, a, b):
+            if a.shape is not None and a.shape.is_static():
+                return is_constant(a) and is_constant(b) and a.shape.rank() <= 1
+            return False
+
+        # Both sides have the same match condition, just reorder the inputs to
+        # the pattern (input "a" always refers to the multiplication scales)
+        return [_check, _check]
+
+    def rewrite(self):
+        # Reshape the scales to have valid broadcasting matching the matrix
+        # multiplication input
+        return [
+            lambda op, x, a, b: op.MatMul(
+                x, op.Mul(op.Reshape(a, op.Constant(value_ints=[-1, +1])), b)
+            ),
+            lambda op, x, a, b: op.MatMul(
+                op.Mul(b, op.Reshape(a, op.Constant(value_ints=[+1, -1]))), x
+            ),
+        ]
 
 
 # Commutativity of scalar multiplication allows to propagate transposes by
