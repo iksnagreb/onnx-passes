@@ -17,7 +17,7 @@ from onnx_passes.passes.base import Transformation, RewriteRulePass, \
     RewriteRuleSetPass
 
 # Checking ir.Value for being constants and comparing constants to be identical
-from onnx_passes.passes.util import is_constant, is_scalar
+from onnx_passes.passes.util import is_constant, is_scalar, collect_attrs
 
 # List of operator types following the reduction trait/category
 from onnx_passes.traits.reduction import REDUCTIONS
@@ -145,6 +145,51 @@ class MoveTransposePastReduce(Transformation, RewriteRuleSetPass):
         for __OP__ in REDUCTIONS:
             # Fix the template parameter __OP__
             yield partial(_rewrite, __OP__)
+
+
+# Moves transpose operators past padding (usually in front of convolution) by
+# permuting the axes attribute of the padding operator
+@passes.verify.equality
+@passes.register("reorder")
+class MoveTransposePastPad(Transformation, RewriteRulePass):
+    def pattern(self, op, x, perm, pads, const_value, axes):
+        return op.Pad(
+            op.Transpose(x, perm=perm), pads, const_value, axes, _outputs=["y"]
+        )
+
+    def check(self, op, x, perm, pads, const_value, axes, y):
+        # Permutation must be present (references within function not allowed)
+        # return perm is not None and perm.as_ints() is not None
+        if perm is not None and perm.as_ints() is not None:
+            # The padding axes must be constant to relate them to the
+            # permutation axes which are always constant attributes
+            return is_constant(axes)
+        # Fallthrough: Some check not passed above...
+        return False
+
+    def rewrite(self, op, x, perm, pads, const_value, axes, y):
+        # Default attributes of the Pad operator according to operators
+        # reference: https://onnx.ai/onnx/operators/onnx__Pad.html
+        attributes = {
+            "mode": (ir.AttributeType.STRING, "constant"),
+        }
+
+        # Collect node attributes falling back to defaults defined above
+        attributes = collect_attrs(y.producer(), attributes)
+
+        # Constant permutation axes to look up the corresponding permuted axes
+        axes = ir.convenience.get_const_tensor(axes).numpy()
+        # Permute the padding axes, also properly resolves negative axes
+        axes = [perm.as_ints()[i] for i in axes]
+
+        # Turn axes back into ONNX operators to insert back into the graph
+        # as a constant
+        axes = op.Constant(value_ints=axes)
+
+        # Replacement pattern: pad first and transpose the result
+        return op.Transpose(
+            op.Pad(x, pads, const_value, axes, **attributes), perm=perm
+        )
 
 
 # ==============================================================================
