@@ -13,10 +13,18 @@ import onnx_passes.passes as passes
 
 # All algebraic passes are transformations derived from pattern-based rewrite
 # rules
-from onnx_passes.passes.base import Transformation, RewriteRulePass
+from onnx_passes.passes.base import Transformation, RewriteRulePass, \
+    RewriteRuleSetPass
 
 # Checking ir.Value for being constants and comparing constants to be identical
 from onnx_passes.passes.util import is_constant, is_scalar
+
+# List of operator types following the reduction trait/category
+from onnx_passes.traits.reduction import REDUCTIONS
+
+# Function with partially applied arguments: Used to greate a generator
+# mechanism inserting operators into a pattern template
+from functools import partial
 
 # Transformation templates are implemented by inspecting the signature of the
 # operator-specializing function
@@ -77,41 +85,66 @@ class EliminateIdentityTranspose(Transformation, RewriteRulePass):
 
 # Moves transpose past reduction operators: Replaces the reduction axes by
 # permuted axes and deletes dimensions from the permutation if keepdims=0
-# TODO: Turn this into a transformation template or RewriteRuleSetPass handling
-#  all types of reduction operators not just sum-reduction...
 @passes.verify.equality
 @passes.register("reorder")
-class MoveTransposePastReduce(Transformation, RewriteRulePass):
-    def pattern(self, op, x, perm, axes, keepdims):
-        return op.ReduceSum(op.Transpose(x, perm=perm), axes, keepdims=keepdims)
+class MoveTransposePastReduce(Transformation, RewriteRuleSetPass):
+    def pattern(self):
+        # Generic pattern template with placeholder for the reduction operator
+        def _pattern(__op__, op, x, perm, axes, keepdims):
+            return op.__getattr__(__op__)(
+                op.Transpose(x, perm=perm), axes, keepdims=keepdims
+            )
 
-    def check(self, op, x, perm, axes, keepdims):
-        # The reduction axes must be constant to relate them to the permutation
-        # axes which are always constant attributes
-        return is_constant(axes)
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in REDUCTIONS:
+            # Fix the template parameter __OP__
+            yield partial(_pattern, __OP__)
 
-    def rewrite(self, op, x, perm, axes, keepdims):
-        # Constant reduction axes to look up the corresponding permuted axes
-        axes = ir.convenience.get_const_tensor(axes).numpy()
-        # Permute the reduction axes, also properly resolves negative axes
-        axes = [perm.as_ints()[i] for i in axes]
+    def check(self):
+        # Generic match condition template with placeholder for the reduction
+        # operator
+        def _check(__op__, op, x, perm, axes, keepdims):
+            # The reduction axes must be constant to relate them to the
+            # permutation axes which are always constant attributes
+            return is_constant(axes)
 
-        # If Reduce deletes the reduction axes, the transpose permutation must
-        # be adjusted
-        if keepdims.as_int() == 0:
-            # Delete reduced axes from permutation list without adjusting the
-            # index there might be holes now
-            perm = [i for i in perm.as_ints() if i not in axes]
-            # Fill holes in permutation indices be remapping the indices to the
-            # new shorter dimensions
-            perm = [sorted(perm).index(i) for i in perm]
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in REDUCTIONS:
+            # Fix the template parameter __OP__
+            yield partial(_check, __OP__)
 
-        # Turn axes back into ONNX operators to insert back into the graph as a
-        # constant
-        axes = op.Constant(value_ints=axes)
+    def rewrite(self):
+        # Generic replacement template with placeholder for the reduction
+        # operator
+        def _rewrite(__op__, op, x, perm, axes, keepdims):
+            # Constant reduction axes to look up the corresponding permuted axes
+            axes = ir.convenience.get_const_tensor(axes).numpy()
+            # Permute the reduction axes, also properly resolves negative axes
+            axes = [perm.as_ints()[i] for i in axes]
 
-        # Replacement pattern: reduce first and transpose the result
-        return op.Transpose(op.ReduceSum(x, axes, keepdims=keepdims), perm=perm)
+            # If Reduce deletes the reduction axes, the transpose permutation
+            # must be adjusted
+            if keepdims.as_int() == 0:
+                # Delete reduced axes from permutation list without adjusting
+                # the index there might be holes now
+                perm = [i for i in perm.as_ints() if i not in axes]
+                # Fill holes in permutation indices be remapping the indices to
+                # the new shorter dimensions
+                perm = [sorted(perm).index(i) for i in perm]
+
+            # Turn axes back into ONNX operators to insert back into the graph
+            # as a constant
+            axes = op.Constant(value_ints=axes)
+
+            # Replacement pattern: reduce first and transpose the result
+            return op.Transpose(
+                op.__getattr__(__op__)(x, axes, keepdims=keepdims), perm=perm
+            )
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in REDUCTIONS:
+            # Fix the template parameter __OP__
+            yield partial(_rewrite, __OP__)
 
 
 # ==============================================================================
