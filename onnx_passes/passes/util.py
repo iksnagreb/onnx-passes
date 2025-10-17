@@ -113,30 +113,13 @@ def inject_pre_post_condition(cls: type[Pass], pre: callable, post: callable):
 # Loads reference data from the config or state dictionary of an ONNX IR pass by
 # first considering the state dictionary
 def load_reference_data(p: Pass) -> tuple[list, list]:
-    # Accessing non-existing dictionaries might result in AttributeError or
-    # TypeError
-    try:
-        # First try the state dictionary if it contains a reference section
-        if p.state_dict and "reference" in p.state_dict:
-            return (p.state_dict["reference"].setdefault("inp", []),
-                    p.state_dict["reference"].setdefault("out", []))
+    # List of verification input and output files, defaults to empty lists
+    inp = p.config.setdefault("reference", {}).setdefault("inp", [])
+    out = p.config.setdefault("reference", {}).setdefault("out", [])
 
-        # Make sure the next test does not result in KeyError or ValueError by
-        # injecting empty default lists
-        p.config["reference"].setdefault("inp", [])
-        p.config["reference"].setdefault("out", [])
-
-        # If no reference data is tracked via the state dictionary, this is
-        # probably the first attempt at loading the data: Check the config
-        if p.config and "reference" in p.config:
-            return ([np.load(file) for file in p.config["reference"]["inp"]],
-                    [np.load(file) for file in p.config["reference"]["out"]])
-
-        # Nothing found, return two empty lists indicating no inputs/outputs
-        return [], []
-    # If the "references" section is not present, we might end up here
-    except (AttributeError, TypeError):
-        return [], []
+    # Load each file into a NumPy array and return two lists of inputs and
+    # expected outputs
+    return [np.load(file) for file in inp], [np.load(file) for file in out]
 
 
 # Expands a constant of True to the shape of the input x
@@ -186,4 +169,3 @@ def unbroadcast(x):
     # Squeeze leading dimensions of size 1 as these can be restored when using
     # the array in broadcasting expressions
     return np.reshape(y, (*dropwhile(lambda size: size == 1, y.shape),))
-
