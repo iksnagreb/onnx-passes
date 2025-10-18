@@ -22,7 +22,7 @@ import numpy as np
 
 # Alias to save some brackets...
 def prod(*args):
-    return np.prod([*args])
+    return int(np.prod([*args]))
 
 
 # Lowers convolution operators to MatMul (plus input generator Im2Col). The
