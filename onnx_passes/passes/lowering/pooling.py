@@ -8,8 +8,9 @@ import onnx_passes.passes as passes
 # Derive Transformations (allowed to modify the graph) from pattern-based
 # rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
-# Collecting node attributes with optional defaults
-from onnx_passes.passes.util import collect_attrs
+# Collecting node attributes with optional defaults, generating constants of 1
+# matching another tensor in shape and type
+from onnx_passes.passes.util import collect_attrs, ones_like
 
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
@@ -269,11 +270,14 @@ class MaxPoolToReduceMax(Transformation, RewriteRulePass):
         )
 
 
-# Lowers AveragePool to ReduceMean (plus Im2Col and reshaping and transposing of
+# Lowers AveragePool to ReduceSum (plus Im2Col and reshaping and transposing of
 # inputs)
+#
+# Note: As this expands the averaging scale to the full output size, this should
+# be combined with unbroadcasting to remove any redundancies.
 @passes.register("lower-pooling")
 @passes.verify.tolerance
-class AveragePoolToReduceMean(Transformation, RewriteRulePass):
+class AveragePoolToReduceSum(Transformation, RewriteRulePass):
     def pattern(self, op, x):
         return op.AveragePool(x, _outputs=["y"])
 
@@ -302,11 +306,9 @@ class AveragePoolToReduceMean(Transformation, RewriteRulePass):
             if np.any(np.asarray(attributes["pads"].as_ints()) != 0):
                 return False
 
-        # Cannot handle the case where the zero-padding is not included in the
-        # averaging calculation for now
-        # TODO: It should be possible to add support for this by precomputing
-        #  individual scales for each pooling window...
-        if attributes["count_include_pad"].as_int() == 0:
+        # This is an integer, but actually is interpreted as a boolean, it is
+        # unclear how to interpret anything but 0 or 1, better reject this...
+        if attributes["count_include_pad"].as_int() not in {0, 1}:
             return False
 
         # Operator is in a valid state and can be accepted for rewriting
@@ -367,6 +369,10 @@ class AveragePoolToReduceMean(Transformation, RewriteRulePass):
         # reason to forward this to the input generator
         del attributes["auto_pad"]
 
+        # Prepare counting elements for normalizing by dividing by the kernel
+        # size. Each original element contributes 1 to the count.
+        count = op.Cast(ones_like(op, x), to=ir.DataType.INT64)
+
         # Insert explicit padding operator at the input of the whole operator
         # pattern (omit if all paddings are zero)
         if np.any(pads):
@@ -376,6 +382,23 @@ class AveragePoolToReduceMean(Transformation, RewriteRulePass):
                 op.Constant(value=ir.tensor(pads)),
                 # Make implicit zero padding explicit
                 op.Constant(value=ir.tensor(0.0, x.dtype)),
+                # Padding along spatial axes only
+                op.Constant(value=ir.tensor([i + 2 for i in range(len(Is))]))
+            )
+
+            # Attribute controlling whether to include the padding in the
+            # averaging calculation
+            count_include_pad = attributes["count_include_pad"].as_int()
+
+            # Counts should receive the same padding amount as the input, but,
+            # depending on the attribute, these counts are considered for the
+            # averaging calculation or not.
+            count = op.Pad(
+                count,
+                # Convert the padding per axis from attribute to constant tensor
+                op.Constant(value=ir.tensor(pads)),
+                # Make implicit zero padding explicit
+                op.Constant(value_int=count_include_pad),
                 # Padding along spatial axes only
                 op.Constant(value=ir.tensor([i + 2 for i in range(len(Is))]))
             )
@@ -394,9 +417,18 @@ class AveragePoolToReduceMean(Transformation, RewriteRulePass):
         # Get rid of the ceiling mode which is not used by the lowered operator
         del attributes["ceil_mode"]
 
+        # Permutations for converting between channels-first (implicitly assumed
+        # by pooling) and channels-last (after lowering) layout
+        to_channels_last = [0, *[i + 2 for i in range(len(Is))], 1]
+        to_channels_first = [0, len(Os) + 1, *[i + 1 for i in range(len(Os))]]
+
         # Convert from channels-first layout to channels-last layout by
         # transposing the axes
-        x = op.Transpose(x, perm=[0, *[i + 2 for i in range(len(Is))], 1])
+        x = op.Transpose(x, perm=to_channels_last)
+
+        # As counts are derived from the input, permute them to channels-last
+        # layout as well
+        count = op.Transpose(count, perm=to_channels_last)
 
         # Precompute the sliding window generator access pattern to insert as a
         # constant into the graph for executing the ONNX reference of Im2Col
@@ -406,8 +438,6 @@ class AveragePoolToReduceMean(Transformation, RewriteRulePass):
 
         # Im2Col does not handle padding nor averaging, get rid of the
         # corresponding attribute
-        # TODO: Will be required below once adding support for this option in
-        #  the averaging calculation
         del attributes["count_include_pad"]
 
         # Im2Col receives both attributes and precomputed indices: Pure ONNX
@@ -424,13 +454,26 @@ class AveragePoolToReduceMean(Transformation, RewriteRulePass):
         # and get rid of this axis to have the expected rank at the output
         # TODO: Change to ReduceSum followed by scale, precomputed to account
         #  for zero padding if count_include_pad=0
-        y = op.ReduceMean(y, op.Constant(value_ints=[len(Os) + 1]), keepdims=0)
+        y = op.ReduceSum(y, op.Constant(value_ints=[len(Os) + 1]), keepdims=0)
+
+        # Likewise, generate sliding windows of the padded element counts for
+        # each kernel and reduce these over the spatial dimensions to get the
+        # element counts per kernel, which is the normalization scale.
+        count = op.ReduceSum(
+            op.Reshape(
+                op.Im2Col(count, j, **attributes, _domain=CUSTOM_DOMAIN),
+                op.Constant(value_ints=[N, *Os, prod(*Ks), C])
+            ),
+            op.Constant(value_ints=[len(Os) + 1]),
+            keepdims=0
+        )
+
+        # Normalize by dividing by the element count per kernel
+        y = op.Div(y, op.CastLike(count, y))
 
         # Convert from channels-last back to channels-first layout transposing
         # the axes
-        return op.Transpose(
-            y, perm=[0, len(Os) + 1, *[i + 1 for i in range(len(Os))]]
-        )
+        return op.Transpose(y, perm=to_channels_first)
 
 # TODO: LpPool seems confusing (use abs or not?, is p integer or float?) and
 #  PyTorch does not actually seem to export LpPool but AveragePool...
