@@ -38,8 +38,6 @@ def evaluate_model(model: ir.Model, inputs: list,
     if not all(isinstance(provider, str) for provider in kwargs["providers"]):
         kwargs["providers"] = [_sanitize(args) for args in kwargs["providers"]]
 
-    # Make a deep copy of the model to not mess up the graph by executing it...
-    model = ir.from_proto(ir.to_proto(model))
     # Remember the original list of outputs before extending by all
     # intermediate tensors
     outputs = list(model.graph.outputs)
@@ -64,7 +62,12 @@ def evaluate_model(model: ir.Model, inputs: list,
 
     # Convert the model to a string-serialized protobuf representation
     # understood by ONNX Runtime
-    model = ir.to_proto(model).SerializeToString()
+    proto = ir.to_proto(model).SerializeToString()
+
+    # Remove the intermediate tensors from the extended model outputs to not
+    # mess up the original model
+    model.graph.outputs.clear()
+    model.graph.outputs.extend(outputs)
 
     # Disable further ONNX Runtime session graph optimizations
     sess_options = onnxruntime.SessionOptions()
@@ -76,15 +79,11 @@ def evaluate_model(model: ir.Model, inputs: list,
 
     # Create an inference session from the ONNX model converted to proto
     # representation
-    session = onnxruntime.InferenceSession(model, sess_options, **kwargs)
+    session = onnxruntime.InferenceSession(proto, sess_options, **kwargs)
 
     # Fill the execution context with inputs paired-up with the corresponding
     # input names from the model graph
-    # TODO: Check if some mechanism is necessary to ensure input order is
-    #  preserved through all of the flow...
-    context = {
-        inp.name: x for inp, x in zip(session.get_inputs(), inputs)
-    }
+    context = {inp.name: x for inp, x in zip(session.get_inputs(), inputs)}
 
     # Evaluate the model on the inputs form the execution context by running the
     # prepared inference session and collect all outputs as results
