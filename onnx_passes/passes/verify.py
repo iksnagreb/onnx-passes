@@ -90,7 +90,7 @@ def equality(cls: type[Pass]):
 
     # Post-condition comparing model outputs to a reference for strict
     # equality - fails raising VerificationError if the output does not match
-    def ensures(self: Pass, model: ir.Model) -> None:
+    def ensures(self: Pass, result: ir.passes.PassResult) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {}):
@@ -99,16 +99,19 @@ def equality(cls: type[Pass]):
         # Verbosity can be enabled globally by setting it to True
         self.config.setdefault("logging", {}).setdefault("verbose", False)
 
-        # # Skip evaluating on post-condition if the pass did not modify the
-        # # model
-        # if not self._modified:
-        #     # Verbosity should now be defined, either defaulting to False or
-        #     # explicitly
-        #     if self.config["logging"]["verbose"]:
-        #         # TODO: Make use of a proper logger...
-        #         print(f"Skipping verification of {self.__class__.__name__}")
-        #     # Exit here, skipping running inference
-        #     return
+        # Skip evaluating on post-condition if the pass did not modify the
+        # model
+        if not result.modified:
+            # Verbosity should now be defined, either defaulting to False or
+            # explicitly
+            if self.config["logging"]["verbose"]:
+                # TODO: Make use of a proper logger...
+                print(f"Skipping verification of {self.__class__.__name__}")
+            # Exit here, skipping running inference
+            return
+
+        # Extract the model from the pass results
+        model = result.model
 
         # Load ONNX Runtime configuration
         onnxruntime = self.config.setdefault("onnxruntime", {})
@@ -176,11 +179,25 @@ def tolerance(cls: type[Pass]):
 
     # Post-condition comparing model outputs to a reference for equality within
     # tolerance - fails raising VerificationError if the output does not match
-    def ensures(self: Pass, model: ir.Model) -> None:
+    def ensures(self: Pass, result: ir.passes.PassResult) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {}):
             return
+
+        # Skip evaluating on post-condition if the pass did not modify the
+        # model
+        if not result.modified:
+            # Verbosity should now be defined, either defaulting to False or
+            # explicitly
+            if self.config["logging"]["verbose"]:
+                # TODO: Make use of a proper logger...
+                print(f"Skipping verification of {self.__class__.__name__}")
+            # Exit here, skipping running inference
+            return
+
+        # Extract the model from the pass results
+        model = result.model
 
         # Load ONNX Runtime configuration
         onnxruntime = self.config.setdefault("onnxruntime", {})
@@ -253,7 +270,7 @@ def metric(cls: type[Pass]):
 
     # Post-condition comparing model outputs to a reference via a task-specific
     # metric - fails raising VerificationError if the output does not match
-    def ensures(self: Pass, model: ir.Model) -> None:
+    def ensures(self: Pass, result: ir.passes.PassResult) -> None:
         # Verification can be disabled globally by setting it to False or
         # specifying an explicitly empty configuration dictionary
         if not self.config.setdefault("verify", {}):
@@ -266,6 +283,20 @@ def metric(cls: type[Pass]):
         # metric-based verification
         if not expected:
             return
+
+        # Skip evaluating on post-condition if the pass did not modify the
+        # model
+        if not result.modified:
+            # Verbosity should now be defined, either defaulting to False or
+            # explicitly
+            if self.config["logging"]["verbose"]:
+                # TODO: Make use of a proper logger...
+                print(f"Skipping verification of {self.__class__.__name__}")
+            # Exit here, skipping running inference
+            return
+
+        # Extract the model from the pass results
+        model = result.model
 
         # Load ONNX Runtime configuration
         onnxruntime = self.config.setdefault("onnxruntime", {})

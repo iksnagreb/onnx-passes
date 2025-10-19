@@ -24,11 +24,10 @@ class Pass(PassBase, abc.ABC):
         # Used by verification to inject expected outputs for post-condition
         self.expected = None
         self._id = None
-        self._modified = False
 
     # Inject generating a unique pass-id available for all pre- and post-
     # conditions, as well as the wrapped __call__ and call methods
-    def __call__(self, *args, **kwargs):
+    def __call__(self, model_or_result: ir.Model | ir.passes.PassResult, /):
         # Count the number of passes already applied to the model to derive
         # unique checkpoint filenames
         i = self.state_dict.setdefault("counter", 0)
@@ -36,11 +35,79 @@ class Pass(PassBase, abc.ABC):
         self._id = f"{i:08d}-{type(self).__name__}"
         # Increment the step counter
         self.state_dict["counter"] += 1
-        # Now forward all arguments to the base-class __call__ implementation
-        result = PassBase.__call__(self, *args, **kwargs)  # noqa: args, kwargs
-        # Remember whether the pass modified the model: Can be used by post
-        # conditions
-        self._modified = result.modified
+
+        # ======================================================================
+        # The following is essentially a copy of the PassBase.__call__ at the
+        # time of onnx-ir==0.1.10, modified to forward the PassResult to the
+        # post-condition, not just the model.
+        # ======================================================================
+
+        # PassBase accepts both, ir.Model and ir.passes.PassResult from previous
+        # pass application in a sequence of passes
+        if isinstance(model_or_result, ir.passes.PassResult):
+            model = model_or_result.model
+        else:
+            model = model_or_result
+
+        # Evaluate the precondition on the model, which raises an exception to
+        # indicate failure
+        try:
+            self.requires(model)
+        # Explicit precondition error is simply forwarded to the caller
+        except ir.passes.PreconditionError:
+            raise
+        # All other exceptions are augmented to indicate that this is from
+        # within the precondition
+        except Exception as e:
+            raise ir.passes.PreconditionError(
+                f"Pre-condition for pass '{self.__class__.__name__}' failed"
+            ) from e
+
+        # Call the pass implementation (provided by the specialization) on the
+        # model producing a PassResult
+        result = self.call(model)
+
+        # Ensure the implementation respects the API signature and yields a
+        # PassResult and not simply a model or something entirely different
+        if not isinstance(result, ir.passes.PassResult):
+            raise TypeError(
+                f"The result of the pass '{self.__class__.__name__}' should be"
+                f" type PassResult."
+                f" Please create one with ir.passes.PassResult()."
+            )
+
+        # Ensure the implementation respects the declared properties/categories
+        # regarding in-place pass application
+        if self.in_place and result.model is not model:
+            raise ir.passes.PassError(
+                f"The pass '{self.__class__.__name__}' is declared in-place,"
+                f" but the model returned is *not* the same object as the input"
+                f" model. Pass developer: Pass should return the same model"
+                f" object or the in_place property should return False."
+            )
+        if not self.in_place and result.model is model:
+            raise ir.passes.PassError(
+                f"The pass '{self.__class__.__name__}' is declared not"
+                f" in-place, but the model returned *is* the same object as the"
+                f" input model. Pass developer: Pass should return a new model"
+                f" object or the in_place property should return True."
+            )
+
+        # Evaluate the postcondition on the pass result (model and indication on
+        # whether the model has been modified), which raises an exception to
+        # indicate failure
+        try:
+            self.ensures(result)
+        # Explicit postcondition error is simply forwarded to the caller
+        except ir.passes.PostconditionError:
+            raise
+        # All other exceptions are augmented to indicate that this is from
+        # within the postcondition
+        except Exception as e:
+            raise ir.passes.PostconditionError(
+                f"Post-condition for pass '{self.__class__.__name__}' failed"
+            ) from e
+
         # Forward the pass result to the derived implementations (or the caller
         # if this is the outermost specialization)
         return result
@@ -71,7 +138,7 @@ class Pass(PassBase, abc.ABC):
             ir.save(model, filename)
 
     # Post-condition evaluated after leaving a pass - implements verbosity
-    def ensures(self, model: ir.Model) -> None:
+    def ensures(self, result: ir.passes.PassResult) -> None:
         # Verbosity can be enabled globally by setting it to True
         self.config.setdefault("logging", {}).setdefault("verbose", False)
         # Verbosity should now be defined, either defaulting to False or
@@ -87,7 +154,7 @@ class Pass(PassBase, abc.ABC):
             # Mark this as the after-the-pass checkpoint
             filename = f"after-{self.config['logging']['checkpoint']}"
             # Save the model checkpoint
-            ir.save(model, filename)
+            ir.save(result.model, filename)
 
         # Detailed logging of all intermediate models can be disabled globally
         # by setting the option to False, otherwise it is interpreted as a
@@ -100,7 +167,7 @@ class Pass(PassBase, abc.ABC):
             # Mark this as the after-the-pass checkpoint
             filename = os.path.join(path, f"{self.id}.onnx")
             # Save the model checkpoint
-            ir.save(model, filename)
+            ir.save(result.model, filename)
 
         # Write a detailed history of passes finished on the model into the
         # state dictionary
@@ -140,8 +207,8 @@ class Transformation(Pass, FunctionalPass, abc.ABC):
     # There might be unused nodes after transforming parts of the graph, always
     # make sure to remove those before checking any other post-conditions - this
     # mostly prevents the output to be spammed with warning messages...
-    def ensures(self, model: ir.Model) -> None:
-        super().ensures(model), remove_unused_nodes(model)
+    def ensures(self, result: ir.passes.PassResult) -> None:
+        super().ensures(result), remove_unused_nodes(result.model)
 
 
 # Pattern-based graph rewriting implemented in ONNX Script

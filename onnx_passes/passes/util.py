@@ -100,8 +100,8 @@ def inject_pre_post_condition(cls: type[Pass], pre: callable, post: callable):
 
     # Evaluate the original followed by the new post-condition - we do this
     # first to preserve the order of operations when stacking decorators
-    def ensures(self: Pass, model: ir.Model) -> None:
-        _ensures(self, model), post(self, model)
+    def ensures(self: Pass, result: ir.passes.PassResult) -> None:
+        _ensures(self, result), post(self, result)
 
     # Inject the new pre- and post-condition methods overwriting the exiting
     # methods which have been wrapped by the new ones.
