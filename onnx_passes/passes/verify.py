@@ -152,7 +152,7 @@ def equality(cls: type[Pass]):
 @passes.register("verify")
 class VerifyEquality(Analysis):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(model, False)
+        return ir.passes.PassResult(model, True)
 
 
 # Injects tolerance-based verification into an ONNX IR pass by showing the model
@@ -250,7 +250,7 @@ def tolerance(cls: type[Pass]):
 @passes.register("verify")
 class VerifyTolerance(Analysis):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(model, False)
+        return ir.passes.PassResult(model, True)
 
 
 # Injects metric-based verification into an ONNX IR pass by evaluating a metric,
@@ -352,4 +352,4 @@ def metric(cls: type[Pass]):
 @passes.register("verify")
 class VerifyMetric(Analysis):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(model, False)
+        return ir.passes.PassResult(model, True)
