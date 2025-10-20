@@ -1012,7 +1012,7 @@ class MoveTransposePastReshape(Transformation, RewriteRulePass):
     def pattern(self, op, x, perm, shape):
         return op.Reshape(op.Transpose(x, perm=perm, _outputs=["_out"]), shape)
 
-    def check(self, op, x, shape, _out, **kwargs):
+    def check(self, op, x, perm, shape, _out, **kwargs):
         # The output shape produced by Reshape must be a constant to check for
         # shape-compatibility
         if (shape := ir.convenience.get_const_tensor(shape)) is None:
@@ -1027,8 +1027,9 @@ class MoveTransposePastReshape(Transformation, RewriteRulePass):
         if not _squeezed_or_unsqueezed(_out.shape, shape.numpy())[-1]:
             return False
 
-        # Shapes are compatible - accept the pattern for rewrite
-        return True
+        # Shapes are compatible - accept the pattern for rewrite if the
+        # permutation is available
+        return perm is not None and perm.as_ints() is not None
 
     def rewrite(self, op, x, perm, shape, _out):
         # Constant shape produced by reshape as numpy array for calculating
@@ -1038,6 +1039,11 @@ class MoveTransposePastReshape(Transformation, RewriteRulePass):
         # Decompose the reshape operation into the squeezing and unsqueezing
         # component
         squeeze, unsqueeze, _ = _squeezed_or_unsqueezed(_out.shape, shape)
+
+        # Apply the permutation to the axes as the transpose will be placed
+        # after the Reshape, but axes has been derived with Reshape before
+        squeeze = [perm.as_ints()[i] for i in squeeze]
+        unsqueeze = [perm.as_ints()[i] for i in unsqueeze]
 
         # Squeeze must be applied first, do not insert Squeeze operator with
         # empty axes
@@ -1052,7 +1058,7 @@ class MoveTransposePastReshape(Transformation, RewriteRulePass):
         # Delete squeezed axes from permutation list without adjusting the index
         # there might be holes now
         perm = [i for i in perm.as_ints() if i not in squeeze]
-        # Fill holes in permutation indices be remapping the indices to the new
+        # Fill holes in permutation indices by remapping the indices to the new
         # shorter dimensions
         perm = [sorted(perm).index(i) for i in perm]
 
