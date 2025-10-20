@@ -30,6 +30,8 @@ def register(f: Callable):
 # Injects all registered custom operators into the model as model local
 # functions
 def inject_custom_ops(model: ir.Model):
+    # Update the opset import to include the custom domain
+    model.opset_imports[str(domain)] = domain.version
     # Convert from ONNX IR representation to proto representation which offers
     # access to the list of local functions
     model = ir.to_proto(model)
