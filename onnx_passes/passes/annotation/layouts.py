@@ -16,8 +16,7 @@ from onnx_passes.passes.base import Transformation, RewriteRuleSetPass
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 # LayoutConverter custom operator implemented with this library
-from onnx_passes.ops import layouts  # noqa: Used via registry
-
+from onnx_passes.ops.layouts import LayoutConverter  # noqa: Used via registry
 
 # Exception type indicating failure while inserting layout assumptions and/or
 # conversions - currently does not do add anything ontop the base Exception.
@@ -82,7 +81,7 @@ class ConvertLayouts(Transformation):
 
             # New output connecting the layout converter to the original graph
             # input (or rather its consumers)
-            output = ir.Value()
+            output = ir.Value(type=inp.type, shape=inp.shape)
 
             # Each consumer of the original input must be rewired to consume the
             # new converter output
@@ -124,7 +123,7 @@ class ConvertLayouts(Transformation):
 
             # New output connecting the layout converter to the original graph
             # output (or rather its consumers)
-            output = ir.Value()
+            output = ir.Value(type=out.type, shape=out.shape)
 
             # Select the inverse permutation of the layout to forward to the
             # transpose
