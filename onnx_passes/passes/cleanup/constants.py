@@ -16,7 +16,10 @@ import onnx_passes.passes as passes
 
 
 # Remove initializers from inputs - wrapper around ONNX IR pass
-@passes.verify.equality
+#
+# Note: As this enables different ONNX Runtime constant optimizations, this
+# pass does not preserve equality, only equality within tolerance.
+@passes.verify.tolerance
 @passes.register("cleanup")
 @passes.register("remove-initializers-from-inputs")
 class RemoveInitializersFromInputs(passes.base.Transformation):

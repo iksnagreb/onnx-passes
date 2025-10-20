@@ -31,7 +31,11 @@ def _inverse_perm(perm: list[int]):
 
 # Inserts LayoutConverter operators at the graph inputs and outputs as
 # configured by the configuration dictionary
-@passes.verify.equality
+#
+# Note: As this contains a call to RemoveInitializersFromInputsPass, which
+# enables different ONNX Runtime constant optimizations, this pass does not
+# preserve equality, only equality within tolerance.
+@passes.verify.tolerance
 @passes.register("convert-layouts")
 class ConvertLayouts(Transformation):
     # List of input layout annotations from the configuration dictionary
