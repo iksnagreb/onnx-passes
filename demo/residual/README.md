@@ -13,6 +13,6 @@ the residual block. This is done by exploiting algebraic properties of MatMul,
 Mul and Add, namely associativity (reorder the Adds), commutativity (swap Mul
 and MatMul) and distributivity (swap Mul and joining Add).
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx shape-inference streamline
+onnx-passes -c cfg.yaml -o out.onnx model.onnx streamline checker verify
 netron --browse out.onnx
 ```
