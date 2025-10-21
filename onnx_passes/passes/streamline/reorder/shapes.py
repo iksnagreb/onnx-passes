@@ -1043,17 +1043,11 @@ class MoveTransposePastReshape(Transformation, RewriteRulePass):
         # Apply the permutation to the axes as the transpose will be placed
         # after the Reshape, but axes has been derived with Reshape before
         squeeze = [perm.as_ints()[i] for i in squeeze]
-        unsqueeze = [perm.as_ints()[i] for i in unsqueeze]
 
         # Squeeze must be applied first, do not insert Squeeze operator with
         # empty axes
         if squeeze:
             x = op.Squeeze(x, op.Constant(value_ints=squeeze))
-
-        # Unsqueeze must be applied second, do not insert Unsqueeze operator
-        # with empty axes
-        if unsqueeze:
-            x = op.Unsqueeze(x, op.Constant(value_ints=unsqueeze))
 
         # Delete squeezed axes from permutation list without adjusting the index
         # there might be holes now
@@ -1070,6 +1064,15 @@ class MoveTransposePastReshape(Transformation, RewriteRulePass):
         # Insert new unsqueezed axes into the holes of the permutation list
         for u in unsqueeze:
             perm.insert(u, u)
+
+        # Apply the permutation to the axes as the transpose will be placed
+        # after the Reshape, but axes has been derived with Reshape before
+        unsqueeze = [perm[i] for i in unsqueeze]
+
+        # Unsqueeze must be applied second, do not insert Unsqueeze operator
+        # with empty axes
+        if unsqueeze:
+            x = op.Unsqueeze(x, op.Constant(value_ints=unsqueeze))
 
         # Insert new permutation un squeezed/unsqueezed axes
         return op.Transpose(x, perm=perm)
