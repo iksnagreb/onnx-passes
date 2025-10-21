@@ -16,6 +16,6 @@ propagate and can be folded into constant parameter tensors. As expected, only
 the unmatched transpose following the Gelu remain and propagates to the end of
 the graph:
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx reorder shape-inference fold-constants cleanup checker verify
+onnx-passes -c cfg.yaml -o out.onnx model.onnx streamline checker verify
 netron --browse out.onnx
 ```

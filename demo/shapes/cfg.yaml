@@ -40,4 +40,4 @@ logging:
   # Keeps intermediate models after each pass - path to some logging directory
   keep_intermediates: false
 # Keep applying the passes exhaustively until the model stops changing
-exhaustive: true
+exhaustive: false
