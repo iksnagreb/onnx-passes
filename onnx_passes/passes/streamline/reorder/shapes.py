@@ -496,47 +496,34 @@ class _MoveElementwisePastReshape(Transformation, RewriteRulePass):
             if kwargs[x].shape is None or kwargs[x].shape.is_dynamic():
                 return False
 
-            # If the rank of the output is smaller than the rank of the
-            # input, the shape must be the result of squeezing the input
-            #
-            # If the rank of the output is larger than the rank of the
-            # input, the shape must be the result of unsqueezing the input
-            if not _squeezed_or_unsqueezed(kwargs[x].shape, shape.numpy())[-1]:
-                return False
-
         # Count the number of constant inputs and reject the transformation if
         # this would result in more non-constant foldable reshapes
         return sum(not is_constant(kwargs[x]) for x in self.parameters) <= 1
 
     def rewrite(self, op, _out, shape, **kwargs):
-        # Constant shape produced by Reshape as numpy array for calculating
-        # squeeze/unsqueeze equivalents on the input size
-        shape = ir.convenience.get_const_tensor(shape).numpy()
-
         # Collect a list of replacement inputs (generate graph patterns of
         # Squeeze/Unsqueeze equivalents)
         xs = []
 
+        # Calculate output shape of the elementwise operator following
+        # broadcasting
+        broadcast = np.broadcast_shapes(
+            *[kwargs[x].shape for x in self.parameters]
+        )
+
         # For each of the inputs a new Reshape operation will be inserted in
         # front of the elementwise operation
         for x in [kwargs[x] for x in self.parameters]:
-            # If the rank of the output is smaller than the rank of the
-            # input, the shape must be the result of squeezing the input
-            #
-            # If the rank of the output is larger than the rank of the
-            # input, the shape must be the result of unsqueezing the input
-            squeeze, unsqueeze, _ = _squeezed_or_unsqueezed(x.shape, shape)
-
-            # Squeeze must be applied first, do not insert Squeeze operator with
-            # empty axes
-            if squeeze:
-                x = op.Squeeze(x, op.Constant(value_ints=squeeze))
-
-            # Unsqueeze must be applied second, do not insert Unsqueeze operator
-            # with empty axes (scalars are trivial to broadcast and do not need
-            # to be unsqueezed explicitly)
-            if unsqueeze and not is_scalar(x):
-                x = op.Unsqueeze(x, op.Constant(value_ints=unsqueeze))
+            # Scalars are trivial to broadcast without reshaping, so this can be
+            # skipped
+            # Note: This is necessary to treat Clip as an elementwise operation,
+            # which it is not exactly as min and max do not broadcast
+            if not is_scalar(x):
+                # Expand and reshape each input to the elementwise operation,
+                # broadcasting is now fully explicit
+                x = op.Reshape(
+                    op.Expand(x, op.Constant(value_ints=broadcast)), shape
+                )
 
             # Collect replacement input to be wired up with the elementwise
             # operator down below
