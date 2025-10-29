@@ -24,7 +24,7 @@ from onnx_passes.traits.elementwise import is_elementwise
 # replacement elementwise operator.
 #
 # Note: In case of unary elementwise operators the match condition is trivially
-# fulfilled and no extra Reshape is necessary.
+# fulfilled and no extra broadcasting is necessary.
 @passes.verify.equality
 @passes.register("reorder")
 class MoveElementwisePastSplit(Transformation):
