@@ -23,7 +23,7 @@ ELEMENTWISE_UNARY = {
     "HardSigmoid",
     "HardSwish",
     "Identity",
-    "IfInf",
+    "IsInf",
     "IsNaN",
     "LeakyRelu",
     "Log",
