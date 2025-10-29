@@ -138,9 +138,8 @@ class ConvertLayouts(Transformation):
             x = tape.op("LayoutConverter", [out], layout, domain=CUSTOM_DOMAIN)
             _ = tape.op("Transpose", [x], perm, output=output)
 
-            # Rewire teh graph output to connect to the converter output
-            model.graph.outputs.remove(out)
-            model.graph.outputs.append(output)
+            # Rewire the graph output to connect to the converter output
+            model.graph.outputs[model.graph.outputs.index(out)] = output
 
         # Only modify the graph if converter nodes are recorded
         if tape.nodes:
