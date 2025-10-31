@@ -159,7 +159,6 @@ class MoveTransposePastPad(Transformation, RewriteRulePass):
 
     def check(self, op, x, perm, pads, const_value, axes, y):
         # Permutation must be present (references within function not allowed)
-        # return perm is not None and perm.as_ints() is not None
         if perm is not None and perm.as_ints() is not None:
             # The padding axes must be constant to relate them to the
             # permutation axes which are always constant attributes
