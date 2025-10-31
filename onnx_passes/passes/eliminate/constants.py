@@ -322,3 +322,22 @@ class EliminateIdentityCastLike(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y):
         return op.Identity(x)
+
+
+# Eliminates Expand (broadcast) where the target shape is known and the same as
+# the static shape of the input
+@passes.verify.equality
+@passes.register("eliminate")
+@passes.register("eliminate-identity")
+class EliminateIdentityExpand(Transformation, RewriteRulePass):
+    def pattern(self, op, x, shape):
+        return op.Expand(x, shape)
+
+    def check(self, op, x, shape):
+        if x.shape is not None and x.shape.is_static():
+            if (shape := ir.convenience.get_const_tensor(shape)) is not None:
+                return np.all(shape.numpy() == x.shape)
+        return False
+
+    def rewrite(self, op, x, shape):
+        return op.Identity(x)
