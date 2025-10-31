@@ -148,7 +148,7 @@ def zeros_like(op, x):
 
 # Reverse broadcasting of an array according to NumPy broadcasting semantics and
 # also squeezes all leading dimensions of size 1.
-def unbroadcast(x):
+def unbroadcast(x, squeeze=True):
     # Start collecting a list of slices which can be used to index into the
     # array to remove repeated dimensions
     slices = []
@@ -168,4 +168,9 @@ def unbroadcast(x):
 
     # Squeeze leading dimensions of size 1 as these can be restored when using
     # the array in broadcasting expressions
-    return np.reshape(y, (*dropwhile(lambda size: size == 1, y.shape),))
+    if squeeze:
+        return np.reshape(y, (*dropwhile(lambda size: size == 1, y.shape),))
+
+    # Explicitly leave unbroadcast dimensions marked as 1, i.e., keep the rank
+    # but remove redundancies
+    return y
