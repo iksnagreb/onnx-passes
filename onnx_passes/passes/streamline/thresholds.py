@@ -1,6 +1,8 @@
 # Streamlining passes are Transformations with the frontend composed of other
 # passes
-from onnx_passes.passes.base import Transformation, RewriteRuleSetPass
+from onnx_passes.passes.base import (
+    Transformation, RewriteRuleSetPass, RewriteRulePass
+)
 from onnx_passes.passes.compose import ComposePass
 
 # Need to import the passes module to set up the registry and make the
@@ -187,3 +189,86 @@ class ConvertRoundToThresholds(Transformation, RewriteRuleSetPass):
             partial(_rewrite, "Ceil"),
             partial(_rewrite, "Floor"),
         ]
+
+
+# Threshold decomposition involves approximate unbroadcasting of replacement
+# thresholds at ist core
+from onnx_passes.passes.util import unbroadcast
+
+
+def _decompose_thresholds(thresholds: np.ndarray):
+    # Draw some random thresholds covering only the final axis to replace
+    # the fine-granular thresholds. Thresholds should always be sorted.
+    t = np.sort(np.random.rand(*thresholds.shape[-2:]), axis=-1)
+    # Generate the corresponding bias in front of the thresholds acting
+    # elementwise on all axes except for the internal threshold axis.
+    bias = np.round(t - thresholds)[..., :1]
+    # As the original derivation does not assume rounding the bias, add this
+    # correction term before unbroadcasting while allowing small deviations.
+    return unbroadcast(thresholds + bias, approximate=True), bias[..., 0]
+
+
+# Decomposes fine-granular (e.g., per-element) thresholds into a fine-granular
+# integer-valued elementwise addition and per-channel thresholds if possible.
+@passes.verify.tolerance
+@passes.register("decompose-thresholds")
+class DecomposeThresholds(Transformation, RewriteRulePass):
+    def pattern(self, op, x, thresholds, weights):
+        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
+
+    def check(self, op, x, thresholds, weights):
+        # Thresholds must be constant to be decomposed, otherwise there are no
+        # known values to extract and iterate
+        if (thresholds := ir.convenience.get_const_tensor(thresholds)) is None:
+            return False
+
+        # If the threshold tensor already is of at most per-channel granularity,
+        # there is no need to decompose
+        if len(unbroadcast(thresholds.numpy()).shape) <= 2:
+            return False
+
+        # Decompose the threshold tensor into new per-channel thresholds and a
+        # corresponding per-element bias
+        t, bias = _decompose_thresholds(thresholds.numpy())
+
+        # The threshold decomposition must actually be at most per-channel
+        # granularity. No need to verify the bias shape, this is allowed to be a
+        # fine-granular tensor.
+        if len(t.shape) > 2:
+            return False
+
+        # Generate some test inputs to verify the correctness of the
+        # decomposition
+        x = np.random.randn(32, *thresholds.shape[:-1], 1)
+
+        # Verify approximate correctness of the decomposition
+        return np.all((x >= thresholds.numpy()) == (x + bias[..., None] >= t))
+
+    def rewrite(self, op, x, thresholds, weights):
+        # We start with the initial fine-granular thresholds in numpy format
+        thresholds = ir.convenience.get_const_tensor(thresholds).numpy()
+
+        # Decompose the threshold tensor into new per-channel thresholds and a
+        # corresponding per-element bias
+        thresholds, bias = _decompose_thresholds(thresholds)
+
+        # If the step weights are constant, try unbroadcasting as an unrelated
+        # optimization along the way
+        if (weights := ir.convenience.get_const_tensor(weights)) is not None:
+            weights = op.CastLike(
+                op.Constant(value=ir.tensor(unbroadcast(weights.numpy()))), x
+            )
+
+        # Insert thresholds back into ONNX constants and make sure the type is
+        # the same as the input as required by ONNX standard of elementwise
+        thresholds = op.CastLike(op.Constant(value=ir.tensor(thresholds)), x)
+
+        # Insert the new bias into ONNX constants and make sure the type is the
+        # same as the input as required by the ONNX standard of elementwise
+        bias = op.CastLike(op.Constant(value=ir.tensor(bias)), x)
+
+        # Replacement pattern: MultiThreshold decomposed into additive bias and
+        # per-channel thresholds
+        return op.MultiThreshold(
+            op.Add(x, bias), thresholds, weights, _domain=CUSTOM_DOMAIN
+        )
