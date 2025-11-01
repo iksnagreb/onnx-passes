@@ -3,7 +3,8 @@ import onnx_ir as ir
 
 # All algebraic passes are transformations derived from pattern-based rewrite
 # rules
-from onnx_passes.passes.base import Transformation, RewriteRulePass
+from onnx_passes.passes.base import Transformation, RewriteRulePass, \
+    RewriteRuleSetPass
 
 # Checking ir.Value for being constants
 from onnx_passes.passes.util import is_constant, is_scalar, unbroadcast
@@ -379,3 +380,60 @@ class MoveMulPastReduceMin(Transformation, RewriteRulePass):
                 op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims
             )
         )
+
+
+# List of operator types following the reduction trait/category
+from onnx_passes.traits.reduction import REDUCTIONS
+
+# Function with partially applied arguments: Used to greate a generator
+# mechanism inserting operators into a pattern template
+from functools import partial
+
+
+# Reducing over a single element is equivalent to reshaping (or even a no-op if
+# the reductions keeps the dimensions)
+@passes.verify.equality
+@passes.register("algebraic")
+class EliminateIdentityReduce(Transformation, RewriteRuleSetPass):
+    def pattern(self):
+        # Generic pattern template with placeholder for the reduction operator
+        def _pattern(__op__, op, x, axes, keepdims):
+            return op.__getattr__(__op__)(x, axes, keepdims=keepdims)
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in REDUCTIONS:
+            # Fix the template parameter __OP__
+            yield partial(_pattern, __OP__)
+
+    def check(self):
+        # Generic match condition template with placeholder for the reduction
+        # operator
+        def _check(__op__, op, x, axes, keepdims):
+            # Reduction axes must be constant and the input shape statically
+            # known to decide whether there is only a single reduced element
+            if x.shape is not None and x.shape.is_static():
+                if (axes := ir.convenience.get_const_tensor(axes)) is not None:
+                    if np.all(np.asarray(x.shape)[axes.numpy()] == 1):
+                        # Eliminating reduction over an empty set of values
+                        # should be handled as constant folding
+                        return np.prod(x.shape) > 0
+            # Not identity reduction or not enough information to decide
+            return False
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in REDUCTIONS:
+            # Fix the template parameter __OP__
+            yield partial(_check, __OP__)
+
+    def rewrite(self):
+        # Generic replacement template with placeholder for the reduction
+        # operator
+        def _rewrite(__op__, op, x, axes, keepdims):
+            if keepdims is not None and keepdims.as_int() == 0:
+                return op.Squeeze(x, axes)
+            return op.Identity(x)
+
+        # Instantiate the pattern variations for each operator listed above
+        for __OP__ in REDUCTIONS:
+            # Fix the template parameter __OP__
+            yield partial(_rewrite, __OP__)
