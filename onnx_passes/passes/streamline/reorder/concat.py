@@ -106,8 +106,8 @@ class MoveElementwisePastConcat(Transformation):
                 # Rewire the graph outputs to use the new instead of the old
                 model.graph.outputs[model.graph.outputs.index(out)] = output
 
-            # Collect producers at each input forming a list of stacks of
-            # candidate operators to be handled
+            # Collect producers at each input forming a list of candidate
+            # operators to be handled
             producers = [x.producer() for x in concat.inputs]
 
             # Loop until done (rather complex condition deciding when none of
@@ -152,8 +152,8 @@ class MoveElementwisePastConcat(Transformation):
                         # from each list will be concatenated, the second, ...
                         inputs.append(xs)
 
-                    # Concatenate all matched-up real inputs and forward as
-                    # inputs to the new instance of the producer operation
+                    # Concatenate all matched-up inputs and forward as inputs to
+                    # the new instance of the producer operation
                     concatenated = []
                     # Zipping the unpacked outermost list transposes the inputs,
                     # i.e., each inner list now represents of tuple of inputs to
