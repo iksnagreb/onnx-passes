@@ -28,8 +28,8 @@ def prod(*args):
 # Lowers convolution operators to MatMul (plus input generator Im2Col). The
 # optional bias is extracted as a standalone operator and grouped convolutions
 # are implemented via Split and Concat operators.
-@passes.register("lower-conv")
 @passes.verify.tolerance
+@passes.register("lower-conv")
 class ConvToMatMul(Transformation, RewriteRuleSetPass):
     def pattern(self):
         return [

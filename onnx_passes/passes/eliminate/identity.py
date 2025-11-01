@@ -307,6 +307,43 @@ class EliminateIdentityExpand(Transformation, RewriteRulePass):
         return op.Identity(x)
 
 
+# Domain used by custom operators implemented with this library
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+# Make custom Im2Col operator available for convolution lowering
+from onnx_passes.ops.im2col import Im2Col  # noqa: Used indirectly via registry
+
+
+# Eliminates Im2Col (input generators) where the output shape is the same as the
+# input shape, which is given if the kernel, stride and dilation are all 1
+@passes.verify.equality
+@passes.register("eliminate")
+@passes.register("eliminate-identity")
+class EliminateIdentityIm2Col(Transformation, RewriteRulePass):
+    def pattern(self, op, x, indices, dilations, kernel_shape, strides):
+        return op.Im2Col(
+            x, indices, dilations=dilations, kernel_shape=kernel_shape,
+            strides=strides, _domain=CUSTOM_DOMAIN
+        )
+
+    def check(self, op, x, indices, dilations, kernel_shape, strides):
+        if dilations is not None:
+            if np.any(np.asarray(dilations.as_ints()) != 1):
+                return False
+
+        if kernel_shape is not None:
+            if np.any(np.asarray(kernel_shape.as_ints()) != 1):
+                return False
+
+        if strides is not None:
+            if np.any(np.asarray(strides.as_ints()) != 1):
+                return False
+
+        return True
+
+    def rewrite(self, op, x, indices, dilations, kernel_shape, strides):
+        return op.Identity(x)
+
+
 # Identity elimination pass build into ONNX IR and ONNXScript
 from onnx_ir.passes.common import IdentityEliminationPass
 
