@@ -191,6 +191,27 @@ class RangeAnnotation(passes.base.Annotation):
         return ir.passes.PassResult(model, modified=False)
 
 
+# Removes range annotation from reachable (i.e., consumed/produced by some node)
+# value infos within the graph
+@passes.register("cleanup")
+class CleanupRangeAnnotation(passes.base.Annotation):
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        # Modify a deep copy of the original model as Annotation passes are
+        # functional passes...
+        model = ir.from_proto(ir.to_proto(model))
+
+        # Delete the range annotation from all inputs and outputs of each node
+        # in the graph is present
+        for node in RecursiveGraphIterator(model.graph, reverse=False):
+            for value in [*node.inputs, *node.outputs]:
+                if "range" in value.metadata_props:
+                    del value.metadata_props["range"]
+
+        # Annotation passes do not modify the model, but might add metadata or
+        # fill the state dictionary (not considered as modified)
+        return ir.passes.PassResult(model, modified=False)
+
+
 @register("Identity")
 def _propagate_range_identity(x):
     return x
