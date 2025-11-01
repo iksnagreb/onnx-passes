@@ -1,5 +1,8 @@
-# sys.exit for quitting upon error
+# sys.exit for quitting upon error, sys.path.extend to resolve modules in cwd
 import sys
+# os.getcwd to get the current working directory
+import os
+
 
 # Dynamically import python modules at runtime used for dynamically registering
 # passes according to configuration files
@@ -60,11 +63,15 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
         with open(state, "rb") as file:
             _state = pickle.load(file)
 
+    # Allow dynamic imports from the current working directory when running from
+    # the commandline
+    sys.path.extend([os.getcwd()])
+
     # Inject dynamic module imports if the configuration specifies an imports
     # section, e.g., for dynamically registering passes
     if "imports" in _config:
         for name in _config["imports"]:
-            importlib.__import__(name)
+            importlib.import_module(name)
 
     # The configuration file can already specify an initial sequence of ONNX IR
     # passes which will be executed before any passes specified as arguments
