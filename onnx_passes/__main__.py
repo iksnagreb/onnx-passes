@@ -138,7 +138,7 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
     # If no output file name is specified, serialize the model back to the proto
     # representation but print to the standard output - state ist lost!
     else:
-        print(ir.to_proto(result.model))
+        print(ir.to_onnx_text(result.model))
 
 
 # Entry point when actually called as a main script and not just imported
