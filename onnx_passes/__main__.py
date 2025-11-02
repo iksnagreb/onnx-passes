@@ -3,7 +3,6 @@ import sys
 # os.getcwd to get the current working directory
 import os
 
-
 # Dynamically import python modules at runtime used for dynamically registering
 # passes according to configuration files
 import importlib
@@ -16,6 +15,8 @@ import yaml
 # Pickle is used for serializing the state dictionary tracked with the ONNX IR
 # passes
 import pickle
+# Compress the serialized state dictionary using LZMA
+import lzma
 
 # Infrastructure for handling ONNX IR models and managing sequences of passes:
 #   ir.load, ir.save, ir.to_proto, ir.PassManager
@@ -115,7 +116,7 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
             # Make sure to always save the state dictionary if we have an output
             # file name - helps with debugging
             if output is not None:
-                with open(f"{output}.pkl", "wb") as file:
+                with lzma.open(f"{output}.pkl.xz", "wb") as file:
                     pickle.dump(_state, file)  # noqa: 'SupportsWrite[bytes]'?
             # Exit with printing the exception name and message
             sys.exit(f"{error.__class__.__name__}: {error}")
@@ -132,7 +133,7 @@ def main(model: str, passes: list[str], output: str, config: str, state: str):
         ir.save(result.model, output)
         # Derive the state dictionary name from the output model name by
         # appending the pickle suffix
-        with open(f"{output}.pkl", "wb") as file:
+        with lzma.open(f"{output}.pkl.xz", "wb") as file:
             pickle.dump(_state, file)  # noqa: 'SupportsWrite[bytes]'?
     # If no output file name is specified, serialize the model back to the proto
     # representation but print to the standard output - state ist lost!

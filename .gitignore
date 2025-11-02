@@ -8,6 +8,7 @@
 __pycache__
 *.npy
 *.pkl
+*.pkl.xz
 # Python packages and poetry lockfile
 dist/
 poetry.lock
