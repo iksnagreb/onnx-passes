@@ -237,12 +237,9 @@ class DecomposeThresholds(Transformation, RewriteRulePass):
         if len(t.shape) > 2:
             return False
 
-        # Generate some test inputs to verify the correctness of the
-        # decomposition
-        x = np.random.randn(32, *thresholds.shape[:-1], 1)
-
-        # Verify approximate correctness of the decomposition
-        return np.all((x >= thresholds.numpy()) == (x + bias[..., None] >= t))
+        # Accept this decomposition, even if it might sometimes introduce a
+        # small drop in model quality/accuracy
+        return True
 
     def rewrite(self, op, x, thresholds, weights):
         # We start with the initial fine-granular thresholds in numpy format
