@@ -34,6 +34,23 @@ class EliminateIdentityMul(Transformation, RewriteRulePass):
         return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
 
 
+# Removes all divisions without effect from the graph, i.e., x / 1 = x
+@passes.verify.equality
+@passes.register("eliminate")
+@passes.register("eliminate-identity")
+class EliminateIdentityDiv(Transformation, RewriteRulePass):
+    def pattern(self, op, x, a):
+        return op.Div(x, a, _outputs=["_out"])
+
+    def check(self, op, x, a, _out):
+        if a := ir.convenience.get_const_tensor(a):
+            return _out.shape is not None and np.all(a.numpy() == 1)
+        return False
+
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+
+
 # Removes all bitwise-and without effect from the graph, i.e., x & 11...1 = x
 @passes.verify.equality
 @passes.register("eliminate")
@@ -87,6 +104,23 @@ class EliminateIdentityAdd(Transformation, RewriteRulePass):
 
     def pattern(self, op, x, a):
         return op.Add(x, a, _outputs=["_out"])
+
+    def check(self, op, x, a, _out):
+        if a := ir.convenience.get_const_tensor(a):
+            return _out.shape is not None and np.all(a.numpy() == 0)
+        return False
+
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+
+
+# Removes all subtractions without effect from the graph, i.e., x - 0 = x
+@passes.verify.equality
+@passes.register("eliminate")
+@passes.register("eliminate-identity")
+class EliminateIdentitySub(Transformation, RewriteRulePass):
+    def pattern(self, op, x, a):
+        return op.Sub(x, a, _outputs=["_out"])
 
     def check(self, op, x, a, _out):
         if a := ir.convenience.get_const_tensor(a):
