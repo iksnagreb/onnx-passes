@@ -79,7 +79,7 @@ class EliminateComparison(Transformation, RewriteRuleSetPass):
 
 # A. Same value is added to both sides of a comparison: Remove the addition and
 # expand the output to recover the shape after broadcasting...
-@passes.verify.equality
+@passes.verify.tolerance
 @passes.register("algebraic")
 class EliminateAddFromComparison(Transformation, RewriteRuleSetPass):
     @property
@@ -132,7 +132,7 @@ class EliminateAddFromComparison(Transformation, RewriteRuleSetPass):
 
 # B. Different values added to either side of a comparison: Rearrange such that
 # constants end up on the right side and non-constants on the left...
-@passes.verify.equality
+@passes.verify.tolerance
 @passes.register("algebraic")
 class GroupAddComparison(Transformation, RewriteRuleSetPass):
     @property
@@ -237,7 +237,7 @@ class GroupAddComparison(Transformation, RewriteRuleSetPass):
 # # value on either side...
 # # TODO: Seems just to be a special case of the more genric reordering above,
 # #  just skipping some extra steps when the bare constant is on the left?
-# @passes.verify.equality
+# @passes.verify.tolerance
 # @passes.register("algebraic")
 # class AbsorbAddIntoComparison(Transformation, RewriteRuleSetPass):
 #     @property
@@ -303,7 +303,7 @@ class GroupAddComparison(Transformation, RewriteRuleSetPass):
 # value on either side, if the absorbed constant is positive
 # TODO: Handle more generic case of negative constants which flip the comparison
 #  to its converse
-@passes.verify.equality
+@passes.verify.tolerance
 @passes.register("algebraic")
 class AbsorbMulIntoComparison(Transformation, RewriteRuleSetPass):
     @property
@@ -387,7 +387,7 @@ def max_like(op, x):
 # Absorbs Clip operators into the constant side of a comparison operator by
 # applying a generalized inverse of Clip s.t.
 #   Clip(x, min, max) == a <=> x == Clip^-1(x, min, max)
-@passes.verify.equality
+@passes.verify.tolerance
 @passes.register("algebraic")
 class AbsorbClipIntoComparison(Transformation, RewriteRuleSetPass):
     # Generalized inverse of clipping: Pushes out of bounds inputs to the
@@ -531,7 +531,7 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
 #  to simplify the rule definitions here?
 
 
-@passes.verify.equality
+@passes.verify.tolerance
 @passes.register("algebraic")
 class AbsorbReluIntoComparison(_AbsorbFunctionIntoComparison):
     __FUNCTION__ = lambda _, op, x: op.Relu(x)
@@ -543,7 +543,7 @@ class AbsorbReluIntoComparison(_AbsorbFunctionIntoComparison):
         return op.Where(op.Less(x, zeros_like(op, x)), min_like(op, x), x)
 
 
-@passes.verify.equality
+@passes.verify.tolerance
 @passes.register("algebraic")
 class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
     __FUNCTION__ = lambda _, op, x: op.Sigmoid(x)
