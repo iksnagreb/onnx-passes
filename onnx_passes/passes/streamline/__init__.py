@@ -18,15 +18,15 @@ class Streamline(passes.compose.ComposePass, passes.base.Transformation):
     # Ordered sequence of passes and pass collections to be applied for each
     # iteration of streamlining
     __passes__ = [
-        # Core of streamlining: Rearranging operators and grouping constants and
-        # non-constants, such as scales and biases
-        "algebraic",
         # Core of streamlining: Factorization of multiplication-like operators
         # pulling out common scale factors
         "factorize",
         # Core of streamlining: Remove redundant parameters if they can be
         # restored via broadcasting rules
         "unbroadcast",
+        # Core of streamlining: Rearranging operators and grouping constants and
+        # non-constants, such as scales and biases
+        "algebraic",
         # Core of streamlining: Rearranging operators related to shape and
         # layout transformations, such as Reshape, Transpose, Slice, ...
         "reorder",
