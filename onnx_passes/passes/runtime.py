@@ -76,6 +76,9 @@ def evaluate_model(model: ir.Model, inputs: list,
     )
     # Only show error and fatal messages
     sess_options.log_severity_level = 3
+    # Disable the memory arena on CPU, which seems to result in excessive memory
+    # utilization sometimes
+    sess_options.enable_cpu_mem_arena = False
 
     # Create an inference session from the ONNX model converted to proto
     # representation
