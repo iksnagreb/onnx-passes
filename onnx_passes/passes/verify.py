@@ -66,6 +66,14 @@ def top_5_accuracy(produced: list, expected: list) -> float:
     return float(sum((predictions == classes).any(axis=-1)) / total)  # noqa
 
 
+# Counts the number of mispredictions by taking the argmax along the final axis
+def count_mispredictions(produced: list, expected: list) -> float:
+    # Unwrap the single probability and expected probabilities tensors
+    probabilities, expected = produced[0], expected[0]
+    # Count instances where the predicted and expected class differ
+    return np.sum(probabilities.argmax(axis=-1) != expected.argmax(axis=-1))
+
+
 # Injects equality-based verification into an ONNX IR pass by checking if the
 # model output on some reference is equal to the known expected output
 def equality(cls: type[Pass]):
