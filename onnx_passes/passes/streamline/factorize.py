@@ -60,3 +60,29 @@ class ExtractCommonScaleFromMatMul(Transformation, RewriteRulePass):
         # Replacement pattern: Divide common scale from inputs to MatMuls on the
         # input side and reintroduce both scales on the output side
         return op.Mul(op.MatMul(x, y), op.Mul(scale_x, scale_y))
+
+
+# Extracts common floating-point factors from constant inputs to Gather if this
+# results in a single scalar following the Gather. This only applies to the data
+# input of the Gather operator.
+@passes.verify.tolerance
+@passes.register("factorize")
+class ExtractCommonScaleFromGather(Transformation, RewriteRulePass):
+    def pattern(self, op, data, indices):
+        return op.Gather(data, indices)
+
+    def check(self, op, data, indices):
+        return _extract_common_scale(data) != 1
+
+    def rewrite(self, op, data, indices):
+        # Common scales (or 1.0) of the data input
+        scale = op.Constant(value_float=_extract_common_scale(data))
+
+        # Round should not be injected on non factorized and especially not on
+        # non-constant inputs
+        if _extract_common_scale(data) != 1:
+            data = op.Round(op.Div(data, scale))
+
+        # Replacement pattern: Divide common scale from input to Gather on the
+        # input side and reintroduce the same scale on the output side
+        return op.Mul(op.Gather(data, indices), scale)
