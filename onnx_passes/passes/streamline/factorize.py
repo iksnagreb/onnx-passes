@@ -78,11 +78,6 @@ class ExtractCommonScaleFromGather(Transformation, RewriteRulePass):
         # Common scales (or 1.0) of the data input
         scale = op.Constant(value_float=_extract_common_scale(data))
 
-        # Round should not be injected on non factorized and especially not on
-        # non-constant inputs
-        if _extract_common_scale(data) != 1:
-            data = op.Round(op.Div(data, scale))
-
         # Replacement pattern: Divide common scale from input to Gather on the
         # input side and reintroduce the same scale on the output side
-        return op.Mul(op.Gather(data, indices), scale)
+        return op.Mul(op.Gather(op.Round(op.Div(data, scale)), indices), scale)
