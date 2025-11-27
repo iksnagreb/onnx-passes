@@ -1,3 +1,6 @@
+# Environment variables...
+import os
+
 # ir.Model, ir.from_proto, ir.to_proto, ...
 import onnx_ir as ir
 
@@ -79,6 +82,16 @@ def evaluate_model(model: ir.Model, inputs: list,
     # Disable the memory arena on CPU, which seems to result in excessive memory
     # utilization sometimes
     sess_options.enable_cpu_mem_arena = False
+
+    # Limit the number of threads when managed via SLURM to avoid issues with
+    #   pthread_setaffinity_np spamming the error log/terminal
+    if "SLURM_JOB_CPUS_PER_NODE" in os.environ:
+        sess_options.inter_op_num_threads = (
+            int(os.environ["SLURM_JOB_CPUS_PER_NODE"])
+        )
+        sess_options.intra_op_num_threads = (
+            int(os.environ["SLURM_JOB_CPUS_PER_NODE"])
+        )
 
     # Create an inference session from the ONNX model converted to proto
     # representation
