@@ -27,7 +27,7 @@ def _extract_common_scale(x: ir.Value) -> float:
 
         # Pulling out the scale and multiplying it back must yield the same
         # result within some tolerance
-        if np.allclose(x, scale * np.round(x.numpy() / scale)):
+        if np.allclose(x.numpy(), scale * np.round(x.numpy() / scale)):
             return scale.item()
     # Common factor of 1.0 can trivially be pulled out of any tensor
     return 1.0
