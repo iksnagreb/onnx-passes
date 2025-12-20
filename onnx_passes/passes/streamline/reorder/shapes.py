@@ -565,6 +565,13 @@ class MoveMulPastReshape(_MoveElementwisePastReshape):
 
 @passes.verify.equality
 @passes.register("reorder")
+class MoveSquarePastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Mul(x, x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("reorder")
 class MoveDivPastReshape(_MoveElementwisePastReshape):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Div(x, y, **kwargs)
