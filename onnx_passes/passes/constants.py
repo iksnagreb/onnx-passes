@@ -78,7 +78,6 @@ class FoldConstantShape(Transformation, RewriteRulePass):
 # shapes) are not supported
 @passes.verify.equality
 @passes.register("fold-constants")
-@passes.register()
 class FoldConstantSize(Transformation, RewriteRulePass):
     def pattern(self, op, x):
         return op.Size(x)
@@ -157,3 +156,53 @@ def _fold_constants_im2col(node: ir.Node, op, _):
     return op.Constant(
         value=ir.tensor(x.numpy().reshape(x.shape[0], -1)[:, indices.numpy()])
     )
+
+
+# Use ONNX Script implementation of inverse Swish and Silu in eager mode
+# evaluation, i.e., executing the Python/Numpy, during constant folding
+from onnx_passes.ops.inverse_swish import InverseSwish, InverseSilu
+
+
+@register("InverseSwish", domain=CUSTOM_DOMAIN)
+def _fold_constants_inverse_swish(node: ir.Node, op, _):
+    # Skip if there are not exactly one input (Swish and its inverse are unary)
+    if len(node.inputs) != 1:
+        return None
+
+    # Constant folding requires the input to be constants, otherwise there is
+    # nothing to fold...
+    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    # Default Swish alpha is 1.0, according to ONNX operators reference:
+    #   https://onnx.ai/onnx/operators/onnx__Swish.html
+    if (alpha := node.attributes.get("alpha")) is None:
+        alpha = ir.Attr("alpha", ir.AttributeType.FLOAT, 1.0)
+
+    # Default InverseSwish k is 0, i.e., the principal branch
+    if (k := node.attributes.get("k")) is None:
+        k = ir.Attr("k", ir.AttributeType.INT, 0)
+
+    # Use the eager mode evaluation to generate the folded constant node
+    return op.Constant(value=ir.tensor(
+        InverseSwish(x.numpy(), k=k.as_int(), alpha=alpha.as_int())
+    ))
+
+
+@register("InverseSilu", domain=CUSTOM_DOMAIN)
+def _fold_constants_inverse_silu(node: ir.Node, op, _):
+    # Skip if there are not exactly one input (Swish and its inverse are unary)
+    if len(node.inputs) != 1:
+        return None
+
+    # Constant folding requires the input to be constants, otherwise there is
+    # nothing to fold...
+    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    # Default InverseSilu k is 0, i.e., the principal branch
+    if (k := node.attributes.get("k")) is None:
+        k = ir.Attr("k", ir.AttributeType.INT, 0)
+
+    # Use the eager mode evaluation to generate the folded constant node
+    return op.Constant(value=ir.tensor(InverseSilu(x.numpy(), k=k.as_int())))
