@@ -572,6 +572,16 @@ class MoveSquarePastReshape(_MoveElementwisePastReshape):
 
 @passes.verify.equality
 @passes.register("reorder")
+class MoveSiluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Mul(op.Sigmoid(x), x, **kwargs)
+
+    @property
+    def commute(self):
+        return True
+
+@passes.verify.equality
+@passes.register("reorder")
 class MoveDivPastReshape(_MoveElementwisePastReshape):
     __operator__ = lambda _, op, x, y, **kwargs: \
         op.Div(x, y, **kwargs)
