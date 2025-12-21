@@ -92,14 +92,14 @@ class EliminateAbsorption(_Absorption, _Commutative):
 @passes.register("algebraic")
 class EliminateAnnihilatorAnd(_Annihilator, _Commutative):
     __OP__ = lambda _, op, x, y: op.And(x, y)
-    __ANNIHILATOR__ = 0
+    __ANNIHILATOR__ = False
 
 
 @passes.verify.equality
 @passes.register("algebraic")
 class EliminateAnnihilatorOr(_Annihilator, _Commutative):
     __OP__ = lambda _, op, x, y: op.Or(x, y)
-    __ANNIHILATOR__ = ~0  # = 111...1
+    __ANNIHILATOR__ = True
 
 
 # ==============================================================================
