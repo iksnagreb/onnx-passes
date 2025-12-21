@@ -36,7 +36,7 @@ def InverseSwish(x, alpha: float = 1.0, k: int = 0, tolerance: float = 1.0e-8):
     return op.Where(
         k == 0,
         op.Where(
-            x >= x_min, x + alpha ** -1 * w, -inf
+            x >= x_min, op.Where(x >= inf, inf, x + alpha ** -1 * w), -inf
         ),
         op.Where(
             k == -1,
