@@ -41,7 +41,7 @@ def InverseSwish(x, alpha: float = 1.0, k: int = 0, tolerance: float = 1.0e-8):
         op.Where(
             k == -1,
             op.Where(
-                x < 0.0, op.Where(x >= x_min, x + alpha ** -1 * w, -inf), inf
+                x < 0.0, op.Where(x >= x_min, x + alpha ** -1 * w, inf), -inf
             ),
             # Fallback: As ONNX Script needs to trace all branches and cannot
             # raise exceptions, NaN is returned for k not in {0,-1}
