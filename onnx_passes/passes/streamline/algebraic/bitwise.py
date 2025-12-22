@@ -148,11 +148,15 @@ class DeMorganBitwise(Transformation, RewriteRuleSetPass):
     def pattern(self):
         return [
             lambda op, x, y: op.BitwiseAnd(op.BitwiseNot(x), op.BitwiseNot(y)),
-            lambda op, x, y: op.BitwiseOr(op.BitwiseNot(x), op.BitwiseNot(y))
+            lambda op, x, y: op.BitwiseOr(op.BitwiseNot(x), op.BitwiseNot(y)),
+            lambda op, x, y: op.BitwiseNot(op.And(op.BitwiseNot(x), y)),
+            lambda op, x, y: op.BitwiseNot(op.Or(op.BitwiseNot(x), y))
         ]
 
     def rewrite(self):
         return [
             lambda op, x, y: op.BitwiseNot(op.BitwiseOr(x, y)),
-            lambda op, x, y: op.BitwiseNot(op.BitwiseAnd(x, y))
+            lambda op, x, y: op.BitwiseNot(op.BitwiseAnd(x, y)),
+            lambda op, x, y: op.BitwiseOr(x, op.BitwiseNot(y)),
+            lambda op, x, y: op.BitwiseAnd(x, op.BitwiseNot(y))
         ]

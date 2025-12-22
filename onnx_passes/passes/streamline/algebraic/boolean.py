@@ -148,11 +148,15 @@ class DeMorganBoolean(Transformation, RewriteRuleSetPass):
     def pattern(self):
         return [
             lambda op, x, y: op.And(op.Not(x), op.Not(y)),
-            lambda op, x, y: op.Or(op.Not(x), op.Not(y))
+            lambda op, x, y: op.Or(op.Not(x), op.Not(y)),
+            lambda op, x, y: op.Not(op.And(op.Not(x), y)),
+            lambda op, x, y: op.Not(op.Or(op.Not(x), y))
         ]
 
     def rewrite(self):
         return [
             lambda op, x, y: op.Not(op.Or(x, y)),
-            lambda op, x, y: op.Not(op.And(x, y))
+            lambda op, x, y: op.Not(op.And(x, y)),
+            lambda op, x, y: op.Or(x, op.Not(y)),
+            lambda op, x, y: op.And(x, op.Not(y))
         ]
