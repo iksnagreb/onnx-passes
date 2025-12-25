@@ -165,7 +165,7 @@ from onnx_passes.ops.inverse_swish import InverseSwish, InverseSilu
 
 @register("InverseSwish", domain=CUSTOM_DOMAIN)
 def _fold_constants_inverse_swish(node: ir.Node, op, _):
-    # Skip if there are not exactly one input (Swish and its inverse are unary)
+    # Skip if there is not exactly one input (Swish and its inverse are unary)
     if len(node.inputs) != 1:
         return None
 
@@ -191,7 +191,7 @@ def _fold_constants_inverse_swish(node: ir.Node, op, _):
 
 @register("InverseSilu", domain=CUSTOM_DOMAIN)
 def _fold_constants_inverse_silu(node: ir.Node, op, _):
-    # Skip if there are not exactly one input (Swish and its inverse are unary)
+    # Skip if there is not exactly one input (Swish and its inverse are unary)
     if len(node.inputs) != 1:
         return None
 
@@ -206,3 +206,28 @@ def _fold_constants_inverse_silu(node: ir.Node, op, _):
 
     # Use the eager mode evaluation to generate the folded constant node
     return op.Constant(value=ir.tensor(InverseSilu(x.numpy(), k=k.as_int())))
+
+
+# Use ONNX Script implementation of ArgSort in eager mode evaluation, i.e.,
+# executing the Python/Numpy, during constant folding
+from onnx_passes.ops.argsort import ArgSort
+
+
+@register("ArgSort", domain=CUSTOM_DOMAIN)
+def _fold_constants_argsort(node: ir.Node, op, _):
+    # Skip if there is not exactly one input (ArgSort does not accept further
+    # inputs)
+    if len(node.inputs) != 1:
+        return None
+
+    # Constant folding requires the input to be constants, otherwise there is
+    # nothing to fold...
+    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    # Default ArgSort axis is -1, i.e., sort along the last axis
+    if (axis := node.attributes.get("axis")) is None:
+        axis = ir.Attr("axis", ir.AttributeType.INT, -1)
+
+    # Use the eager mode evaluation to generate the folded constant node
+    return op.Constant(value=ir.tensor(ArgSort(x.numpy(), axis=axis.as_int())))
