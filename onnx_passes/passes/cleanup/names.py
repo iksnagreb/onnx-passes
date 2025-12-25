@@ -20,8 +20,6 @@ class GiveUniqueNames(passes.base.Transformation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         # Track whether any node actually changed
         modified = False
-        # Modify a deep copy of the original model
-        model = ir.from_proto(ir.to_proto(model))
         # Start counting global inputs and outputs to the graph
         inputs, outputs = [], []
 
@@ -118,7 +116,8 @@ class GiveUniqueNames(passes.base.Transformation):
             #  immutable, however, this seems to work fine..
             out.name = name
 
-        # We prefer functional passes - return a deep copy to be modified
+        # Wrap modified model in PassResult object but never indicate it to be
+        # modified
         # TODO: Seems to never stop when returning the true modification state
         #  as iterations overwrite the result of previous over and over again...
         return ir.passes.PassResult(model, False)

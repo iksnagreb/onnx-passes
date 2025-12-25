@@ -30,8 +30,6 @@ class UnbroadcastElementwise(Transformation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         # Track whether any node actually changed
         modified = False
-        # Modify a deep copy of the original model
-        model = ir.from_proto(ir.to_proto(model))
 
         # Tape recording initializers to be inserted into the graph at the end
         tape = ir.tape.Tape()
@@ -116,6 +114,6 @@ class UnbroadcastElementwise(Transformation):
         for initializer in tape.initializers:
             model.graph.register_initializer(initializer)
 
-        # Potentially modified copy of the model and indicator whether the model
-        # actually changed
+        # Potentially modified model and indicator whether the model actually
+        # changed
         return ir.passes.PassResult(model, modified)

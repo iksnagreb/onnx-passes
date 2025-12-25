@@ -9,7 +9,7 @@ import abc
 import onnx_ir as ir
 
 # Base classes inherited from ONNX IR used by the custom ONNX passes
-from onnx_ir.passes import PassBase, FunctionalPass
+from onnx_ir.passes import PassBase, FunctionalPass, InPlacePass
 
 
 # Base class for deriving all custom passes of the ONNX IR pass library: This
@@ -187,11 +187,12 @@ class Analysis(Pass, abc.ABC):
         return False
 
 
-# Base class for deriving annotation passes, which are functional passes, i.e.,
-# may return a modified copy of the original model but may not modify the
-# original model. Annotation passes *should* not modify the structure or any
-# values contained in the model, only attributes, shapes or data types.
-class Annotation(Pass, FunctionalPass, abc.ABC):
+# Base class for deriving annotation passes, which are in-place passes which
+# modify the original model.
+#
+# Annotation passes *should* not modify the structure or any values contained in
+# the model, only attributes, shapes or data types.
+class Annotation(Pass, InPlacePass, abc.ABC):
     ...
 
 
@@ -199,11 +200,12 @@ class Annotation(Pass, FunctionalPass, abc.ABC):
 from onnxscript.optimizer import remove_unused_nodes
 
 
-# Base class for deriving transformation passes, which are functional passes,
-# i.e., may return a modified copy of the original model but may not modify the
-# original model. Transformation passes may modify arbitrary properties of the
-# model, including structure and values.
-class Transformation(Pass, FunctionalPass, abc.ABC):
+# Base class for deriving transformation passes, which are in-place passes which
+# modify the original model.
+#
+# Transformation passes may modify arbitrary properties of the model, including
+# structure and values.
+class Transformation(Pass, InPlacePass, abc.ABC):
     # There might be unused nodes after transforming parts of the graph, always
     # make sure to remove those before checking any other post-conditions - this
     # mostly prevents the output to be spammed with warning messages...
@@ -264,12 +266,12 @@ class RewriteRulePass(Pass, abc.ABC):
         return False
 
     # Implement the pass by assembling the pattern-based rewrite rule from the
-    # class definition and applying it to a deep copy of the model
+    # class definition
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         # Create a rule set from the class definition and commutativity flag
         rule_set = RewriteRuleSet([self.rule()], commute=self.commute)
-        # Apply the rule as the single rule of a rewrite pass on the model copy
-        return RewritePass(rule_set)(ir.from_proto(ir.to_proto(model)))
+        # Apply the rule as the single rule of a rewrite pass
+        return RewritePass(rule_set)(model)
 
 
 # Partial application of function used to bind match conditions to the wrapper
@@ -336,9 +338,9 @@ class RewriteRuleSetPass(Pass, abc.ABC):
         return False
 
     # Implement the pass by assembling the pattern-based rewrite rule from the
-    # class definition and applying it to a deep copy of the model
+    # class definition
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         # Create a rule set from the class definition and commutativity flag
         rule_set = RewriteRuleSet(self.rules(), commute=self.commute)
-        # Apply the rules as the rewrite pass on the model copy
-        return RewritePass(rule_set)(ir.from_proto(ir.to_proto(model)))
+        # Apply the rules as the rewrite pass
+        return RewritePass(rule_set)(model)

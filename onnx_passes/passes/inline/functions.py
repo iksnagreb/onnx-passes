@@ -14,7 +14,5 @@ import onnx_passes.passes as passes
 @passes.register("inline")
 @passes.register("inline-functions")
 class InlineFunctions(passes.base.Transformation):
-    # Applies the built-in ONNX IR function inline pass on a deep copy of the
-    # model (as we prefer functional passes not modifying the original).
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return InlinePass()(ir.from_proto(ir.to_proto(model)))
+        return InlinePass()(model)

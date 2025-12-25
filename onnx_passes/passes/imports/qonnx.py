@@ -4,7 +4,8 @@ import onnx_passes.passes as passes
 
 # Derive Transformations (allowed to modify the graph) from pattern-based
 # rewrite rules
-from onnx_passes.passes.base import Transformation, RewriteRulePass
+from onnx_passes.passes.base import Pass, FunctionalPass, Transformation, \
+    RewriteRulePass
 
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN, inject_custom_ops
@@ -123,20 +124,15 @@ QONNX_MINIMUM_OPSET_VERSION = 19
 
 # QONNX Quant function implements configurable rounding mode via string
 # comparison inside the graph, Equal supports string comparison since opset 19
-class _ConvertQONNXMinimumVersion(passes.base.Annotation):
+class _ConvertQONNXMinimumVersion(Pass, FunctionalPass):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        # Always start with a copy of the model as all passes are not in-place
-        model = ir.from_proto(ir.to_proto(model))
-
         # No need to convert the version if already above the minimum
         onnx_opset_version = model.graph.opset_imports[""]
         if onnx_opset_version >= QONNX_MINIMUM_OPSET_VERSION:
             return ir.passes.PassResult(model, False)
 
         # Convert to the minimum version required
-        result = ConvertVersionPass(QONNX_MINIMUM_OPSET_VERSION)(
-            ir.from_proto(ir.to_proto(model))
-        )
+        result = ConvertVersionPass(QONNX_MINIMUM_OPSET_VERSION)(model)
 
         # Re-inject the custom operator functions into the models inlines and
         # removes function definitions
@@ -146,7 +142,7 @@ class _ConvertQONNXMinimumVersion(passes.base.Annotation):
 # Bundles QONNX operator import and required version conversion passes in the
 # required order
 @passes.register("import-qonnx")
-class ImportQONNX(passes.compose.ComposePass, passes.base.Transformation):
+class ImportQONNX(passes.compose.ComposePass, FunctionalPass):
     __passes__ = [
         _ConvertQONNXMinimumVersion,
         ImportQONNXQuant,

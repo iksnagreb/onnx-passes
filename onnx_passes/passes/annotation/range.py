@@ -158,9 +158,6 @@ def _set_range(value: ir.Value, _min: Any = None, _max: Any = None):
 @passes.register("range-annotation")
 class RangeAnnotation(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        # Modify a deep copy of the original model as Annotation passes are
-        # functional passes...
-        model = ir.from_proto(ir.to_proto(model))
         # Iterate all nodes in the graph - forward iterator as we are
         # propagating ranges from the input to the output
         for node in RecursiveGraphIterator(model.graph, reverse=False):
@@ -196,10 +193,6 @@ class RangeAnnotation(passes.base.Annotation):
 @passes.register("cleanup")
 class CleanupRangeAnnotation(passes.base.Annotation):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        # Modify a deep copy of the original model as Annotation passes are
-        # functional passes...
-        model = ir.from_proto(ir.to_proto(model))
-
         # Delete the range annotation from all inputs and outputs of each node
         # in the graph is present
         for node in RecursiveGraphIterator(model.graph, reverse=False):

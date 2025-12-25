@@ -24,6 +24,11 @@ ALWAYS_FOLD_OPS = {
     "Transpose", "Constant", "ConstantOfShape", "Reshape", "Not", "Split"
 }
 
+# Disables all size limits ofr constant-folding
+NO_LIMITS = {
+    "input_size_limit": np.inf, "output_size_limit": np.inf
+}
+
 
 # TODO: Come up with more clever folding strategies, for now this tries to fold
 #  everything, which is probably fine with MatMul scale factor extraction?
@@ -35,18 +40,13 @@ def _should_fold(_: ir.Node):
 @passes.verify.tolerance
 @passes.register("fold-constants")
 class FoldConstants(Transformation):
-    # Applies the built-in ONNX IR constant folding pass on a deep copy of the
-    # model (as we prefer functional passes not modifying the original).
     def call(self, model: ir.Model) -> ir.passes.PassResult:
-        # Make a deep copy of the model on which the constant folding can
-        # operate in-place
-        model = ir.from_proto(ir.to_proto(model))
         # Configure constant folding behavior: Size limits of constant foldable
         # tensors - disable all size limits by default
-        kwargs = self.config.setdefault("fold_constants", {
-            "input_size_limit": np.inf, "output_size_limit": np.inf
-        })
-        # Run in-place constant folding on deep copy - yields PassResult
+        kwargs = self.config.setdefault(
+            "fold_constants", {**NO_LIMITS, "onnx_shape_inference": True}
+        )
+        # Run in-place constant - yields PassResult
         modified = fold_constants(model, should_fold=_should_fold,
                                   **kwargs).modified
         # Constant folding might leave unused initializer nodes in the graph

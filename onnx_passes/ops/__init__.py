@@ -47,11 +47,11 @@ import onnx_passes.passes as passes
 
 # Inserting custom ops is considered as an annotation pass as it does not really
 # modify the model graph structure or values
-from onnx_passes.passes.base import Annotation
+from onnx_passes.passes.base import Pass, FunctionalPass
 
 
 # Annotation pass inserting custom operator functions into the model
 @passes.register("inject-ops")
-class InjectCustomOps(Annotation):
+class InjectCustomOps(Pass, FunctionalPass):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.PassResult(inject_custom_ops(model), False)
