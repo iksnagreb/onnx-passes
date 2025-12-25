@@ -9,6 +9,10 @@ import onnx_passes.passes as passes
 # rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
+# Some functions are defined in the custom domain and needs to be made available
+# as an ONNX Script function once used
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+
 # NumPy used for calculations on shapes and constant tensors in rewrites and
 # match conditions
 import numpy as np
@@ -572,13 +576,25 @@ class MoveSquarePastReshape(_MoveElementwisePastReshape):
 
 @passes.verify.equality
 @passes.register("reorder")
-class MoveSiluPastReshape(_MoveElementwisePastReshape):
+class MoveCompositeSiluPastReshape(_MoveElementwisePastReshape):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Mul(op.Sigmoid(x), x, **kwargs)
 
     @property
     def commute(self):
         return True
+
+
+@passes.verify.equality
+@passes.register("reorder")
+class MoveCompositeSwishPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, alpha, **kwargs: \
+        op.Mul(op.Sigmoid(op.Mul(x, alpha)), x, **kwargs)
+
+    @property
+    def commute(self):
+        return True
+
 
 @passes.verify.equality
 @passes.register("reorder")
@@ -809,6 +825,20 @@ class MoveExpPastReshape(_MoveElementwisePastReshape):
 class MoveFloorPastReshape(_MoveElementwisePastReshape):
     __operator__ = lambda _, op, x, **kwargs: \
         op.Floor(x, **kwargs)
+
+
+@passes.verify.equality
+@passes.register("reorder")
+class MoveFusedSiluPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Silu(x, **kwargs, _domain=CUSTOM_DOMAIN)
+
+
+@passes.verify.equality
+@passes.register("reorder")
+class MoveFusedSwishPastReshape(_MoveElementwisePastReshape):
+    __operator__ = lambda _, op, x, **kwargs: \
+        op.Swish(x, _domain=CUSTOM_DOMAIN)
 
 
 @passes.verify.equality

@@ -1,3 +1,6 @@
+# ir.Value, ir.convenience.get_const_tensor
+import onnx_ir as ir
+
 # Algebraic properties as transformation templates
 from onnx_passes.passes.streamline.algebraic._properties import (
     _Associative,
@@ -17,6 +20,9 @@ from onnx_passes.passes.base import Transformation, RewriteRulePass, \
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
 import onnx_passes.passes as passes
+
+# NumPy used during match condition checks to operate on shapes and tensors
+import numpy as np
 
 
 # ==============================================================================
@@ -149,14 +155,45 @@ class DeMorganBitwise(Transformation, RewriteRuleSetPass):
         return [
             lambda op, x, y: op.BitwiseAnd(op.BitwiseNot(x), op.BitwiseNot(y)),
             lambda op, x, y: op.BitwiseOr(op.BitwiseNot(x), op.BitwiseNot(y)),
-            lambda op, x, y: op.BitwiseNot(op.And(op.BitwiseNot(x), y)),
-            lambda op, x, y: op.BitwiseNot(op.Or(op.BitwiseNot(x), y))
         ]
 
     def rewrite(self):
         return [
             lambda op, x, y: op.BitwiseNot(op.BitwiseOr(x, y)),
             lambda op, x, y: op.BitwiseNot(op.BitwiseAnd(x, y)),
-            lambda op, x, y: op.BitwiseOr(x, op.BitwiseNot(y)),
-            lambda op, x, y: op.BitwiseAnd(x, op.BitwiseNot(y))
         ]
+
+
+@passes.verify.equality
+@passes.register("algebraic")
+class MoveBitwiseNotPastBitwiseXor(Transformation, RewriteRulePass):
+    @property
+    def commute(self) -> bool:
+        return True
+
+    def pattern(self, op, x, y):
+        return op.BitwiseXor(op.BitwiseNot(x), y)
+
+    def rewrite(self, op, x, y):
+        return op.BitwiseNot(op.BitwiseXor(x, y))
+
+
+@passes.verify.equality
+@passes.register("algebraic")
+class ConvertBitwiseXorToBitwiseNot(Transformation, RewriteRulePass):
+    @property
+    def commute(self) -> bool:
+        return True
+
+    def pattern(self, op, x, a):
+        return op.BitwiseXor(x, a, _outputs=["_out"])
+
+    def check(self, op, x, a, _out):
+        if a := ir.convenience.get_const_tensor(a):
+            return _out.shape is not None and np.all(a.numpy() == ~0)
+        return False
+
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(
+            op.BitwiseNot(x), op.Constant(value_ints=list(_out.shape))
+        )

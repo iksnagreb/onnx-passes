@@ -1,6 +1,9 @@
 # ir.Model, ir.DataType, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
 import onnx_ir as ir
 
+# Matching against one value pattern from a selection of alternative patterns
+from onnxscript.rewriter.pattern import OrValue
+
 # Algebraic properties as transformation templates
 from onnx_passes.passes.streamline.algebraic._properties import _Converse
 
@@ -75,6 +78,55 @@ class EliminateComparison(Transformation, RewriteRuleSetPass):
         return [
             true_like, true_like, true_like, false_like, false_like
         ]
+
+
+# Eliminates instances of comparing a tensor to infinities, which yields a
+# constant.
+@passes.verify.equality
+@passes.register("algebraic")
+class EliminateInfinityComparison(Transformation, RewriteRuleSetPass):
+    def pattern(self):
+        return [
+            lambda op, x, a: op.LessOrEqual(x, a),
+            lambda op, x, a: op.GreaterOrEqual(x, a),
+            lambda op, x, a: op.Less(x, a),
+            lambda op, x, a: op.Greate(x, a),
+
+            lambda op, x, a: op.Less(a, x),
+            lambda op, x, a: op.Greater(a, x),
+            lambda op, x, a: op.LessOrEqual(a, x),
+            lambda op, x, a: op.GreaterOrEqual(a, x)
+        ]
+
+    def check(self):
+        def _check_lhs(__y__, op, x, a):
+            if (a := ir.convenience.get_const_tensor(a)) is not None:
+                return np.all(a.numpy() == __y__)
+            return False
+
+        def _check_rhs(__y__, op, x, a):
+            if (a := ir.convenience.get_const_tensor(a)) is not None:
+                return np.all(a.numpy() == __y__)
+            return False
+
+        for __y__ in [+np.inf, -np.inf, -np.inf, +np.inf]:
+            yield partial(_check_lhs, __y__)
+
+        for __y__ in [+np.inf, -np.inf, -np.inf, +np.inf]:
+            yield partial(_check_rhs, __y__)
+
+    def rewrite(self):
+        def _rewrite_lhs(__op__, op, x, a):
+            return __op__(op, op.Equal(a, x))
+
+        def _rewrite_rhs(__op__, op, x, a):
+            return __op__(op, op.Equal(x, a))
+
+        for __OP__ in [false_like, false_like, true_like, true_like]:
+            yield partial(_rewrite_lhs, __OP__)
+
+        for __OP__ in [true_like, true_like, false_like, false_like]:
+            yield partial(_rewrite_rhs, __OP__)
 
 
 # A. Same value is added to both sides of a comparison: Remove the addition and
@@ -463,11 +515,54 @@ class AbsorbClipIntoComparison(Transformation, RewriteRuleSetPass):
             yield partial(_rewrite_rhs, __OP__)
 
 
-# Absorbs a function into the constant side of a comparison operator: This
-# requires a generalized inverse of the function s.t. f(x) == a <=> x == f^-1(a)
+# Some transformation templates rely on inspecting the signature/parameters of
+# the operator-specializing function
+import inspect
+
+
+# Absorbs a function into the constant side of a comparison operator based on a
+# generalized inverse of the function, which might insert several branches of
+# comparisons, separating increasing from decreasing segments of the function.
+#
+# TODO: For now, this only supports elementwise unary functions, though some
+#  infrastructure for handling n-ary functions is already in place...
 class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
+    # Placeholder for matching elementwise functions on the non-constant side of
+    # the comparison
     __FUNCTION__: Callable
+
+    # Placeholder for the inverse function: Must accept the same arguments as
+    # the function and an optional input specifying the branch index
     __INVERSE__: Callable
+
+    # Split the inverse into increasing (+1) and decreasing (-1) branches,
+    # where the first entry is the branch index k for evaluating the inverse
+    __BRANCHES__: list[tuple[int, bool]] = [(0, +1)]
+
+    @property
+    def _arity(self):
+        # __FUNCTION__: (self, op, ...) -> ??? where arity is the number of ...
+        return len(inspect.signature(self.__FUNCTION__).parameters) - 1
+
+    @property
+    def _arity_inverse(self):
+        # __INVERSE__: (self, op, ...) -> ??? where arity is the number of ...
+        return len(inspect.signature(self.__INVERSE__).parameters) - 1
+
+    @property
+    def _accepts_branch_index(self):
+        # Check whether the optional branch index is accepted by the inverse
+        # placeholder
+        return "_branch_index" in inspect.signature(self.__INVERSE__).parameters
+
+    # TODO: To allow for future extension to n-ary functions
+    def _function(self, op, x):
+        return self.__FUNCTION__(op, x)
+
+    def _inverse(self, op, *args, _branch_index: int = 0):
+        if self._accepts_branch_index:
+            return self.__INVERSE__(op, *args, _branch_index=_branch_index)
+        return self.__INVERSE__(op, *args)
 
     __OPS__ = [
         lambda op: op.Equal,
@@ -477,58 +572,135 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
         lambda op: op.GreaterOrEqual
     ]
 
+    # Pattern generator: Generates left and right hand side variations of the
+    # match pattern for all comparison operators in __OPS__
     def pattern(self):
-        # Pattern template matches the function applied to the left hand side
         def _pattern_lhs(__op__, op, x, a):
-            return __op__(op)(self.__FUNCTION__(op, x), a)
+            return __op__(op)(self._function(op, x), a)
 
-        # Pattern template matches the function applied to the left hand side
         def _pattern_rhs(__op__, op, x, a):
-            return __op__(op)(a, self.__FUNCTION__(op, x))
+            return __op__(op)(a, self._function(op, x))
 
-        # Instantiate the pattern variations for each operator listed above
         for __OP__ in self.__OPS__:
             # Fix the template parameter __OP__
             yield partial(_pattern_lhs, __OP__)
             yield partial(_pattern_rhs, __OP__)
 
+    # Check generator: Generates left and right hand side variations of the
+    # match condition for all comparison operators in __OPS__
     def check(self):
-        # Only rewrite if the graph actually gets simplified, i.e., the right
-        # hand side is constant
         def _check_lhs(__op__, op, x, a):
             return not is_constant(x) and is_constant(a)
 
-        # Only rewrite if the graph actually gets simplified, i.e., the right
-        # hand side is constant
         def _check_rhs(__op__, op, x, a):
             return not is_constant(x) and is_constant(a)
 
-        # Instantiate the pattern variations for each operator listed above
         for __OP__ in self.__OPS__:
             # Fix the template parameter __OP__
             yield partial(_check_lhs, __OP__)
             yield partial(_check_rhs, __OP__)
 
+    # Rewrite generator: Generates left and right hand side variations of the
+    # replacement pattern for all comparison operators in __OPS__
     def rewrite(self):
-        # Rewrite by applying the inverse function to the right hand side and
-        # dropping the original function from the left hand side
         def _rewrite_lhs(__op__, op, x, a):
-            return __op__(op)(x, self.__INVERSE__(op, a))
+            # Collect comparison replacement patterns for each branch of the
+            # generalized inverse function
+            branches = {+1: [], -1: []}
 
-        # Rewrite by applying the inverse function to the left hand side and
-        # dropping the original function from the right hand side
+            # Evaluate branches and collect replacement patterns by branch
+            # direction
+            for k, d in self.__BRANCHES__:
+                # Evaluate the kth branch of the inverse on all constant inputs
+                branches[d].append(self._inverse(op, a, _branch_index=k))
+
+            # If there are no decreasing branches, joining the branches can be
+            # simplified to a single comparison by taking the minimum over the
+            # increasing branches
+            if not branches[-1]:
+                return __op__(op)(x, op.Min(*branches[+1]))
+
+            # If there are no increasing branches, joining the branches can be
+            # simplified to a single comparison by taking the maximum over the
+            # decreasing branches
+            if not branches[+1]:
+                return op.Not(__op__(op)(x, op.Max(*branches[-1])))
+
+            # Join the mixed branches of the inverse function disjunctively by a
+            # chain of Or functions (unfortunately there is no variadic Or...).
+            #
+            # Note: The chain of Or with alternating negations can be simplified
+            # to the following single-level Xor expression with only a single
+            # negation at the output by taking the min/max of the branches.
+            return (
+                op.Not(
+                    op.Xor(
+                        __op__(op)(
+                            x,
+                            op.Max(*branches[-1])
+                        ),
+                        __op__(op)(
+                            x,
+                            op.Max(
+                                op.Min(*branches[+1]),
+                                op.Max(*branches[-1])
+                            )
+                        )
+                    )
+                )
+            )
+
         def _rewrite_rhs(__op__, op, x, a):
-            return __op__(op)(self.__INVERSE__(op, a), x)
+            # Collect comparison replacement patterns for each branch of the
+            # generalized inverse function
+            branches = {+1: [], -1: []}
 
-        # Instantiate the pattern variations for each operator listed above
+            # Evaluate branches and collect replacement patterns by branch
+            # direction
+            for k, d in self.__BRANCHES__:
+                # Evaluate the kth branch of the inverse on all constant inputs
+                branches[d].append(self._inverse(op, a, _branch_index=k))
+
+            # If there are no decreasing branches, joining the branches can be
+            # simplified to a single comparison by taking the maximum over the
+            # increasing branches
+            if not branches[-1]:
+                return __op__(op)(op.Max(*branches[+1]), x)
+
+            # If there are no increasing branches, joining the branches can be
+            # simplified to a single comparison by taking the minimum over the
+            # decreasing branches
+            if not branches[+1]:
+                return op.Not(__op__(op)(op.Min(*branches[-1])), x)
+
+            # Join the mixed branches of the inverse function disjunctively by a
+            # chain of Or functions (unfortunately there is no variadic Or...).
+            #
+            # Note: The chain of Or with alternating negations can be simplified
+            # to the following single-level Xor expression with only a single
+            # negation at the output by taking the min/max of the branches.
+            return (
+                op.Not(
+                    op.Xor(
+                        __op__(op)(
+                            op.Min(*branches[-1]),
+                            x
+                        ),
+                        __op__(op)(
+                            op.Min(
+                                op.Max(*branches[+1]),
+                                op.Min(*branches[-1])
+                            ),
+                            x
+                        )
+                    )
+                )
+            )
+
         for __OP__ in self.__OPS__:
             # Fix the template parameter __OP__
             yield partial(_rewrite_lhs, __OP__)
             yield partial(_rewrite_rhs, __OP__)
-
-
-# TODO: Implement generalized inverse functions as ONNX Script custom operators
-#  to simplify the rule definitions here?
 
 
 @passes.verify.tolerance
@@ -549,7 +721,9 @@ class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
     __FUNCTION__ = lambda _, op, x: op.Sigmoid(x)
 
     # Generalized inverse of Sigmoid:
-    #   Sigmoid^-1(x) = {-inf for x <= 0, x for 0 < x < 1, +inf for x >= 0}
+    #   Sigmoid^-1(x) = {
+    #       -inf for x <= 0, log(x / (1 - x)) for 0 < x < 1, +inf for x >= 1
+    #   }
     @staticmethod
     def __INVERSE__(op, x):
         # Sanitize the input x to not evaluate the logarithm on inputs where it
@@ -565,7 +739,7 @@ class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
             op.CastLike(op.Constant(value_float=0.5), x)
         )
 
-        # Select from three cases depending on x: x <= 0, 0 < x < 1, x >= 0
+        # Select from three cases depending on x: x <= 0, 0 < x < 1, x >= 1
         return op.Where(
             # Check for input inside defined range: 0 < x < 1
             op.And(op.Less(zeros_like(op, x), x), op.Less(x, ones_like(op, x))),
@@ -582,7 +756,72 @@ class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
                 op.LessOrEqual(x, zeros_like(op, x)),
                 # Map to negative infinity: -inf for x <= 0
                 min_like(op, x),
-                # Map to positive infinity: +inf for x >= 0
+                # Map to positive infinity: +inf for x >= 1
                 max_like(op, x)
             )
         )
+
+
+# Inverse Silu is defined in the custom domain and needs to be made available as
+# an ONNX Script function once used
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+from onnx_passes.ops.inverse_swish import InverseSilu  # noqa: Used via registry
+from onnx_passes.ops.swish import Silu  # noqa: Used via registry
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbSiluIntoComparison(_AbsorbFunctionIntoComparison):
+    # Match the composite representation of the Silu function, as there is no
+    # Silu operator in standard ONNX
+    __FUNCTION__ = lambda _, op, x: \
+        OrValue([x * op.Sigmoid(x), op.Silu(x, _domain=CUSTOM_DOMAIN)])
+
+    # Allow the multiplication of the composite representation to commute so we
+    # only have to write this pattern once
+    @property
+    def commute(self):
+        return True
+
+    # Replace by the inverse Silu defined in the custom domain, offering
+    # branches to select
+    @staticmethod
+    def __INVERSE__(op, x, _branch_index: int = 0):
+        return op.InverseSilu(x, k=_branch_index, _domain=CUSTOM_DOMAIN)
+
+    # Silu (or rather its inverse) has two branches: A principal where the
+    # function is increasing and a secondary where it is decreasing
+    __BRANCHES__ = [(0, +1), (-1, -1)]
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbSquareIntoComparison(_AbsorbFunctionIntoComparison):
+    __FUNCTION__ = lambda _, op, x: op.Mul(x, x)
+
+    @staticmethod
+    def __INVERSE__(op, x, _branch_index: int = 0):
+        # Short aliases to infinity and NaN used for out of range inputs
+        inf = op.Constant(value_float=float("inf"))
+
+        # Principal branch of the square root: Regular square root to the right
+        # of zero, negatives mapped to negative infinity, as x**2 >= -? = True
+        if _branch_index == 0:
+            return op.Where(
+                op.GreaterOrEqual(x, zeros_like(op, x)), op.Sqrt(x), op.Neg(inf)
+            )
+
+        # Secondary branch of the square root: Selects the negated square root
+        # as x**2 >= a has two solutions {+sqrt(a), -sqrt(a)}
+        if _branch_index == -1:
+            return op.Where(
+                op.GreaterOrEqual(x, zeros_like(op, x)), op.Neg(op.Sqrt(x)), inf
+            )
+
+        # Invalid branch selected: Square root has only two branches. Instead of
+        # raising an exception, try to stay within ONNX by returning NaN.
+        return op.Expand(op.Constant(value_float=np.nan), op.Shape(x))
+
+    # Square (or rather its inverse) has two branches: A principal where the
+    # function is increasing and a secondary where it is decreasing
+    __BRANCHES__ = [(0, +1), (-1, -1)]

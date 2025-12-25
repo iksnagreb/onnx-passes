@@ -1,3 +1,6 @@
+# ir.Value, ir.convenience.get_const_tensor
+import onnx_ir as ir
+
 # Algebraic properties as transformation templates
 from onnx_passes.passes.streamline.algebraic._properties import (
     _Associative,
@@ -17,6 +20,9 @@ from onnx_passes.passes.base import Transformation, RewriteRulePass, \
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
 import onnx_passes.passes as passes
+
+# NumPy used during match condition checks to operate on shapes and tensors
+import numpy as np
 
 
 # ==============================================================================
@@ -140,6 +146,7 @@ class EliminateComplementationOr(Transformation, RewriteRulePass):
 
 @passes.verify.equality
 @passes.register("algebraic")
+@passes.register()
 class DeMorganBoolean(Transformation, RewriteRuleSetPass):
     @property
     def commute(self) -> bool:
@@ -149,14 +156,43 @@ class DeMorganBoolean(Transformation, RewriteRuleSetPass):
         return [
             lambda op, x, y: op.And(op.Not(x), op.Not(y)),
             lambda op, x, y: op.Or(op.Not(x), op.Not(y)),
-            lambda op, x, y: op.Not(op.And(op.Not(x), y)),
-            lambda op, x, y: op.Not(op.Or(op.Not(x), y))
         ]
 
     def rewrite(self):
         return [
             lambda op, x, y: op.Not(op.Or(x, y)),
             lambda op, x, y: op.Not(op.And(x, y)),
-            lambda op, x, y: op.Or(x, op.Not(y)),
-            lambda op, x, y: op.And(x, op.Not(y))
         ]
+
+
+@passes.verify.equality
+@passes.register("algebraic")
+class MoveNotPastXor(Transformation, RewriteRulePass):
+    @property
+    def commute(self) -> bool:
+        return True
+
+    def pattern(self, op, x, y):
+        return op.Xor(op.Not(x), y)
+
+    def rewrite(self, op, x, y):
+        return op.Not(op.Xor(x, y))
+
+
+@passes.verify.equality
+@passes.register("algebraic")
+class ConvertXorToNot(Transformation, RewriteRulePass):
+    @property
+    def commute(self) -> bool:
+        return True
+
+    def pattern(self, op, x, a):
+        return op.Xor(x, a, _outputs=["_out"])
+
+    def check(self, op, x, a, _out):
+        if a := ir.convenience.get_const_tensor(a):
+            return _out.shape is not None and np.all(a.numpy() == True)
+        return False
+
+    def rewrite(self, op, x, a, _out):
+        return op.Expand(op.Not(x), op.Constant(value_ints=list(_out.shape)))
