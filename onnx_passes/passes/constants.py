@@ -231,3 +231,58 @@ def _fold_constants_argsort(node: ir.Node, op, _):
 
     # Use the eager mode evaluation to generate the folded constant node
     return op.Constant(value=ir.tensor(ArgSort(x.numpy(), axis=axis.as_int())))
+
+
+# Use ONNX Runtime as evaluator for some constant folding implementations
+# instead of the default ONNX Reference evaluator
+from onnxscript.evaluator import ORTEvaluator
+from onnx.onnx_cpp2py_export.defs import get_schema
+
+_ort_evaluator = ORTEvaluator()
+
+
+def _ort_evaluate(node: ir.Node, *args, **kwargs):
+    # If the node itself does not specify the operator version, use the version
+    # from the graphs opset imports
+    version = node.version
+
+    if version is None:
+        version = node.graph.opset_imports[node.domain]
+
+    # Evaluate th node with all args interpreted as inputs and keyword arguments
+    # interpreted as attributes
+    return _ort_evaluator.eval(
+        get_schema(node.op_type, version, node.domain), [*args], {**kwargs}
+    )
+
+
+# Default constant folding of GatherElements uses the ONNX reference evaluator
+# which implements gathering in NumPy via np.choose which seems to have issues
+# with large inputs (or rather inputs with many elements along the axis).
+@register("GatherElements")
+def _fold_constants_gather_elements(node: ir.Node, op, _):
+    # Skip if there is not exactly one input (Gather does not accept fewer or
+    # further inputs)
+    if len(node.inputs) != 2:
+        return None
+
+    # Constant folding requires both inputs to be constants, otherwise there is
+    # nothing to fold...
+    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    # Constant folding requires both inputs to be constants, otherwise there is
+    # nothing to fold...
+    if (indices := ir.convenience.get_const_tensor(node.inputs[1])) is None:
+        return None
+
+    # Default GatherElements axis is 0, according to ONNX operators reference:
+    #   https://onnx.ai/onnx/operators/onnx__GatherElements.html
+    if (axis := node.attributes.get("axis")) is None:
+        axis = ir.Attr("axis", ir.AttributeType.INT, 0)
+
+    # Use the ONNX Runtime evaluator to execute the node instead of the default
+    # reference evaluator
+    return op.Constant(value=ir.tensor(
+        _ort_evaluate(node, x.numpy(), indices.numpy(), axis=axis.value).value
+    ))
