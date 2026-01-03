@@ -129,7 +129,9 @@ class _ConvertQONNXMinimumVersion(Pass, FunctionalPass):
         # No need to convert the version if already above the minimum
         onnx_opset_version = model.graph.opset_imports[""]
         if onnx_opset_version >= QONNX_MINIMUM_OPSET_VERSION:
-            return ir.passes.PassResult(model, False)
+            return ir.passes.PassResult(
+                ir.from_proto(ir.to_proto(model)), False
+            )
 
         # Convert to the minimum version required
         result = ConvertVersionPass(QONNX_MINIMUM_OPSET_VERSION)(model)
