@@ -412,8 +412,8 @@ def _decompose_multiplicity(thresholds: np.ndarray, weights: np.ndarray):
     # Restore original shape of the leading dimensions of the threshold and
     # weight tensor
     return (
-        np.reshape(np.asarray(thresholds), shape=(*thresholds_shape, -1)),
-        np.reshape(np.asarray(weights), shape=(*weights_shape, -1))
+        np.reshape(np.asarray(thresholds), (*thresholds_shape, -1)),
+        np.reshape(np.asarray(weights), (*weights_shape, -1))
     )
 
 
