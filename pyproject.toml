@@ -23,7 +23,9 @@ dependencies = [
     "onnx>=1.17.0",
     "onnx-ir (>=0.1.10,<=0.1.13)",
     "onnxruntime<=1.22.0",
-    "onnxscript (>=0.5.3,<=0.5.7)",
+    # TODO: Revert to the PyPI version once the extended commutativity PR is
+    #  merged and released: https://github.com/microsoft/onnxscript/pull/2741
+    "onnxscript @ git+https://github.com/iksnagreb/onnxscript.git@b0ffb28",
     "netron>=8.0.0",
     "click>=8.2.1",
     "PyYAML>=6.0.0",
