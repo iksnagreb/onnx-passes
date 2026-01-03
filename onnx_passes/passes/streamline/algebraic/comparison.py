@@ -87,15 +87,15 @@ class EliminateComparison(Transformation, RewriteRuleSetPass):
 class EliminateInfinityComparison(Transformation, RewriteRuleSetPass):
     def pattern(self):
         return [
-            lambda op, x, a: op.LessOrEqual(x, a),
-            lambda op, x, a: op.GreaterOrEqual(x, a),
-            lambda op, x, a: op.Less(x, a),
-            lambda op, x, a: op.Greate(x, a),
+            lambda op, x, a: op.LessOrEqual(x, a),  # x <= +inf == True
+            lambda op, x, a: op.GreaterOrEqual(x, a),  # x >= -inf == True
+            lambda op, x, a: op.Less(x, a),  # x < -inf == False
+            lambda op, x, a: op.Greate(x, a),  # x > +inf == False
 
-            lambda op, x, a: op.Less(a, x),
-            lambda op, x, a: op.Greater(a, x),
-            lambda op, x, a: op.LessOrEqual(a, x),
-            lambda op, x, a: op.GreaterOrEqual(a, x)
+            lambda op, x, a: op.Less(a, x),  # +inf < x == False
+            lambda op, x, a: op.Greater(a, x),  # -inf > x == False
+            lambda op, x, a: op.LessOrEqual(a, x),  # -inf <= x == True
+            lambda op, x, a: op.GreaterOrEqual(a, x)  # +inf >= x == True
         ]
 
     def check(self):
@@ -122,10 +122,10 @@ class EliminateInfinityComparison(Transformation, RewriteRuleSetPass):
         def _rewrite_rhs(__op__, op, x, a):
             return __op__(op, op.Equal(x, a))
 
-        for __OP__ in [false_like, false_like, true_like, true_like]:
+        for __OP__ in [true_like, true_like, false_like, false_like]:
             yield partial(_rewrite_lhs, __OP__)
 
-        for __OP__ in [true_like, true_like, false_like, false_like]:
+        for __OP__ in [false_like, false_like, true_like, true_like]:
             yield partial(_rewrite_rhs, __OP__)
 
 
