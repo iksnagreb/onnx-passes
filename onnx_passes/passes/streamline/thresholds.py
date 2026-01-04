@@ -398,7 +398,7 @@ def _decompose_multiplicity(thresholds: np.ndarray, weights: np.ndarray):
     # Add infinity padding to the threshold list, pad each set of thresholds by
     # the amount necessary to have the same number of thresholds for each set
     thresholds = np.pad(thresholds, ((0, 0), (0, 1)), constant_values=np.inf)
-    weights = np.pad(weights, ((0, 0), (0, 1)), constant_values=max_n - n)
+    weights = np.concatenate((weights, max_n - n), axis=-1)
 
     # Number of repetitions of each threshold, i.e., integer-valued threshold
     # multiplicity
@@ -444,8 +444,10 @@ class ThresholdMultiplicityDecomposition(Transformation, RewriteRulePass):
         if np.any(np.asarray(np.round(weights), dtype=np.int64) != weights):
             return False
 
-        # Decompose if there are weights that are not +/- 1
-        return np.any(np.abs(weights) != 1.0) or np.any(thresholds >= np.inf)
+        # Decompose if there are weights that are not +/- 1 or if for all axes
+        # there are infinity thresholds which can be removed
+        return (np.any(np.abs(weights) != 1.0)
+                or np.all(np.any(thresholds >= np.inf, axis=-1)))
 
     def rewrite(self, op, x, thresholds, weights):
         # Apply the decomposition to thresholds and weights converted to NumPy
