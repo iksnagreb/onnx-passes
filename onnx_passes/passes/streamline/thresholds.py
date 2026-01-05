@@ -299,21 +299,88 @@ class ThresholdMonotonicityDecomposition(Transformation, RewriteRulePass):
         )
 
 
+def _decompose_granularity_torch(thresholds):
+    # Try to dynamically load PyTorch and raise an exception if it is not
+    # available
+    try:
+        import torch
+    except ModuleNotFoundError:
+        raise RuntimeError(
+            "PyTorch is required for threshold granularity decomposition"
+        )
+
+    # Split the shape into the fine-granular bias component and the per-channel
+    # threshold component (both cover the channel axis, i.e., -2)
+    b_shape, t_shape = thresholds.shape[:-1], thresholds.shape[-2:]
+
+    # Convert from NumPy to PyTorch format for accelerated minimization
+    thresholds = torch.as_tensor(thresholds, dtype=torch.float32)
+
+    # Initial bias and per-channel thresholds parameter tensor to be optimized
+    bias = torch.randn(b_shape, requires_grad=True)
+    t = torch.randn(t_shape, requires_grad=True)
+
+    # Set up an LBFGS optimizer to solve for the bias as per-channel threshold
+    # which reconstruct the fine-granular thresholds via broadcasting
+    optimizer = torch.optim.LBFGS([bias, t], line_search_fn="strong_wolfe")
+
+    # Do not consider infinity thresholds for optimization: There is no bias
+    # which could pull these away from infinity into any direction
+    infinity = torch.abs(thresholds) >= torch.inf
+
+    # Wraps objective function evaluation and gradient calculation as required
+    # by the LBFGS step
+    def closure():
+        # Clear the gradients from lat iteration
+        optimizer.zero_grad()
+        # Optimization objective: Reconstruction error for recovering the fine
+        # granular thresholds as thresholds = t - bias
+        loss = torch.sum(
+            torch.square(
+                torch.where(
+                    infinity, 0, (bias.unsqueeze(-1) - (t - thresholds))
+                )
+            )
+        )
+        # Compute the gradient of the objective with respect to t and the bias
+        loss.backward()
+        # LBFGS needs the loss
+        return loss
+
+    # Optimize the reconstruction objective via LBFGS optimizer step
+    optimizer.step(closure)
+
+    # Convert the result back to NumPy format (force to detach from the
+    # computational graph)
+    return t.numpy(force=True), bias.numpy(force=True)
+
+
 # Threshold granularity decomposition involves approximate unbroadcasting of
 # replacement thresholds at ist core
 from onnx_passes.passes.util import unbroadcast
 
 
-def _decompose_granularity(thresholds: np.ndarray):
+def _decompose_granularity_naive(thresholds: np.ndarray):
     # Draw some random thresholds covering only the final axis to replace
     # the fine-granular thresholds. Thresholds should always be sorted.
-    t = np.sort(np.random.rand(*thresholds.shape[-2:]), axis=-1)
+    t = np.sort(np.random.randn(*thresholds.shape[-2:]), axis=-1)
     # Generate the corresponding bias in front of the thresholds acting
     # elementwise on all axes except for the internal threshold axis.
     bias = np.round(t - thresholds)[..., :1]
     # As the original derivation does not assume rounding the bias, add this
     # correction term before unbroadcasting while allowing small deviations.
     return unbroadcast(thresholds + bias, approximate=True), bias[..., 0]
+
+
+def _decompose_granularity(thresholds: np.ndarray):
+    # First try the naive decomposition via unbroadcasting and with bias rounded
+    # to integers: Successful if this yields a tensor of rank two or less
+    if len((naive := _decompose_granularity_naive(thresholds))[0].shape) <= 2:
+        return naive
+
+    # If the naive solution is not successful, we need to solve an optimization
+    # problem to approximate theta = theta' - bias
+    return _decompose_granularity_torch(thresholds)
 
 
 # Decomposes fine-granular (e.g., per-element) thresholds into a fine-granular
