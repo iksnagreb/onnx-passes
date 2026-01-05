@@ -195,6 +195,11 @@ class ConvertRoundToThresholds(Transformation, RewriteRuleSetPass):
 
 
 def _sort_thresholds(thresholds: np.ndarray, weights: np.ndarray):
+    # Broadcast threshold and step direction weights to make indices compatible
+    thresholds, weights = np.broadcast_arrays(thresholds, weights)
+
+    # Sort thresholds and step direction weights in ascending order along the
+    # last axis
     return (
         np.take_along_axis(thresholds, np.argsort(thresholds), axis=-1),
         np.take_along_axis(weights, np.argsort(thresholds), axis=-1),
@@ -227,6 +232,11 @@ class SortThresholds(Transformation, RewriteRulePass):
             ir.convenience.get_const_tensor(thresholds).numpy(),
             ir.convenience.get_const_tensor(weights).numpy(),
         )
+
+        # Try to unbroadcast the sorted parameters (while sorting these might be
+        # broadcast to ensure compatible indices)
+        thresholds = unbroadcast(thresholds)
+        weights = unbroadcast(weights)
 
         # Insert thresholds back into ONNX constants and make sure the type is
         # the same as the input as required by ONNX standard of elementwise
