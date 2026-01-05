@@ -456,6 +456,8 @@ def _decompose_multiplicity(thresholds: np.ndarray, weights: np.ndarray):
 
     # Get rid of all "dead" thresholds by setting their multiplicity to zero
     weights = np.where(thresholds >= np.inf, 0, weights)
+    # np.where broadcasts the shapes
+    weights_shape = np.broadcast_shapes(thresholds_shape, weights_shape)
 
     # Number of steps per set of thresholds and maximum number of steps of the
     # entire set
