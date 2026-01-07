@@ -32,13 +32,11 @@ def register(f: Callable):
 def inject_custom_ops(model: ir.Model):
     # Update the opset import to include the custom domain
     model.opset_imports[str(domain)] = domain.version
-    # Convert from ONNX IR representation to proto representation which offers
-    # access to the list of local functions
-    model = ir.to_proto(model)
     # Add all registered function to the model
-    model.functions.extend([f.to_function_proto() for f in _registry.values()])
-    # Convert back to ONNX IR representation
-    return ir.from_proto(model)
+    for func in _registry.values():
+        ir_func = ir.from_proto(func.to_function_proto())
+        model.functions[ir_func.identifier()] = ir_func
+    return model
 
 
 # Need to import the passes module to set up the registry and make the
