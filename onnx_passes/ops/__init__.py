@@ -29,7 +29,7 @@ def register(f: Callable):
 
 # Injects all registered custom operators into the model as model local
 # functions
-def inject_custom_ops(model: ir.Model):
+def inject_custom_ops(model: ir.Model) -> ir.Model:
     # Update the opset import to include the custom domain
     model.opset_imports[str(domain)] = domain.version
     # Add all registered function to the model
@@ -45,11 +45,11 @@ import onnx_passes.passes as passes
 
 # Inserting custom ops is considered as an annotation pass as it does not really
 # modify the model graph structure or values
-from onnx_passes.passes.base import Pass, FunctionalPass
+from onnx_passes.passes.base import Pass, InPlacePass
 
 
 # Annotation pass inserting custom operator functions into the model
 @passes.register("inject-ops")
-class InjectCustomOps(Pass, FunctionalPass):
+class InjectCustomOps(Pass, InPlacePass):
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.PassResult(inject_custom_ops(model), False)
