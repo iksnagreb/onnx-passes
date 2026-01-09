@@ -117,9 +117,14 @@ def load_reference_data(p: Pass) -> tuple[list, list]:
     inp = p.config.setdefault("reference", {}).setdefault("inp", [])
     out = p.config.setdefault("reference", {}).setdefault("out", [])
 
+    def _load(file_or_array):
+        if isinstance(file_or_array, np.ndarray):
+            return file_or_array
+        return np.load(file_or_array)
+
     # Load each file into a NumPy array and return two lists of inputs and
     # expected outputs
-    return [np.load(file) for file in inp], [np.load(file) for file in out]
+    return [_load(file) for file in inp], [_load(file) for file in out]
 
 
 # Expands a constant of True to the shape of the input x
