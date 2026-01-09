@@ -289,6 +289,15 @@ class ThresholdMonotonicityDecomposition(Transformation, RewriteRulePass):
         _thresholds = ir.convenience.get_const_tensor(thresholds).numpy()
         _weights = ir.convenience.get_const_tensor(weights).numpy()
 
+        # If all weights are negative, this is a monotonically decreasing
+        # function, we can simply flip all step directions and negate the output
+        if np.all(_weights <= 0):
+            return op.Neg(
+                op.MultiThreshold(
+                    x, thresholds, op.Abs(weights), _domain=CUSTOM_DOMAIN
+                )
+            )
+
         # Decompose the threshold tensor into increasing and decreasing segments
         decreasing, increasing = _decompose_monotonicity(_thresholds, _weights)
 
