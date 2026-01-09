@@ -248,6 +248,49 @@ class SortThresholds(Transformation, RewriteRulePass):
         return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
 
 
+@passes.verify.tolerance
+@passes.register("unbroadcast")
+class UnbroadcastThresholds(Transformation, RewriteRulePass):
+    def pattern(self, op, x, thresholds, weights):
+        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
+
+    def check(self, op, x, thresholds, weights):
+        # Thresholds must be constant to be decomposed, otherwise there are no
+        # known values to extract and iterate
+        if (thresholds := ir.convenience.get_const_tensor(thresholds)) is None:
+            return False
+
+        # Weights must be constant to be decomposed, otherwise there are no
+        # known values to extract and iterate
+        if (weights := ir.convenience.get_const_tensor(weights)) is None:
+            return False
+
+        # Check whether the threshold tensor can be unbroadcast
+        if len(unbroadcast(thresholds.numpy()).shape) < len(thresholds.shape):
+            return True
+
+        # Check whether the weights tensor can be unbroadcast
+        if len(unbroadcast(weights.numpy()).shape) < len(weights.shape):
+            return True
+
+        # Do not unbroadcast again if thresholds are already unbroadcast
+        return False
+
+    def rewrite(self, op, x, thresholds, weights):
+        # Unbroadcast thresholds and step direction weights in numpy format
+        thresholds = ir.convenience.get_const_tensor(thresholds).numpy()
+        weights = ir.convenience.get_const_tensor(weights).numpy()
+
+        # Insert thresholds back into ONNX constants and make sure the type is
+        # the same as the input as required by ONNX standard of elementwise
+        thresholds = op.Constant(value=ir.tensor(unbroadcast(thresholds)))
+        weights = op.Constant(value=ir.tensor(unbroadcast(weights)))
+
+        # Replacement pattern: MultiThreshold operator with thresholds and
+        # weights unbroadcast if possible
+        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
+
+
 def _decompose_monotonicity(thresholds: np.ndarray, weights: np.ndarray):
     # Get rid of all zero steps by setting the corresponding threshold to
     # infinity, i.e., x > inf = False
