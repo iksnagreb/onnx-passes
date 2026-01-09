@@ -362,7 +362,7 @@ def _decompose_granularity_torch(thresholds):
 
     # Convert the result back to NumPy format (force to detach from the
     # computational graph)
-    return t.numpy(force=True), bias.numpy(force=True)
+    return unbroadcast(t.numpy(force=True)), bias.numpy(force=True)
 
 
 # Threshold granularity decomposition involves approximate unbroadcasting of
@@ -435,10 +435,8 @@ class ThresholdGranularityDecomposition(Transformation, RewriteRulePass):
 
         # If the step weights are constant, try unbroadcasting as an unrelated
         # optimization along the way
-        if (weights := ir.convenience.get_const_tensor(weights)) is not None:
-            weights = op.CastLike(
-                op.Constant(value=ir.tensor(unbroadcast(weights.numpy()))), x
-            )
+        if (w := ir.convenience.get_const_tensor(weights)) is not None:
+            weights = op.Constant(value=ir.tensor(unbroadcast(w.numpy())))
 
         # Insert thresholds back into ONNX constants and make sure the type is
         # the same as the input as required by ONNX standard of elementwise
