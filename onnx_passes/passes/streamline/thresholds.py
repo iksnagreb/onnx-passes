@@ -223,8 +223,15 @@ class SortThresholds(Transformation, RewriteRulePass):
         if (weights := ir.convenience.get_const_tensor(weights)) is None:
             return False
 
+        # Convert ONNX tensor to NumPy array for further checks
+        weights, thresholds = weights.numpy(), thresholds.numpy()
+
+        # If there is only a single threshold, there is nothing to sort
+        if len(thresholds.shape) == 0 or thresholds.shape[-1] == 1:
+            return False
+
         # Do not sort again if thresholds are already sorted
-        return np.any(np.sort(thresholds.numpy(), axis=-1) != thresholds)
+        return np.any(np.sort(thresholds, axis=-1) != thresholds)
 
     def rewrite(self, op, x, thresholds, weights):
         # Sort thresholds and associated step direction weights in numpy format
