@@ -340,7 +340,7 @@ class FuseThresholdSegments(Transformation, RewriteRulePass):
         thresholds = op.Reshape(
             thresholds,
             op.Concat(
-                op.Shape(x, end=-2),
+                op.Shape(thresholds, end=-2),
                 op.Constant(value_ints=[-1]),
                 axis=0
             )
@@ -349,7 +349,7 @@ class FuseThresholdSegments(Transformation, RewriteRulePass):
         weights = op.Reshape(
             weights,
             op.Concat(
-                op.Shape(x, end=-2),
+                op.Shape(weights, end=-2),
                 op.Constant(value_ints=[-1]),
                 axis=0
             )
@@ -368,7 +368,7 @@ class FuseThresholdSegments(Transformation, RewriteRulePass):
         # negates the weights, this biases the output to -number of steps, which
         # we counteract by biasing in the opposite direction.
         bias = op.Squeeze(
-            num_thresholds if inverted else op.Constant(value_floats=0.0)
+            num_thresholds if inverted else op.Constant(value_float=0.0)
         )
 
         # Apply the reshape decomposition to the input tensor to fuse only the
