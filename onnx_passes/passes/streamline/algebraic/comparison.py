@@ -797,7 +797,7 @@ class AbsorbSiluIntoComparison(_AbsorbFunctionIntoComparison):
 @passes.verify.tolerance
 @passes.register("algebraic")
 class AbsorbSquareIntoComparison(_AbsorbFunctionIntoComparison):
-    __FUNCTION__ = lambda _, op, x: op.Mul(x, x)
+    __FUNCTION__ = lambda _, op, x: OrValue([op.Mul(x, x), op.Pow(x, 2)])
 
     @staticmethod
     def __INVERSE__(op, x, _branch_index: int = 0):
