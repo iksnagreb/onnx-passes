@@ -825,3 +825,24 @@ class AbsorbSquareIntoComparison(_AbsorbFunctionIntoComparison):
     # Square (or rather its inverse) has two branches: A principal where the
     # function is increasing and a secondary where it is decreasing
     __BRANCHES__ = [(0, +1), (-1, -1)]
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbExpIntoComparison(_AbsorbFunctionIntoComparison):
+    __FUNCTION__ = lambda _, op, x: op.Exp(x)
+
+    # Generalized inverse of Exp:
+    #   Exp^-1(x) = {-inf for x <= 0, Log(x) for x > 0}
+    @staticmethod
+    def __INVERSE__(op, x):
+        return op.Where(
+            op.LessOrEqual(x, zeros_like(op, x)), min_like(op, x), op.Log(x)
+        )
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbLogIntoComparison(_AbsorbFunctionIntoComparison):
+    __FUNCTION__ = lambda _, op, x: op.Log(x)
+    __INVERSE__ = lambda _, op, x: op.Exp(x)
