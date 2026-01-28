@@ -163,7 +163,8 @@ class MoveMulPastAdd(Transformation, RewriteRulePass):
 
     def check(self, op, a, x, b):
         if b.dtype is not None and b.dtype.is_floating_point():
-            return is_constant(a) and is_constant(b) and not is_constant(x)
+            if is_constant(a) and is_constant(b) and not is_constant(x):
+                return np.all(ir.convenience.get_const_tensor(a).numpy() != 0)
         return False
 
     def rewrite(self, op, a, x, b):
