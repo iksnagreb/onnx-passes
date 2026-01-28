@@ -94,6 +94,8 @@ from onnx_passes.passes.annotation.range import _get_range  # noqa: Protected
 from onnx_passes.passes.util import ones_like
 # Custom ONNX domain providing a reference implementation of MultiThreshold
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+# Custom unit in the last place (ULP) ONNX operator
+from onnx_passes.ops.ulp import Ulp  # noqa: Used via registry
 
 # Function with partially applied arguments: Used to greate a generator
 # mechanism inserting operators into a pattern template
@@ -155,23 +157,48 @@ class ConvertRoundToThresholds(Transformation, RewriteRuleSetPass):
 
             # Threshold generation depends on the rounding mode
             thresholds = {
-                # TODO: Strictly, Round rounds to even, so the steps should
-                #  alternate between >= and > comparisons or equivalently adding
-                #  a small epsilon turning > into >=.
                 "Round": np.arange(np.round(_min), np.round(_max), 1) + 0.5,
                 "Ceil": np.arange(np.ceil(_min), np.ceil(_max), 1),
                 "Floor": np.arange(np.floor(_min), np.floor(_max), 1) + 1.0,
             }[mode]
 
             # Unsqueeze matching input dimensions from the threshold tensor
-            # TODO: Is this really necessary? Broadcasting should be valid
-            #  anyway...?
             thresholds = np.reshape(thresholds, (*(1 for _ in x.shape), -1))
 
             # Pack numpy array as ONNX operator
             thresholds = op.CastLike(
                 op.Constant(value=ir.tensor(thresholds)), x
             )
+
+            # Define basic constants matching the type of the input to keep the
+            # following more terse and readable
+            _0 = op.CastLike(op.Constant(value_float=0.0), x)
+            _1 = op.CastLike(op.Constant(value_float=1.0), x)
+            _2 = op.CastLike(op.Constant(value_float=2.0), x)
+
+            # Round rounds to even, which means for alternating steps the
+            # comparison alternates between > and >=, or, equivalently, the
+            # threshold adjusted to the next larger floating-point number
+            if mode == "Round":
+                # Rounding depends on whether the integer part of the threshold
+                # is even or odd
+                even = op.Equal(
+                    op.Floor(op.Mod(op.Abs(thresholds), _2, fmod=1)), _0
+                )
+
+                # Add Ulp(thresholds) to thresholds to even positive and odd
+                # negative thresholds to round to even
+                thresholds = op.Add(
+                    thresholds, op.Where(
+                        op.Less(thresholds, _0),
+                        op.Where(
+                            even, _0, op.Ulp(thresholds, _domain=CUSTOM_DOMAIN)
+                        ),
+                        op.Where(
+                            even, op.Ulp(thresholds, _domain=CUSTOM_DOMAIN), _0
+                        )
+                    )
+                )
 
             # Rounding functions are monotonic unit steps
             weights = ones_like(op, thresholds)

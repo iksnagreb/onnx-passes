@@ -233,6 +233,27 @@ def _fold_constants_argsort(node: ir.Node, op, _):
     return op.Constant(value=ir.tensor(ArgSort(x.numpy(), axis=axis.as_int())))
 
 
+# Use ONNX Script implementation of Ulp in eager mode evaluation, i.e.,
+# executing the Python/Numpy, during constant folding
+from onnx_passes.ops.ulp import Ulp
+
+
+@register("Ulp", domain=CUSTOM_DOMAIN)
+def _fold_constants_ulp(node: ir.Node, op, _):
+    # Skip if there is not exactly one input (Ulp does not accept further
+    # inputs)
+    if len(node.inputs) != 1:
+        return None
+
+    # Constant folding requires the input to be constants, otherwise there is
+    # nothing to fold...
+    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    # Use the eager mode evaluation to generate the folded constant node
+    return op.Constant(value=ir.tensor(Ulp(x.numpy())))
+
+
 # Use ONNX Runtime as evaluator for some constant folding implementations
 # instead of the default ONNX Reference evaluator
 from onnxscript.evaluator import ORTEvaluator
@@ -261,7 +282,7 @@ def _ort_evaluate(node: ir.Node, *args, **kwargs):
 # with large inputs (or rather inputs with many elements along the axis).
 @register("GatherElements")
 def _fold_constants_gather_elements(node: ir.Node, op, _):
-    # Skip if there is not exactly one input (Gather does not accept fewer or
+    # Skip if there is not exactly two inputs (Gather does not accept fewer or
     # further inputs)
     if len(node.inputs) != 2:
         return None
@@ -286,3 +307,23 @@ def _fold_constants_gather_elements(node: ir.Node, op, _):
     return op.Constant(value=ir.tensor(
         _ort_evaluate(node, x.numpy(), indices.numpy(), axis=axis.value).value
     ))
+
+
+# Default constant folding of Sqrt uses the ONNX reference evaluator which
+# implements sqrt in NumPy, which apparently sometimes produces different
+# results compared to the ONNX Runtime...
+@register("Sqrt")
+def _fold_constants_sqrt(node: ir.Node, op, _):
+    # Skip if there is not exactly one input (Sqrt does not accept fewer or
+    # further inputs)
+    if len(node.inputs) != 1:
+        return None
+
+    # Constant folding requires the input to be constants, otherwise there is
+    # nothing to fold...
+    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    # Use the ONNX Runtime evaluator to execute the node instead of the default
+    # reference evaluator
+    return op.Constant(value=ir.tensor(_ort_evaluate(node, x.numpy()).value))

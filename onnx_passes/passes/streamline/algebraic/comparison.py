@@ -519,6 +519,10 @@ class AbsorbClipIntoComparison(Transformation, RewriteRuleSetPass):
 # the operator-specializing function
 import inspect
 
+# Custom ONNX operator domain and the unit in the last place (ULP) operator
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+from onnx_passes.ops.ulp import Ulp  # noqa: Used via registry
+
 
 # Absorbs a function into the constant side of a comparison operator based on a
 # generalized inverse of the function, which might insert several branches of
@@ -614,6 +618,11 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
                 # Evaluate the kth branch of the inverse on all constant inputs
                 branches[d].append(self._inverse(op, a, _branch_index=k))
 
+            # Decreasing branches must be corrected by a small positive amount,
+            # the ULP to account for switching > to >= comparisons
+            for i, b in enumerate(branches[-1]):
+                branches[-1][i] =  op.Add(b, op.Ulp(b, _domain=CUSTOM_DOMAIN))
+
             # If there are no decreasing branches, joining the branches can be
             # simplified to a single comparison by taking the minimum over the
             # increasing branches
@@ -660,6 +669,11 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
             for k, d in self.__BRANCHES__:
                 # Evaluate the kth branch of the inverse on all constant inputs
                 branches[d].append(self._inverse(op, a, _branch_index=k))
+
+            # Decreasing branches must be corrected by a small positive amount,
+            # the ULP to account for switching > to >= comparisons
+            for i, b in enumerate(branches[-1]):
+                branches[-1][i] =  op.Add(b, op.Ulp(b, _domain=CUSTOM_DOMAIN))
 
             # If there are no decreasing branches, joining the branches can be
             # simplified to a single comparison by taking the maximum over the
@@ -764,7 +778,6 @@ class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
 
 # Inverse Silu is defined in the custom domain and needs to be made available as
 # an ONNX Script function once used
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 from onnx_passes.ops.inverse_swish import InverseSilu  # noqa: Used via registry
 from onnx_passes.ops.swish import Silu  # noqa: Used via registry
 
