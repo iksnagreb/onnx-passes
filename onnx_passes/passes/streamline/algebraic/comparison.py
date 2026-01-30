@@ -621,7 +621,7 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
             # Decreasing branches must be corrected by a small positive amount,
             # the ULP to account for switching > to >= comparisons
             for i, b in enumerate(branches[-1]):
-                branches[-1][i] =  op.Add(b, op.Ulp(b, _domain=CUSTOM_DOMAIN))
+                branches[-1][i] = op.Add(b, op.Ulp(b, _domain=CUSTOM_DOMAIN))
 
             # If there are no decreasing branches, joining the branches can be
             # simplified to a single comparison by taking the minimum over the
@@ -673,7 +673,7 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
             # Decreasing branches must be corrected by a small positive amount,
             # the ULP to account for switching > to >= comparisons
             for i, b in enumerate(branches[-1]):
-                branches[-1][i] =  op.Add(b, op.Ulp(b, _domain=CUSTOM_DOMAIN))
+                branches[-1][i] = op.Add(b, op.Ulp(b, _domain=CUSTOM_DOMAIN))
 
             # If there are no decreasing branches, joining the branches can be
             # simplified to a single comparison by taking the maximum over the
@@ -859,3 +859,14 @@ class AbsorbExpIntoComparison(_AbsorbFunctionIntoComparison):
 class AbsorbLogIntoComparison(_AbsorbFunctionIntoComparison):
     __FUNCTION__ = lambda _, op, x: op.Log(x)
     __INVERSE__ = lambda _, op, x: op.Exp(x)
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbNegIntoComparison(_AbsorbFunctionIntoComparison):
+    __FUNCTION__ = lambda _, op, x: OrValue([op.Mul(-1, x), op.Neg(x)])
+    __INVERSE__ = lambda _, op, x: op.Neg(x)
+
+    # Negation can be interpreted as a monotonically decreasing function, i.e.,
+    # a single decreasing branch
+    __BRANCHES__ = [(0, -1)]
