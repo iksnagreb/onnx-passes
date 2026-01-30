@@ -870,3 +870,9 @@ class AbsorbNegIntoComparison(_AbsorbFunctionIntoComparison):
     # Negation can be interpreted as a monotonically decreasing function, i.e.,
     # a single decreasing branch
     __BRANCHES__ = [(0, -1)]
+
+    # Allow the multiplication of the composite representation to commute so we
+    # only have to write this pattern once
+    @property
+    def commute(self):
+        return True
