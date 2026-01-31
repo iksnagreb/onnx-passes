@@ -569,10 +569,11 @@ class _AbsorbFunctionIntoComparison(Transformation, RewriteRuleSetPass):
         return self.__INVERSE__(op, *args)
 
     __OPS__ = [
-        lambda op: op.Equal,
+        # TODO: Only these two are related via negation and adding the Ulp,
+        #  others might require subtracting the Ulp.
+        # TODO: Equal should be handled separately via a proper inverse of the
+        #  function.
         lambda op: op.Less,
-        lambda op: op.LessOrEqual,
-        lambda op: op.Greater,
         lambda op: op.GreaterOrEqual
     ]
 
