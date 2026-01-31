@@ -283,8 +283,10 @@ class FuseThresholdSegments(Transformation, RewriteRulePass):
 
         # Number of thresholds/steps per segment, must be the same for all
         # segments to allow concatenation
-        num_thresholds = op.Cast(
-            op.Shape(segments[0].inputs[1], start=-1), to=ir.DataType.FLOAT
+        num_thresholds = op.ReduceProd(
+            op.Cast(
+                op.Shape(segments[0].inputs[1], start=-1), to=ir.DataType.FLOAT
+            )
         )
 
         # Assume implicit positive unit-step weight for all steps if no explicit
