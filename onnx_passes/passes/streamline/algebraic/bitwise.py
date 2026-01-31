@@ -89,6 +89,16 @@ class EliminateBitwiseOr(_Idempotence):
 
 @passes.verify.equality
 @passes.register("algebraic")
+class EliminateBitwiseXor(_Commutative, Transformation, RewriteRulePass):
+    def pattern(self, op, x):
+        return op.BitwiseXor(x, x)
+
+    def rewrite(self, op, x):
+        return op.Expand(op.CastLike(op.Constant(value_int=0), x))
+
+
+@passes.verify.equality
+@passes.register("algebraic")
 class EliminateAbsorptionBitwise(_Absorption, _Commutative):
     __OP1__ = lambda _, op, x, y: op.BitwiseAnd(x, y)
     __OP2__ = lambda _, op, x, y: op.BitwiseOr(x, y)
