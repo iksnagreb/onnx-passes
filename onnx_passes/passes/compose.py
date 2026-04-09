@@ -9,6 +9,10 @@ import onnx_ir as ir
 # @passes.register decorator work, passes.collect and passes.base.Pass
 import onnx_passes.passes as passes
 
+# Utility function tests two models for being isomorphic via NetworkX graph
+# representation
+from onnx_passes.utils.networkx import is_isomorphic
+
 
 # Composes a list of passes to a single pass which can optionally be applied
 # exhaustively
@@ -39,6 +43,14 @@ class ComposePass(passes.base.Pass, abc.ABC):
         # If the composed pass is marked exhaustive, apply the sequence of
         # passes as long as there are changes to the model
         while self.__exhaustive__ and result.modified:
+            # Make a proper copy of the model to have a reliable test for model
+            # change
+            previous = result.model.clone()
+            # Apply the sequence of passes to the model
             result = self.passes(result.model)
+            # Break endless cycles: Even if the pass indicates the model to be
+            # modified, this modification might end up where we started...
+            if is_isomorphic(result.model, previous):
+                break
         # Return the final result of the composed passes
         return result
