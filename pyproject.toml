@@ -16,7 +16,7 @@ maintainers = [
 dynamic = ["version"]
 # click dependencies needs at least python 3.10, thus this is the minimum python
 # version required
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 # List of project dependencies with pinned versions followig the format of
 # requirements.txt
 dependencies = [
