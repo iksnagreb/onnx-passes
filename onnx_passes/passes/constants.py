@@ -257,7 +257,7 @@ def _fold_constants_ulp(node: ir.Node, op, _):
 # Use ONNX Runtime as evaluator for some constant folding implementations
 # instead of the default ONNX Reference evaluator
 from onnxscript.evaluator import ORTEvaluator
-from onnx.onnx_cpp2py_export.defs import get_schema
+from onnxscript.values import Op, Opset
 
 _ort_evaluator = ORTEvaluator()
 
@@ -272,8 +272,8 @@ def _ort_evaluate(node: ir.Node, *args, **kwargs):
 
     # Evaluate th node with all args interpreted as inputs and keyword arguments
     # interpreted as attributes
-    return _ort_evaluator.eval(
-        get_schema(node.op_type, version, node.domain), [*args], {**kwargs}
+    return _ort_evaluator.eval_op(
+        Op(Opset(node.domain, version), node.op_type), [*args], {**kwargs}
     )
 
 
