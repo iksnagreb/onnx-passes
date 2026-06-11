@@ -1,10 +1,11 @@
+# pyright: reportArgumentType=false, reportReturnType=false
 # Use ONNX Script for creating test models
 from onnxscript import script, opset18 as op, FLOAT
 import itertools
 from typing import Optional, Tuple
 
 # Base class/template for deriving pass test cases
-from onnx_passes.tests.base import PassesTestBase
+from onnx_passes.tests.base import PassesTestBase, _DIMS_CURRENT
 
 from onnx_passes.passes.inline.reduce_log_sum_exp import InlineReduceLogSumExp
 
@@ -19,7 +20,7 @@ def _inputs(rank: int):
 
 
 def _axes_variants(rank: int):
-    variants = [None]
+    variants: list[Optional[Tuple[int, ...]]] = [None]
     seen = set()
 
     for n in range(rank + 1):
@@ -36,78 +37,19 @@ def _axes_variants(rank: int):
     return variants
 
 
+def _is_valid_case(rank: int, axes: Optional[Tuple[int, ...]], **_kwargs) -> bool:
+    if axes is None:
+        return True
+    return all(-rank <= axis < rank for axis in axes)
+
+
 def _make_functions(
     rank: int, axes: Optional[Tuple[int, ...]], keepdims: int, noop: int
 ):
     if axes is None:
-        if rank == 1:
-
-            @script(default_opset=op)
-            def model(x: FLOAT["C"]) -> FLOAT:
-                return op.ReduceLogSumExp(
-                    x,
-                    keepdims=keepdims,
-                    noop_with_empty_axes=noop,
-                )
-
-            @script(default_opset=op)
-            def expected(x: FLOAT["C"]) -> FLOAT:
-                return op.Log(
-                    op.ReduceSum(
-                        op.Exp(x),
-                        keepdims=keepdims,
-                        noop_with_empty_axes=noop,
-                    )
-                )
-
-            return model, expected
-
-        if rank == 2:
-
-            @script(default_opset=op)
-            def model(x: FLOAT["N", "C"]) -> FLOAT:
-                return op.ReduceLogSumExp(
-                    x,
-                    keepdims=keepdims,
-                    noop_with_empty_axes=noop,
-                )
-
-            @script(default_opset=op)
-            def expected(x: FLOAT["N", "C"]) -> FLOAT:
-                return op.Log(
-                    op.ReduceSum(
-                        op.Exp(x),
-                        keepdims=keepdims,
-                        noop_with_empty_axes=noop,
-                    )
-                )
-
-            return model, expected
-
-        if rank == 3:
-
-            @script(default_opset=op)
-            def model(x: FLOAT["N", "C", "W"]) -> FLOAT:
-                return op.ReduceLogSumExp(
-                    x,
-                    keepdims=keepdims,
-                    noop_with_empty_axes=noop,
-                )
-
-            @script(default_opset=op)
-            def expected(x: FLOAT["N", "C", "W"]) -> FLOAT:
-                return op.Log(
-                    op.ReduceSum(
-                        op.Exp(x),
-                        keepdims=keepdims,
-                        noop_with_empty_axes=noop,
-                    )
-                )
-
-            return model, expected
 
         @script(default_opset=op)
-        def model(x: FLOAT["N", "C", "H", "W"]) -> FLOAT:
+        def model(x: FLOAT[_DIMS_CURRENT]) -> FLOAT:
             return op.ReduceLogSumExp(
                 x,
                 keepdims=keepdims,
@@ -115,82 +57,10 @@ def _make_functions(
             )
 
         @script(default_opset=op)
-        def expected(x: FLOAT["N", "C", "H", "W"]) -> FLOAT:
+        def expected(x: FLOAT[_DIMS_CURRENT]) -> FLOAT:
             return op.Log(
                 op.ReduceSum(
                     op.Exp(x),
-                    keepdims=keepdims,
-                    noop_with_empty_axes=noop,
-                )
-            )
-
-        return model, expected
-
-    if rank == 1:
-
-        @script(default_opset=op)
-        def model(x: FLOAT["C"]) -> FLOAT:
-            return op.ReduceLogSumExp(
-                x,
-                op.Constant(value_ints=axes),
-                keepdims=keepdims,
-                noop_with_empty_axes=noop,
-            )
-
-        @script(default_opset=op)
-        def expected(x: FLOAT["C"]) -> FLOAT:
-            return op.Log(
-                op.ReduceSum(
-                    op.Exp(x),
-                    op.Constant(value_ints=axes),
-                    keepdims=keepdims,
-                    noop_with_empty_axes=noop,
-                )
-            )
-
-        return model, expected
-
-    if rank == 2:
-
-        @script(default_opset=op)
-        def model(x: FLOAT["N", "C"]) -> FLOAT:
-            return op.ReduceLogSumExp(
-                x,
-                op.Constant(value_ints=axes),
-                keepdims=keepdims,
-                noop_with_empty_axes=noop,
-            )
-
-        @script(default_opset=op)
-        def expected(x: FLOAT["N", "C"]) -> FLOAT:
-            return op.Log(
-                op.ReduceSum(
-                    op.Exp(x),
-                    op.Constant(value_ints=axes),
-                    keepdims=keepdims,
-                    noop_with_empty_axes=noop,
-                )
-            )
-
-        return model, expected
-
-    if rank == 3:
-
-        @script(default_opset=op)
-        def model(x: FLOAT["N", "C", "W"]) -> FLOAT:
-            return op.ReduceLogSumExp(
-                x,
-                op.Constant(value_ints=axes),
-                keepdims=keepdims,
-                noop_with_empty_axes=noop,
-            )
-
-        @script(default_opset=op)
-        def expected(x: FLOAT["N", "C", "W"]) -> FLOAT:
-            return op.Log(
-                op.ReduceSum(
-                    op.Exp(x),
-                    op.Constant(value_ints=axes),
                     keepdims=keepdims,
                     noop_with_empty_axes=noop,
                 )
@@ -199,7 +69,7 @@ def _make_functions(
         return model, expected
 
     @script(default_opset=op)
-    def model(x: FLOAT["N", "C", "H", "W"]) -> FLOAT:
+    def model(x: FLOAT[_DIMS_CURRENT]) -> FLOAT:
         return op.ReduceLogSumExp(
             x,
             op.Constant(value_ints=axes),
@@ -208,7 +78,7 @@ def _make_functions(
         )
 
     @script(default_opset=op)
-    def expected(x: FLOAT["N", "C", "H", "W"]) -> FLOAT:
+    def expected(x: FLOAT[_DIMS_CURRENT]) -> FLOAT:
         return op.Log(
             op.ReduceSum(
                 op.Exp(x),
@@ -239,24 +109,24 @@ class _InlineReduceLogSumExpTemplate(PassesTestBase):
 
 
 def _register_cases() -> None:
-    for rank in range(1, 5):
-        for axes in _axes_variants(rank):
-            for keepdims in (0, 1):
-                for noop in (0, 1):
-                    model, expected = _make_functions(rank, axes, keepdims, noop)
-                    name = (
-                        f"TestInlineReduceLogSumExpRank{rank}"
-                        f"{_axes_tag(axes)}"
-                        f"Keepdims{keepdims}"
-                        f"Noop{noop}"
-                    )
-                    _InlineReduceLogSumExpTemplate.register_case(
-                        globals(),
-                        name,
-                        model=model,
-                        expected=expected,
-                        inputs=lambda rank=rank: _inputs(rank),
-                    )
+    _InlineReduceLogSumExpTemplate.register_sweep_cases(
+        globals(),
+        sweep={
+            "rank": [1, 2, 3, 4],
+            "axes": _axes_variants(4),
+            "keepdims": [0, 1],
+            "noop": [0, 1],
+        },
+        make_functions=_make_functions,
+        name_builder=lambda rank, axes, keepdims, noop: (
+            f"TestInlineReduceLogSumExpRank{rank}"
+            f"{_axes_tag(axes)}"
+            f"Keepdims{keepdims}"
+            f"Noop{noop}"
+        ),
+        inputs_factory=lambda rank, **_kwargs: _inputs(rank),
+        include_case=_is_valid_case,
+    )
 
 
 _register_cases()

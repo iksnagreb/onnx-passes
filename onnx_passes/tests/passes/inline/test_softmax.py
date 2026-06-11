@@ -1,8 +1,9 @@
+# pyright: reportArgumentType=false, reportReturnType=false
 # Use ONNX Script for creating test models
 from onnxscript import script, opset18 as op, FLOAT
 
 # Base class/template for deriving pass test cases
-from onnx_passes.tests.base import PassesTestBase
+from onnx_passes.tests.base import PassesTestBase, _DIMS_CURRENT
 
 from onnx_passes.passes.inline.softmax import InlineSoftmax
 
@@ -16,61 +17,17 @@ def _inputs(rank: int):
     return [values[: np.prod(shape)].reshape(shape)]
 
 
+def _is_valid_case(rank: int, axis: int) -> bool:
+    return -rank <= axis < rank
+
+
 def _make_functions(rank: int, axis: int):
-    if rank == 1:
-
-        @script(default_opset=op)
-        def model(x: FLOAT["C"]) -> FLOAT["C"]:
-            return op.Softmax(x, axis=axis)
-
-        @script(default_opset=op)
-        def expected(x: FLOAT["C"]) -> FLOAT["C"]:
-            e = op.Exp(x)
-            return op.Div(
-                e,
-                op.ReduceSum(e, op.Constant(value_ints=[axis]), keepdims=1),
-            )
-
-        return model, expected
-
-    if rank == 2:
-
-        @script(default_opset=op)
-        def model(x: FLOAT["N", "C"]) -> FLOAT["N", "C"]:
-            return op.Softmax(x, axis=axis)
-
-        @script(default_opset=op)
-        def expected(x: FLOAT["N", "C"]) -> FLOAT["N", "C"]:
-            e = op.Exp(x)
-            return op.Div(
-                e,
-                op.ReduceSum(e, op.Constant(value_ints=[axis]), keepdims=1),
-            )
-
-        return model, expected
-
-    if rank == 3:
-
-        @script(default_opset=op)
-        def model(x: FLOAT["N", "C", "W"]) -> FLOAT["N", "C", "W"]:
-            return op.Softmax(x, axis=axis)
-
-        @script(default_opset=op)
-        def expected(x: FLOAT["N", "C", "W"]) -> FLOAT["N", "C", "W"]:
-            e = op.Exp(x)
-            return op.Div(
-                e,
-                op.ReduceSum(e, op.Constant(value_ints=[axis]), keepdims=1),
-            )
-
-        return model, expected
-
     @script(default_opset=op)
-    def model(x: FLOAT["N", "C", "H", "W"]) -> FLOAT["N", "C", "H", "W"]:
+    def model(x: FLOAT[_DIMS_CURRENT]) -> FLOAT[_DIMS_CURRENT]:
         return op.Softmax(x, axis=axis)
 
     @script(default_opset=op)
-    def expected(x: FLOAT["N", "C", "H", "W"]) -> FLOAT["N", "C", "H", "W"]:
+    def expected(x: FLOAT[_DIMS_CURRENT]) -> FLOAT[_DIMS_CURRENT]:
         e = op.Exp(x)
         return op.Div(
             e,
@@ -90,17 +47,19 @@ class _InlineSoftmaxTemplate(PassesTestBase):
 
 
 def _register_cases() -> None:
-    for rank in range(1, 5):
-        for axis in range(-rank, rank):
-            model, expected = _make_functions(rank, axis)
-            name = f"TestInlineSoftmaxRank{rank}Axis{_axis_tag(axis)}"
-            _InlineSoftmaxTemplate.register_case(
-                globals(),
-                name,
-                model=model,
-                expected=expected,
-                inputs=lambda rank=rank: _inputs(rank),
-            )
+    _InlineSoftmaxTemplate.register_sweep_cases(
+        globals(),
+        sweep={
+            "rank": [1, 2, 3, 4],
+            "axis": list(range(-4, 4)),
+        },
+        make_functions=_make_functions,
+        name_builder=lambda rank, axis: (
+            f"TestInlineSoftmaxRank{rank}Axis{_axis_tag(axis)}"
+        ),
+        inputs_factory=lambda rank, **_kwargs: _inputs(rank),
+        include_case=_is_valid_case,
+    )
 
 
 _register_cases()

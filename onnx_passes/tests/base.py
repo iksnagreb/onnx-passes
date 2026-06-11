@@ -1,6 +1,9 @@
 # Uses pytest for testing, test discovery and reporting
 import pytest
 
+import inspect
+import itertools
+
 from typing import Callable
 
 # Dynamically import python modules at runtime used for dynamically registering
@@ -21,6 +24,34 @@ from onnx_passes.passes import collect
 
 # Graph isomorphism utility for ONNX IR models
 from onnx_passes.utils.networkx import is_isomorphic
+
+
+# Canonical symbolic dimension names used by ONNX Script test annotations.
+#
+# The mapping is lazily extensible via _dims_for_rank so tests can request
+# higher-rank symbolic shapes without manually maintaining this dictionary.
+_DIMS_BY_RANK: dict[int, tuple[str, ...]] = {
+    1: ("C",),
+    2: ("N", "C"),
+    3: ("N", "C", "W"),
+    4: ("N", "C", "H", "W"),
+}
+
+# Shared dimension symbol used in ONNX Script test annotations. Test modules
+# can import this name and use FLOAT[_DIMS_CURRENT] while sweep registration
+# updates its value in the module scope per generated case.
+_DIMS_CURRENT: tuple[str, ...] = _DIMS_BY_RANK[1]
+
+
+def _dims_for_rank(rank: int) -> tuple[str, ...]:
+    if rank <= 0:
+        raise ValueError(f"rank must be positive, got: {rank}")
+
+    if rank not in _DIMS_BY_RANK:
+        # Generic fallback for higher ranks: keep N,C then append D0,D1,...
+        _DIMS_BY_RANK[rank] = ("N", "C", *[f"D{i}" for i in range(rank - 2)])
+
+    return _DIMS_BY_RANK[rank]
 
 
 def _format_exception_chain(exc: BaseException) -> str:
@@ -129,8 +160,20 @@ def _assert_onnx_models_equal(model_1: ir.Model, model_2: ir.Model):
             assert np.array_equal(c1.numpy(), c2.numpy())
 
 
-# Base class for creating simple tests of passes: ...
 class PassesTestBase:
+    """Base template for pass tests and generated test sweeps.
+
+    Typical usage:
+
+    1. Derive a test class and set defaults like ``__passes__``.
+    2. Call :meth:`register_case` for one explicit case, or
+       :meth:`register_sweep_cases` for cartesian product case generation.
+    3. Let pytest collect the generated classes from module globals.
+
+    The generated subclasses inherit the standard assertions in this class:
+    pass execution/verification and model-to-expected graph comparison.
+    """
+
     # List of passes to be tested: Supports full pass resolution from pass
     # class, full pass-class name, or category name
     __passes__: list = []
@@ -175,6 +218,26 @@ class PassesTestBase:
         config: dict | None = None,
         state: dict | None = None,
     ):
+        """Register one concrete pytest-collectable case class.
+
+        Parameters
+        ----------
+        scope:
+            Usually ``globals()`` of the caller module.
+        name:
+            Name of the generated class. Must be unique in ``scope``.
+        model, expected:
+            ONNX Script functions for source and expected graphs.
+        inputs:
+            Optional input factory returning model inputs for eager reference.
+        passes, common, config, state:
+            Optional per-case overrides of inherited class attributes.
+
+        Returns
+        -------
+        type
+            The generated subclass.
+        """
         attrs = {}
 
         if model is not None:
@@ -200,6 +263,174 @@ class PassesTestBase:
         case.__module__ = cls.__module__
         scope[name] = case
         return case
+
+    # Registers a sweep of derived test classes by taking a mapping from
+    # argument names to values. All selected values are forwarded as keyword
+    # arguments to make_functions.
+    @classmethod
+    def register_sweep_cases(
+        cls,
+        scope: dict,
+        *,
+        sweep: dict[str, list | tuple],
+        make_functions: Callable,
+        name_builder: Callable,
+        inputs_factory: Callable | None = None,
+        include_case: Callable | None = None,
+        pre_case: Callable | None = None,
+        dims_var_name: str | None = None,
+        dims_rank_key: str = "rank",
+        passes: list | None = None,
+        common: list | None = None,
+        config: dict | None = None,
+        state: dict | None = None,
+    ):
+        """Register multiple cases by sweeping parameter combinations.
+
+        Each key in ``sweep`` is treated as a keyword argument name for
+        ``make_functions`` and ``name_builder``. The method generates the
+        cartesian product of all value lists and registers one class per
+        combination.
+
+        Parameters
+        ----------
+        scope:
+            Usually ``globals()`` in the calling test module.
+        sweep:
+            Mapping from parameter name to list/tuple of values, for example
+            ``{"rank": [2, 4], "axis": [-1, 1]}``.
+        make_functions:
+            Callable that receives one sweep combination and returns
+            ``(model, expected)``.
+        name_builder:
+            Callable that receives one sweep combination and returns a unique
+            class name string.
+        inputs_factory:
+            Optional callable receiving one sweep combination and returning
+            runtime input arrays for eager verification.
+        include_case:
+            Optional predicate. If it returns ``False``, the case is skipped.
+        pre_case:
+            Optional hook called before ``make_functions`` for each case.
+        dims_var_name, dims_rank_key:
+            Optional helper for ONNX Script symbolic dimensions. When rank is
+            part of the sweep, this updates ``scope[dims_var_name]`` per case.
+            If ``dims_var_name`` is omitted and ``dims_rank_key`` exists in
+            ``sweep``, ``"_DIMS_CURRENT"`` is used automatically.
+
+        Notes
+        -----
+        Minimal pattern::
+
+            PassesTestBase.register_sweep_cases(
+                globals(),
+                sweep={"rank": [2, 4], "axis": [-1, 1]},
+                make_functions=_make_functions,
+                name_builder=lambda **p: f"TestCase_rank{p['rank']}_axis{p['axis']}",
+            )
+        """
+        if not isinstance(scope, dict):
+            raise TypeError("scope must be a dictionary, e.g. globals().")
+
+        if not sweep:
+            raise ValueError("sweep must not be empty.")
+
+        if not callable(make_functions):
+            raise TypeError("make_functions must be callable.")
+
+        if not callable(name_builder):
+            raise TypeError("name_builder must be callable.")
+
+        # If rank is part of the sweep and no explicit symbol name is provided,
+        # use the conventional shared annotation symbol.
+        if dims_var_name is None and dims_rank_key in sweep:
+            dims_var_name = "_DIMS_CURRENT"
+
+        if dims_var_name is not None:
+            if not isinstance(dims_var_name, str) or not dims_var_name:
+                raise TypeError("dims_var_name must be a non-empty string.")
+            if not isinstance(dims_rank_key, str) or not dims_rank_key:
+                raise TypeError("dims_rank_key must be a non-empty string.")
+            if dims_rank_key not in sweep:
+                raise ValueError(
+                    f"dims_rank_key='{dims_rank_key}' not found in sweep keys {list(sweep)}"
+                )
+
+        for key, values in sweep.items():
+            if not isinstance(key, str) or not key:
+                raise TypeError("All sweep keys must be non-empty strings.")
+            if not isinstance(values, (list, tuple)):
+                raise TypeError(
+                    f"Sweep entry '{key}' must be a list or tuple, got {type(values)}."
+                )
+            if len(values) == 0:
+                raise ValueError(f"Sweep entry '{key}' must not be empty.")
+
+        keys = list(sweep.keys())
+        value_lists = [list(values) for values in sweep.values()]
+
+        try:
+            signature = inspect.signature(make_functions)
+            signature.bind_partial(**{key: None for key in keys})
+        except TypeError as e:
+            raise TypeError(
+                "make_functions must accept all sweep keys as keyword arguments"
+                f". Missing/incompatible with keys: {keys}"
+            ) from e
+
+        for values in itertools.product(*value_lists):
+            params = dict(zip(keys, values))
+
+            if dims_var_name is not None:
+                rank = params[dims_rank_key]
+                if not isinstance(rank, int):
+                    raise TypeError(f"{dims_rank_key} must be int, got {type(rank)}")
+                scope[dims_var_name] = _DIMS_BY_RANK.setdefault(
+                    rank, _dims_for_rank(rank)
+                )
+
+            if include_case is not None and not include_case(**params):
+                continue
+
+            if pre_case is not None:
+                pre_case(**params)
+
+            model_expected = make_functions(**params)
+            if not isinstance(model_expected, tuple) or len(model_expected) != 2:
+                raise TypeError(
+                    "make_functions must return a tuple: (model, expected)."
+                )
+
+            model, expected = model_expected
+
+            name = name_builder(**params)
+            if not isinstance(name, str) or not name:
+                raise ValueError("name_builder must return a non-empty string.")
+            if name in scope:
+                raise ValueError(
+                    f"Case '{name}' already exists in scope."
+                    " Ensure unique names per sweep combination."
+                )
+
+            inputs = None
+            if inputs_factory is not None:
+
+                def _inputs_from_params(_params=params.copy()):
+                    return inputs_factory(**_params)
+
+                inputs = _inputs_from_params
+
+            cls.register_case(
+                scope,
+                name,
+                model=model,
+                expected=expected,
+                inputs=inputs,
+                passes=passes,
+                common=common,
+                config=config,
+                state=state,
+            )
 
     @property
     def reference(self):
