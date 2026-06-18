@@ -3,8 +3,7 @@ import onnx_ir as ir
 
 # All algebraic passes are transformations derived from pattern-based rewrite
 # rules
-from onnx_passes.passes.base import Transformation, RewriteRulePass, \
-    RewriteRuleSetPass
+from onnx_passes.passes.base import Transformation, RewriteRulePass, RewriteRuleSetPass
 
 # Checking ir.Value for being constants
 from onnx_passes.passes.util import is_constant, is_scalar, unbroadcast
@@ -31,12 +30,8 @@ class MoveAddPastReduceSum(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y, axes, keepdims):
         return op.Add(
-            op.ReduceSum(
-                op.Expand(x, op.Shape(op.Add(x, y))), axes, keepdims=keepdims
-            ),
-            op.ReduceSum(
-                op.Expand(y, op.Shape(op.Add(x, y))), axes, keepdims=keepdims
-            )
+            op.ReduceSum(op.Expand(x, op.Shape(op.Add(x, y))), axes, keepdims=keepdims),
+            op.ReduceSum(op.Expand(y, op.Shape(op.Add(x, y))), axes, keepdims=keepdims),
         )
 
 
@@ -112,17 +107,13 @@ class MoveMulPastReduceSum(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y, axes, keepdims):
         return op.Mul(
-            op.ReduceSum(
-                op.Expand(x, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims
-            ),
+            op.ReduceSum(op.Expand(x, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
             # This might look weird, but the match condition ensures that all y
             # are the same along the reduction axes, so a min-reduction will
             # just get rid of these axes to keep the shape as expected.
             # TODO: Alternatively a Slice could be inserted, but as long as we
             #  require y to be constant it does not really matter...
-            op.ReduceMin(
-                op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims
-            ),
+            op.ReduceMin(op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
         )
 
 
@@ -171,12 +162,8 @@ class MoveAddPastReduceMax(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y, axes, keepdims):
         return op.Add(
-            op.ReduceMax(
-                op.Expand(x, op.Shape(op.Add(x, y))), axes, keepdims=keepdims
-            ),
-            op.ReduceMax(
-                op.Expand(y, op.Shape(op.Add(x, y))), axes, keepdims=keepdims
-            )
+            op.ReduceMax(op.Expand(x, op.Shape(op.Add(x, y))), axes, keepdims=keepdims),
+            op.ReduceMax(op.Expand(y, op.Shape(op.Add(x, y))), axes, keepdims=keepdims),
         )
 
 
@@ -225,12 +212,8 @@ class MoveAddPastReduceMin(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, y, axes, keepdims):
         return op.Add(
-            op.ReduceMin(
-                op.Expand(x, op.Shape(op.Add(x, y))), axes, keepdims=keepdims
-            ),
-            op.ReduceMin(
-                op.Expand(y, op.Shape(op.Add(x, y))), axes, keepdims=keepdims
-            )
+            op.ReduceMin(op.Expand(x, op.Shape(op.Add(x, y))), axes, keepdims=keepdims),
+            op.ReduceMin(op.Expand(y, op.Shape(op.Add(x, y))), axes, keepdims=keepdims),
         )
 
 
@@ -285,26 +268,15 @@ class MoveMulPastReduceMax(Transformation, RewriteRulePass):
                 # As the factor y does not change over the reduction axes, it
                 # does not matter whether the min- or max-reduced y is used
                 op.GreaterOrEqual(
-                    op.ReduceMax(
-                        op.Expand(y, op.Shape(op.Mul(x, y))), axes,
-                        keepdims=keepdims
-                    ),
-                    op.CastLike(op.Constant(value_int=0), y)
+                    op.ReduceMax(op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
+                    op.CastLike(op.Constant(value_int=0), y),
                 ),
-                op.ReduceMax(
-                    op.Expand(x, op.Shape(op.Mul(x, y))), axes,
-                    keepdims=keepdims
-                ),
-                op.ReduceMin(
-                    op.Expand(x, op.Shape(op.Mul(x, y))), axes,
-                    keepdims=keepdims
-                )
+                op.ReduceMax(op.Expand(x, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
+                op.ReduceMin(op.Expand(x, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
             ),
             # As the factor y does not change over the reduction axes, it does
             # not matter whether the min- or max-reduced y is used
-            op.ReduceMax(
-                op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims
-            )
+            op.ReduceMax(op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
         )
 
 
@@ -359,26 +331,15 @@ class MoveMulPastReduceMin(Transformation, RewriteRulePass):
                 # As the factor y does not change over the reduction axes, it
                 # does not matter whether the min- or max-reduced y is used
                 op.GreaterOrEqual(
-                    op.ReduceMin(
-                        op.Expand(y, op.Shape(op.Mul(x, y))), axes,
-                        keepdims=keepdims
-                    ),
-                    op.CastLike(op.Constant(value_int=0), y)
+                    op.ReduceMin(op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
+                    op.CastLike(op.Constant(value_int=0), y),
                 ),
-                op.ReduceMin(
-                    op.Expand(x, op.Shape(op.Mul(x, y))), axes,
-                    keepdims=keepdims
-                ),
-                op.ReduceMax(
-                    op.Expand(x, op.Shape(op.Mul(x, y))), axes,
-                    keepdims=keepdims
-                )
+                op.ReduceMin(op.Expand(x, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
+                op.ReduceMax(op.Expand(x, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
             ),
             # As the factor y does not change over the reduction axes, it does
             # not matter whether the min- or max-reduced y is used
-            op.ReduceMin(
-                op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims
-            )
+            op.ReduceMin(op.Expand(y, op.Shape(op.Mul(x, y))), axes, keepdims=keepdims),
         )
 
 
@@ -408,15 +369,25 @@ class EliminateIdentityReduce(Transformation, RewriteRuleSetPass):
     def check(self):
         # Generic match condition template with placeholder for the reduction
         # operator
-        def _check(__op__, op, x, axes, keepdims):
+        def _check(__op__, op, x, axes, keepdims:int, noop_with_empty_axes:int=0):
+            if (
+                (ax := ir.convenience.get_const_tensor(axes)) is None or ax.numpy().size == 0
+            ) and noop_with_empty_axes:
+                # Reduction over an empty set of axes, which is a no-op if the
+                # attribute noop_with_empty_axes is set, otherwise this should be handled as
+                # reduction over all axes, which is not an identity reduction in general
+                return True
             # Reduction axes must be constant and the input shape statically
             # known to decide whether there is only a single reduced element
-            if x.shape is not None and x.shape.is_static():
-                if (axes := ir.convenience.get_const_tensor(axes)) is not None:
-                    if np.all(np.asarray(x.shape)[axes.numpy()] == 1):
-                        # Eliminating reduction over an empty set of values
-                        # should be handled as constant folding
-                        return np.prod(x.shape) > 0
+            if (
+                x.shape is not None
+                and x.shape.is_static()
+                and (axes := ir.convenience.get_const_tensor(axes)) is not None
+                and np.all(np.asarray(x.shape)[axes.numpy()] == 1)
+            ):
+                # Eliminating reduction over an empty set of values
+                # should be handled as constant folding
+                return np.prod(x.shape) > 0
             # Not identity reduction or not enough information to decide
             return False
 

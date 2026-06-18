@@ -1,3 +1,4 @@
+# ruff: noqa: F401
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
 import onnx_passes.passes as passes
@@ -17,7 +18,7 @@ import onnx_passes.passes.streamline.unbroadcast
 class Streamline(passes.compose.ComposePass, passes.base.Transformation):
     # Ordered sequence of passes and pass collections to be applied for each
     # iteration of streamlining
-    __passes__ = [
+    __passes__ = [  # noqa: RUF012
         # Core of streamlining: Factorization of multiplication-like operators
         # pulling out common scale factors
         "factorize",
