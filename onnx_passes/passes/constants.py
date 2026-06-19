@@ -327,3 +327,41 @@ def _fold_constants_sqrt(node: ir.Node, op, _):
     # Use the ONNX Runtime evaluator to execute the node instead of the default
     # reference evaluator
     return op.Constant(value=ir.tensor(_ort_evaluate(node, x.numpy()).value))
+
+
+# Constant folding for MatMul with two constant inputs
+@register("MatMul")
+def _fold_constants_matmul(node: ir.Node, op, _):
+    # Skip if there is not exactly two inputs (MatMul does not accept fewer or
+    # further inputs)
+    if len(node.inputs) != 2:
+        return None
+
+    # Skip if any of the inputs is None (e.g., due to missing initializer)
+    if node.inputs[0] is None or node.inputs[1] is None:
+        return None
+
+    # Constant folding requires both inputs to be constants, otherwise there is
+    # nothing to fold...
+    if (a_val := ir.convenience.get_const_tensor(node.inputs[0])) is None:
+        return None
+
+    # Constant folding requires both inputs to be constants, otherwise there is
+    # nothing to fold...
+    if (b_val := ir.convenience.get_const_tensor(node.inputs[1])) is None:
+        return None
+
+    a= a_val.numpy()
+    b = b_val.numpy()
+
+    # If ranks differ, left-pad the lower-rank input with singleton dims
+    # until ranks match (e.g. (4,) -> (1,4) when other is rank-2).
+    if a.ndim != b.ndim:
+        if a.ndim < b.ndim:
+            a = a.reshape((1,) * (b.ndim - a.ndim) + a.shape)
+        else:
+            b = b.reshape((1,) * (a.ndim - b.ndim) + b.shape)
+
+    # Calculate results using numpy
+    result = np.matmul(a, b)
+    return op.Constant(value=ir.tensor(result))
