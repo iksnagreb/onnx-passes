@@ -1,11 +1,11 @@
-# ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
+# ONNX intermediate representation
 import onnx_ir as ir
+# NumPy used to operate on shapes and constant tensors
+import numpy as np
 
-# Unused node removal passes build into ONNX IR
-from onnx_ir.passes.common import RemoveUnusedNodesPass
-
-# Constant folding pass build into ONNX IR and ONNX Script
-from onnxscript.optimizer import fold_constants
+# Common cleanup passes already implemented in ONNX IR, used here without any
+# custom infrastructure.
+import onnx_ir.passes.common
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
@@ -15,339 +15,210 @@ import onnx_passes.passes as passes
 # rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
-# NumPy used to operate on shapes and constant tensors
-import numpy as np
+# Use the ONNX reference evaluator to evaluate nodes for constant folding
+from onnx.reference import ReferenceEvaluator
 
-# Operators which should always be constant folded
-# TODO: Not used anymore...
-ALWAYS_FOLD_OPS = {
-    "Transpose", "Constant", "ConstantOfShape", "Reshape", "Not", "Split"
+# Imperative builder for constructing ONNX IR graphs
+from onnxscript import GraphBuilder
+
+
+def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
+    """Performs basic cleanup of the model graph."""
+
+    # Optionally cleanup a deep copy of the model and keep the original
+    # model unmodified. Deep copy to not entangle the metadata stores.
+    if not inplace:
+        model = model.clone(deep_copy=True)
+
+    # Run a sequence of ONNX IR cleanup passes, starting with the graph in
+    # topological order (which is itself required in a cleaned-up) to not miss
+    # any disconnected, unused nodes.
+    cleanup = ir.passes.PassManager([
+        ir.passes.common.TopologicalSortPass(),
+        ir.passes.common.RemoveUnusedNodesPass(),
+        ir.passes.common.RemoveUnusedFunctionsPass(),
+        ir.passes.common.RemoveUnusedOpsetsPass(),
+        ir.passes.common.LiftConstantsToInitializersPass(),
+        ir.passes.common.RemoveInitializersFromInputsPass(),
+        ir.passes.common.DeduplicateInitializersPass(),
+        ir.passes.common.ShapeInferencePass()
+    ])
+
+    return cleanup(model)
+
+
+# Backlists operator types from evaluation-based constant folding
+BLACKLIST: set[str] = {
+    "Constant", "GatherElements"
 }
 
-# Disables all size limits ofr constant-folding
-NO_LIMITS = {
-    "input_size_limit": np.inf, "output_size_limit": np.inf
-}
+
+def _fold_constants(model: ir.Model,
+                    inplace: bool = True) -> ir.passes.PassResult:
+    """Folds all constants in the model graph by evaluating the nodes."""
+
+    # Optionally constant-fold a deep copy of the model and keep the original
+    # model unmodified. Deep copy to not entangle the metadata stores.
+    if not inplace:
+        model = model.clone(deep_copy=True)
+
+    # Convert all functions currently linked into the model to proto
+    # representation to make them available to the reference evaluator
+    functions = [ir.to_proto(f) for f in model.functions.values()]
+
+    # Bring the graph into topological order to evaluate all nodes before any of
+    # their consumers to fold all constants in one pass
+    model.graph.sort()
+
+    # Graph builder for inserting replacement constant ops into the existing
+    # graph
+    builder = GraphBuilder(model.graph)
+    op = builder.op
+
+    # Keep track of whether the model is modified, i.e., at least one constant
+    # is folded
+    modified = False
+
+    # Constant folding of all nodes in the graph in recursive topological order
+    for node in ir.traversal.RecursiveGraphIterator(model.graph):
+        # Folding 'Constant' operators to be replaced by 'Constant' operators
+        # would iterate forever. Others might be black-listed for reasons...
+        if node.op_type in BLACKLIST:
+            continue
+
+        # Collect all available constant inputs to the node as the execution
+        # context mapping input name to numpy array
+        context = {}
+
+        for x in node.inputs:
+            if x is not None:
+                if (value := ir.convenience.get_const_tensor(x)) is not None:
+                    context[x.name] = value.numpy()
+
+        # Use the ONNX reference evaluator to execute the node on the context
+        # collecting named outputs into the context as well
+        try:
+            session = ReferenceEvaluator(ir.to_proto(node), functions=functions)
+            context = session.run(None, context, intermediate=True)
+
+            # Replace each output of the node by the constant from the context,
+            # rewiring all consumers, including the graph outputs.
+            for y in node.outputs:
+                if (name := y.name) is not None:
+                    ir.convenience.replace_all_uses_with(
+                        y, op.Constant(value=ir.tensor(context[name])), True
+                    )
+                    modified = True
+        except RuntimeError:
+            pass
+
+    # Cleanup the graph removing now disconnected nodes
+    result = _cleanup(model, inplace=True)
+    return ir.passes.PassResult(result.model, result.modified or modified)
 
 
-# TODO: Come up with more clever folding strategies, for now this tries to fold
-#  everything, which is probably fine with MatMul scale factor extraction?
-def _should_fold(_: ir.Node):
-    return True
-
-
-# Performs constant folding on the entire model graph
-@passes.verify.tolerance
+@passes.verify.equality
 @passes.register("fold-constants")
-class FoldConstants(Transformation):
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        # Configure constant folding behavior: Size limits of constant foldable
-        # tensors - disable all size limits by default
-        kwargs = self.config.setdefault(
-            "fold_constants", {**NO_LIMITS, "onnx_shape_inference": True}
-        )
-        # Run in-place constant - yields PassResult
-        modified = fold_constants(model, should_fold=_should_fold,
-                                  **kwargs).modified
-        # Constant folding might leave unused initializer nodes in the graph
-        # which can be removed in-place
-        result = RemoveUnusedNodesPass()(model)
-        # Combine pass result from both passes to not miss modifications due to
-        # unused nodes unrelated to constant folding
-        return ir.passes.PassResult(result.model, modified or result.modified)
+class FoldConstantCastLike(Transformation, RewriteRulePass):
+    """Folds CastLike into Cast if the target dtype is known."""
+
+    def pattern(self, op, x, target):
+        return op.CastLike(x, target)
+
+    def check(self, op, x, target):
+        return target.dtype is not None
+
+    def rewrite(self, op, x, target):
+        return op.Cast(x, to=target.dtype.value)
 
 
-# Replaces Shape operators with Constant operators of the input tensor shape to
-# enable constant folding of shape calculations - dynamic shapes (or missing
-# shapes) are not supported
 @passes.verify.equality
 @passes.register("fold-constants")
 class FoldConstantShape(Transformation, RewriteRulePass):
+    """Folds Shape operators if the input shape is known."""
+
     def pattern(self, op, x):
         return op.Shape(x)
 
     def check(self, _, x: ir.Value):
-        return x.shape and all(isinstance(dim, int) for dim in x.shape)
+        return x.shape is not None and x.shape.is_static()  # noqa: Never None
 
     def rewrite(self, op, x):
         return op.Constant(value_ints=list(x.shape))
 
 
-# Replaces Size operators with Constant operators of the input tensor size to
-# enable constant folding of shape calculations - dynamic shapes (or missing
-# shapes) are not supported
 @passes.verify.equality
 @passes.register("fold-constants")
 class FoldConstantSize(Transformation, RewriteRulePass):
+    """Folds Size operators if the input shape is known."""
+
     def pattern(self, op, x):
         return op.Size(x)
 
     def check(self, _, x: ir.Value):
-        return x.shape and all(isinstance(dim, int) for dim in x.shape)
+        return x.shape is not None and x.shape.is_static()  # noqa: Never None
 
     def rewrite(self, op, x):
         return op.Constant(value_int=int(np.prod(x.shape)))
 
 
-# Registers custom constant folding for operators
-from onnxscript.optimizer._constant_folding import register  # noqa: Protected
-
-
-@register("Split")
-def _fold_constants_split(node: ir.Node, op, _):
-    # Replace single output split by Identity(x)
-    if len(node.outputs) == 1:
-        return op.Identity(node.inputs[0])
-
-    # Skip non-constant inputs
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    _split = None
-
-    # Option A: Sizes per split
-    if len(node.inputs) == 2:
-        # Skip non-constant splits
-        if (_split := ir.convenience.get_const_tensor(node.inputs[1])) is None:
-            return None
-        # Numpy expects splits as starting indices for each section
-        _split = np.cumsum(_split.numpy()[:-1])
-
-    # Option B: Number of (even) splits
-    if (num_outputs := node.attributes.get("num_outputs")) is not None:
-        # Numpy accepts single integer of (even) splits as well
-        _split = num_outputs.as_int()
-
-    # Hm, something must be terribly wrong...
-    if _split is None:
-        return None
-
-    # Default split axis is 0, according to ONNX operators reference:
-    #   https://onnx.ai/onnx/operators/onnx__Split.html
-    if (axis := node.attributes.get("axis")) is None:
-        axis = ir.Attr("axis", ir.AttributeType.INT, 0)
-
-    # Split constant tensor and wrap a list of Constant operators
-    splits = np.split(x.numpy(), _split, axis.as_int())
-    return [op.Constant(value=ir.tensor(x)) for x in splits]
-
-
-# Domain used by custom operators implemented with this library
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-
-
-@register("Im2Col", domain=CUSTOM_DOMAIN)
-def _fold_constants_im2col(node: ir.Node, op, _):
-    # Skip if there are not exactly two inputs as required by our custom-op
-    # specification (proper input + pre-computed access pattern)
-    if len(node.inputs) != 2:
-        return None
-
-    # Constant folding requires both of these inputs to be constants, otherwise
-    # there is nothing to fold...
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    if (indices := ir.convenience.get_const_tensor(node.inputs[1])) is None:
-        return None
-
-    # From Im2Col operator definition, see onnx_passes.ops.im2col, slightly
-    # adjusted from ONNX to NumPy behavior
-    return op.Constant(
-        value=ir.tensor(x.numpy().reshape(x.shape[0], -1)[:, indices.numpy()])
-    )
-
-
-# Use ONNX Script implementation of inverse Swish and Silu in eager mode
-# evaluation, i.e., executing the Python/Numpy, during constant folding
-from onnx_passes.ops import InverseSwish_v1, InverseSilu_v1
-
-
-@register("InverseSwish", domain=CUSTOM_DOMAIN)
-def _fold_constants_inverse_swish(node: ir.Node, op, _):
-    # Skip if there is not exactly one input (Swish and its inverse are unary)
-    if len(node.inputs) != 1:
-        return None
-
-    # Constant folding requires the input to be constants, otherwise there is
-    # nothing to fold...
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    # Default Swish alpha is 1.0, according to ONNX operators reference:
-    #   https://onnx.ai/onnx/operators/onnx__Swish.html
-    if (alpha := node.attributes.get("alpha")) is None:
-        alpha = ir.Attr("alpha", ir.AttributeType.FLOAT, 1.0)
-
-    # Default InverseSwish k is 0, i.e., the principal branch
-    if (k := node.attributes.get("k")) is None:
-        k = ir.Attr("k", ir.AttributeType.INT, 0)
-
-    # Needs a graph and a version for the standard ONNX opset
-    if node.graph is None:
-        return None
-
-    inverse_swish = InverseSwish_v1(Opset("", node.graph.opset_imports[""]))
-
-    # Use the eager mode evaluation to generate the folded constant node
-    return op.Constant(value=ir.tensor(
-        inverse_swish(x.numpy(), k=k.as_int(), alpha=alpha.as_int())
-    ))
-
-
-@register("InverseSilu", domain=CUSTOM_DOMAIN)
-def _fold_constants_inverse_silu(node: ir.Node, op, _):
-    # Skip if there is not exactly one input (Swish and its inverse are unary)
-    if len(node.inputs) != 1:
-        return None
-
-    # Constant folding requires the input to be constants, otherwise there is
-    # nothing to fold...
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    # Default InverseSilu k is 0, i.e., the principal branch
-    if (k := node.attributes.get("k")) is None:
-        k = ir.Attr("k", ir.AttributeType.INT, 0)
-
-    # Needs a graph and a version for the standard ONNX opset
-    if node.graph is None:
-        return None
-
-    inverse_silu = InverseSilu_v1(Opset("", node.graph.opset_imports[""]))
-
-    # Use the eager mode evaluation to generate the folded constant node
-    return op.Constant(value=ir.tensor(inverse_silu(x.numpy(), k=k.as_int())))
-
-
-# Use ONNX Script implementation of ArgSort in eager mode evaluation, i.e.,
-# executing the Python/Numpy, during constant folding
-from onnx_passes.ops import ArgSort_v1
-
-
-@register("ArgSort", domain=CUSTOM_DOMAIN)
-def _fold_constants_argsort(node: ir.Node, op, _):
-    # Skip if there is not exactly one input (ArgSort does not accept further
-    # inputs)
-    if len(node.inputs) != 1:
-        return None
-
-    # Constant folding requires the input to be constants, otherwise there is
-    # nothing to fold...
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    # Default ArgSort axis is -1, i.e., sort along the last axis
-    if (axis := node.attributes.get("axis")) is None:
-        axis = ir.Attr("axis", ir.AttributeType.INT, -1)
-
-    # Needs a graph and a version for the standard ONNX opset
-    if node.graph is None:
-        return None
-
-    argsort = ArgSort_v1(Opset("", node.graph.opset_imports[""]))
-
-    # Use the eager mode evaluation to generate the folded constant node
-    return op.Constant(value=ir.tensor(argsort(x.numpy(), axis=axis.as_int())))
-
-
-# Use ONNX Script implementation of Ulp in eager mode evaluation, i.e.,
-# executing the Python/Numpy, during constant folding
-from onnx_passes.ops import Ulp_v1
-
-
-@register("Ulp", domain=CUSTOM_DOMAIN)
-def _fold_constants_ulp(node: ir.Node, op, _):
-    # Skip if there is not exactly one input (Ulp does not accept further
-    # inputs)
-    if len(node.inputs) != 1:
-        return None
-
-    # Constant folding requires the input to be constants, otherwise there is
-    # nothing to fold...
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    # Needs a graph and a version for the standard ONNX opset
-    if node.graph is None:
-        return None
-
-    ulp = Ulp_v1(Opset("", node.graph.opset_imports[""]))
-
-    # Use the eager mode evaluation to generate the folded constant node
-    return op.Constant(value=ir.tensor(ulp(x.numpy())))
-
-
-# Use ONNX Runtime as evaluator for some constant folding implementations
-# instead of the default ONNX Reference evaluator
-from onnxscript.evaluator import ORTEvaluator
-from onnxscript.values import Op, Opset
-
-_ort_evaluator = ORTEvaluator()
-
-
-def _ort_evaluate(node: ir.Node, *args, **kwargs):
-    # If the node itself does not specify the operator version, use the version
-    # from the graphs opset imports
-    version = node.version
-
-    if version is None:
-        version = node.graph.opset_imports[node.domain]
-
-    # Evaluate th node with all args interpreted as inputs and keyword arguments
-    # interpreted as attributes
-    return _ort_evaluator.eval_op(
-        Op(Opset(node.domain, version), node.op_type), [*args], {**kwargs}
-    )
-
-
-# Default constant folding of GatherElements uses the ONNX reference evaluator
-# which implements gathering in NumPy via np.choose which seems to have issues
-# with large inputs (or rather inputs with many elements along the axis).
-@register("GatherElements")
-def _fold_constants_gather_elements(node: ir.Node, op, _):
-    # Skip if there is not exactly two inputs (Gather does not accept fewer or
-    # further inputs)
-    if len(node.inputs) != 2:
-        return None
-
-    # Constant folding requires both inputs to be constants, otherwise there is
-    # nothing to fold...
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    # Constant folding requires both inputs to be constants, otherwise there is
-    # nothing to fold...
-    if (indices := ir.convenience.get_const_tensor(node.inputs[1])) is None:
-        return None
-
-    # Default GatherElements axis is 0, according to ONNX operators reference:
-    #   https://onnx.ai/onnx/operators/onnx__GatherElements.html
-    if (axis := node.attributes.get("axis")) is None:
-        axis = ir.Attr("axis", ir.AttributeType.INT, 0)
-
-    # Use the ONNX Runtime evaluator to execute the node instead of the default
-    # reference evaluator
-    return op.Constant(value=ir.tensor(
-        _ort_evaluate(node, x.numpy(), indices.numpy(), axis=axis.value).value
-    ))
-
-
-# Default constant folding of Sqrt uses the ONNX reference evaluator which
-# implements sqrt in NumPy, which apparently sometimes produces different
-# results compared to the ONNX Runtime...
-@register("Sqrt")
-def _fold_constants_sqrt(node: ir.Node, op, _):
-    # Skip if there is not exactly one input (Sqrt does not accept fewer or
-    # further inputs)
-    if len(node.inputs) != 1:
-        return None
-
-    # Constant folding requires the input to be constants, otherwise there is
-    # nothing to fold...
-    if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
-        return None
-
-    # Use the ONNX Runtime evaluator to execute the node instead of the default
-    # reference evaluator
-    return op.Constant(value=ir.tensor(_ort_evaluate(node, x.numpy()).value))
+@passes.verify.equality
+@passes.register("fold-constants")
+class FoldConstantGatherElements(Transformation, RewriteRulePass):
+    """Folds GatherElements with both inputs constant.
+
+    Note: This addresses some issue with the ONNX reference evaluator used for
+    constant folding which implements gathering in NumPy via np.choose which
+    seems to have issues with large inputs (or rather inputs with many elements
+    along the axis).
+    """
+
+    def pattern(self, op, x, indices):
+        return op.GatherElements(x, indices, _outputs=["y"])
+
+    def check(self, op, x, indices, y):
+        if ir.convenience.get_const_tensor(x) is not None:
+            if ir.convenience.get_const_tensor(indices) is not None:
+                return True
+        return False
+
+    def rewrite(self, op, x, indices, y):
+        # Default axis is 0, according to ONNX operators reference:
+        #   https://onnx.ai/onnx/operators/onnx__GatherElements.html
+        if (axis := y.producer().attributes.get("axis")) is None:
+            axis = ir.Attr("axis", ir.AttributeType.INT, 0)
+
+        # Extract tensors and attributes as python/numpy objects
+        axis = axis.as_int()
+
+        x = ir.convenience.get_const_tensor(x).numpy()  # noqa: Never None
+        indices = ir.convenience.get_const_tensor(indices).numpy()  # noqa: ...
+
+        # Rearrange and flatten the tensors such that all indexing logic applies
+        # to the final axis
+        x_swapped = x.swapaxes(-1, axis)
+        x = x_swapped.reshape(-1, x.shape[axis])
+        indices = indices.swapaxes(-1, axis).reshape(-1, indices.shape[axis])
+
+        # Output tensor shape matches the input tensor shape
+        y = np.empty_like(x)
+
+        # Gather logic in flattened final axis form
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                y[i][j] = x[i][indices[i][j]]
+
+        # Restore the original shape and axis order
+        y = y.reshape(x_swapped.shape).swapaxes(-1, axis)
+
+        # Constant tensor replacement pattern
+        return op.Constant(value=ir.tensor(y))
+
+
+@passes.verify.tolerance
+@passes.register("fold-constants")
+class FoldConstants(Transformation):
+    """Applies constant folding to the model."""
+
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        return _fold_constants(model, inplace=True)
