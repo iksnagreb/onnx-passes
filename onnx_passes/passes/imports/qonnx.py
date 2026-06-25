@@ -7,11 +7,10 @@ import onnx_passes.passes as passes
 
 # Derive Transformations (allowed to modify the graph) from pattern-based
 # rewrite rules
-from onnx_passes.passes.base import FunctionalPass, Transformation, \
-    RewriteRulePass
+from onnx_passes.passes.base import InPlacePass, Transformation, RewriteRulePass
 
 # Domain used by custom operators implemented with this library
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN, InjectCustomOps
+from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN, LinkCustomOps
 # Domain used by QONNX operators which are to be transplanted into CUSTOM_DOMAIN
 from onnx_passes.ops.qonnx import DOMAIN as QONNX_DOMAIN, BREVITAS_DOMAIN
 
@@ -117,10 +116,10 @@ class ImportQONNXMultiThreshold(Transformation, RewriteRulePass):
 # Bundles QONNX operator import and required version conversion passes in the
 # required order
 @passes.register("import-qonnx")
-class ImportQONNX(passes.compose.ComposePass, FunctionalPass):
+class ImportQONNX(passes.compose.ComposePass, InPlacePass):
     __passes__ = [
         ImportQONNXQuant,
         ImportBrevitasQuant,
         ImportQONNXMultiThreshold,
-        InjectCustomOps
+        LinkCustomOps
     ]
