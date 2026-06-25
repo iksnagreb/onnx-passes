@@ -13,7 +13,8 @@ Reshape operations with constant shape. However, without constant folding, shape
 propagation might be blocked, preventing some streamlining transformations from
 being applicable. The resulting graph can be a mess:
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx reorder shape-inference cleanup checker verify
+onnx-passes -c cfg.yaml -o out.onnx model.onnx shape-inference \
+ reorder shape-inference cleanup checker verify
 netron --browse out.onnx
 ```
 
@@ -22,6 +23,7 @@ When combining shape streamlining with constant folding, shapes propagate and
 the whole graph eventually collapses into an Identity function, just as
 expected:
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx streamline checker verify
+onnx-passes -c cfg.yaml -o out.onnx model.onnx shape-inference streamline \
+ checker verify
 netron --browse out.onnx
 ```

@@ -18,7 +18,8 @@ normalization can be inlined as affine scale and bias operations, i.e.,
 elementwise multiplication and addition along a single channel axis. This leaves
 us with the fully expanded layer tail graph in all its glory:
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx inline-qonnx inline-batchnorm shape-inference checker verify
+onnx-passes -c cfg.yaml -o out.onnx model.onnx inline-qonnx inline-batchnorm \
+ shape-inference checker verify
 netron --browse out.onnx
 ```
 
@@ -33,6 +34,7 @@ the whole layer tail into a single operator. At the output the dequantization
 scale and bias (usually only present for signed quantizers) remain, which, in a
 complete model, would be streamlinable into the next layer.
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx inline-qonnx inline-batchnorm streamline-thresholds streamline checker verify
+onnx-passes -c cfg.yaml -o out.onnx model.onnx inline-qonnx inline-batchnorm \
+ streamline-thresholds streamline checker verify
 netron --browse out.onnx
 ```
