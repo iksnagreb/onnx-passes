@@ -343,8 +343,6 @@ class EliminateIdentityExpand(Transformation, RewriteRulePass):
 
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-# Make custom Im2Col operator available for convolution lowering
-from onnx_passes.ops.im2col import Im2Col  # noqa: Used indirectly via registry
 
 
 # Eliminates Im2Col (input generators) where the output shape is the same as the

@@ -14,8 +14,6 @@ from onnx_passes.passes.util import collect_attrs, ones_like
 
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-# Make custom Im2Col operator available for lowering pooling
-from onnx_passes.ops.im2col import Im2Col  # noqa: Used indirectly via registry
 
 # Numpy for index and shape calculations
 import numpy as np

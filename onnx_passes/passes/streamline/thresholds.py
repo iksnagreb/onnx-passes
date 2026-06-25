@@ -94,8 +94,6 @@ from onnx_passes.passes.annotation.range import _get_range  # noqa: Protected
 from onnx_passes.passes.util import ones_like
 # Custom ONNX domain providing a reference implementation of MultiThreshold
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-# Custom unit in the last place (ULP) ONNX operator
-from onnx_passes.ops.ulp import Ulp  # noqa: Used via registry
 
 # Function with partially applied arguments: Used to greate a generator
 # mechanism inserting operators into a pattern template

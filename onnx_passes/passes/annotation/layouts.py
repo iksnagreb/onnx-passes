@@ -15,8 +15,6 @@ from onnx_passes.passes.base import Transformation, RewriteRuleSetPass
 
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-# LayoutConverter custom operator implemented with this library
-from onnx_passes.ops.layouts import LayoutConverter  # noqa: Used via registry
 
 # Exception type indicating failure while inserting layout assumptions and/or
 # conversions - currently does not do add anything ontop the base Exception.

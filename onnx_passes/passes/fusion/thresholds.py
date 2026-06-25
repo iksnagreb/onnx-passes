@@ -16,11 +16,6 @@ from onnx_passes.passes.util import constant_match, is_constant
 
 # Domain used by custom operators implemented with this library
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-# Make custom MultiThreshold operator available to represent the fused pattern
-from onnx_passes.ops.thresholds import MultiThreshold  # noqa: Used via registry
-# Make custom ArgSort operator available which is used for sorting thresholds
-# and threshold segments
-from onnx_passes.ops.argsort import ArgSort  # noqa: Used via registry
 
 # NumPy is used for shape calculations
 import numpy as np

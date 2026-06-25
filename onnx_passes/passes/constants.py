@@ -160,7 +160,7 @@ def _fold_constants_im2col(node: ir.Node, op, _):
 
 # Use ONNX Script implementation of inverse Swish and Silu in eager mode
 # evaluation, i.e., executing the Python/Numpy, during constant folding
-from onnx_passes.ops.inverse_swish import InverseSwish, InverseSilu
+from onnx_passes.ops import InverseSwish_v1, InverseSilu_v1
 
 
 @register("InverseSwish", domain=CUSTOM_DOMAIN)
@@ -183,9 +183,15 @@ def _fold_constants_inverse_swish(node: ir.Node, op, _):
     if (k := node.attributes.get("k")) is None:
         k = ir.Attr("k", ir.AttributeType.INT, 0)
 
+    # Needs a graph and a version for the standard ONNX opset
+    if node.graph is None:
+        return None
+
+    inverse_swish = InverseSwish_v1(Opset("", node.graph.opset_imports[""]))
+
     # Use the eager mode evaluation to generate the folded constant node
     return op.Constant(value=ir.tensor(
-        InverseSwish(x.numpy(), k=k.as_int(), alpha=alpha.as_int())
+        inverse_swish(x.numpy(), k=k.as_int(), alpha=alpha.as_int())
     ))
 
 
@@ -204,13 +210,19 @@ def _fold_constants_inverse_silu(node: ir.Node, op, _):
     if (k := node.attributes.get("k")) is None:
         k = ir.Attr("k", ir.AttributeType.INT, 0)
 
+    # Needs a graph and a version for the standard ONNX opset
+    if node.graph is None:
+        return None
+
+    inverse_silu = InverseSilu_v1(Opset("", node.graph.opset_imports[""]))
+
     # Use the eager mode evaluation to generate the folded constant node
-    return op.Constant(value=ir.tensor(InverseSilu(x.numpy(), k=k.as_int())))
+    return op.Constant(value=ir.tensor(inverse_silu(x.numpy(), k=k.as_int())))
 
 
 # Use ONNX Script implementation of ArgSort in eager mode evaluation, i.e.,
 # executing the Python/Numpy, during constant folding
-from onnx_passes.ops.argsort import ArgSort
+from onnx_passes.ops import ArgSort_v1
 
 
 @register("ArgSort", domain=CUSTOM_DOMAIN)
@@ -229,13 +241,19 @@ def _fold_constants_argsort(node: ir.Node, op, _):
     if (axis := node.attributes.get("axis")) is None:
         axis = ir.Attr("axis", ir.AttributeType.INT, -1)
 
+    # Needs a graph and a version for the standard ONNX opset
+    if node.graph is None:
+        return None
+
+    argsort = ArgSort_v1(Opset("", node.graph.opset_imports[""]))
+
     # Use the eager mode evaluation to generate the folded constant node
-    return op.Constant(value=ir.tensor(ArgSort(x.numpy(), axis=axis.as_int())))
+    return op.Constant(value=ir.tensor(argsort(x.numpy(), axis=axis.as_int())))
 
 
 # Use ONNX Script implementation of Ulp in eager mode evaluation, i.e.,
 # executing the Python/Numpy, during constant folding
-from onnx_passes.ops.ulp import Ulp
+from onnx_passes.ops import Ulp_v1
 
 
 @register("Ulp", domain=CUSTOM_DOMAIN)
@@ -250,8 +268,14 @@ def _fold_constants_ulp(node: ir.Node, op, _):
     if (x := ir.convenience.get_const_tensor(node.inputs[0])) is None:
         return None
 
+    # Needs a graph and a version for the standard ONNX opset
+    if node.graph is None:
+        return None
+
+    ulp = Ulp_v1(Opset("", node.graph.opset_imports[""]))
+
     # Use the eager mode evaluation to generate the folded constant node
-    return op.Constant(value=ir.tensor(Ulp(x.numpy())))
+    return op.Constant(value=ir.tensor(ulp(x.numpy())))
 
 
 # Use ONNX Runtime as evaluator for some constant folding implementations
