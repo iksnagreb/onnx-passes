@@ -551,7 +551,7 @@ class MultiThreshold_v1(OnnxOperator):
 
 
 class Any_v1(OnnxOperator):
-    """"""
+    """Yields True if any value in input is True (or non-zero)."""
 
     @staticmethod
     def script(op: Opset):
@@ -568,7 +568,7 @@ class Any_v1(OnnxOperator):
 
 
 class Log2_v1(OnnxOperator):
-    """"""
+    """Logarithm base 2."""
 
     @staticmethod
     def script(op: Opset):
