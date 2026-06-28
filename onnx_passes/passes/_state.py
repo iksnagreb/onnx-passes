@@ -14,6 +14,8 @@ class State:
         Global counter of pass applications
     history : list[type]
         History of applied passes by type
+    verify : dict[str, VerifyState]
+        History of verification states (execution context, metrics, etc.)
     """
 
     @dataclass(frozen=True)
