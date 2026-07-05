@@ -206,7 +206,7 @@ class Verify(Pass, ABC):
                         f"Output {tensor.name} not within tolerance"
                     )
 
-        # Check whether all metrics ly within the required range and raise
+        # Check whether all metrics lie within the required range and raise
         # exception if not
         if self._method == Verify.Method.METRIC:
             for metric in self.config.verify.metrics:  # noqa: Not None
@@ -257,7 +257,7 @@ def metric(cls):
 
 @metric
 class VerifyMetrics_v1(Verify):
-    """Metric-based verification of the model without modifying."""
+    """Metric-based verification of the model without actually modifying."""
 
     @property
     def in_place(self) -> bool:

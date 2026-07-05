@@ -4,11 +4,11 @@ import os
 import inspect
 
 # Build a class hierarchy of ONNX passes starting from ABC
-from abc import ABC
+from abc import ABC, abstractmethod
 # Path to files or directories
 from pathlib import Path
 # Type hints for annotating the interface
-from typing import Any
+from typing import Any, Callable
 
 # ONNX intermediate representation
 import onnx_ir as ir
@@ -401,3 +401,112 @@ class Sequential(Pass, ABC):
             result = passes(result.model)
 
         return result
+
+
+# Pattern-based graph rewriting implemented in ONNX Script
+from onnxscript.rewriter import pattern, RewritePass, MatchResult
+
+
+class RewriteRule(Transformation, ABC):
+    """Base class for pattern-based rewrite rule transformation passes."""
+
+    @abstractmethod
+    def pattern(self, *args, **kwargs):
+        """The target pattern to be matched."""
+        raise NotImplementedError(
+            "Method 'pattern' must be implemented by derived class."
+        )
+
+    @abstractmethod
+    def rewrite(self, *args, **kwargs):
+        """The replacement pattern to be inserted into the graph"""
+        raise NotImplementedError(
+            "Method 'rewrite' must be implemented by derived class."
+        )
+
+    def check(self, *args, **kwargs) -> MatchResult:  # noqa: static, unused arg
+        """Match condition to decide whether to rewrite the matched pattern."""
+        return MatchResult()
+
+    @property
+    def commute(self) -> bool:
+        """Allow patterns of commutative ops to commute."""
+        return False
+
+    def rule(self):
+        """Assembles the rewrite rule pass from the class definition."""
+
+        def _check(op, *args, **kwargs):
+            """Check to prevent rewriting inside functions."""
+            if isinstance(op.graph_or_function, ir.Function):
+                return False
+            return self.check(op, *args, **kwargs)
+
+        return pattern.RewriteRule(
+            self.pattern, self.rewrite, _check, remove_nodes=False,
+            verbose=self.config.logging.verbose
+        )
+
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        """Applies the rewrite rule to the model."""
+        rule_set = pattern.RewriteRuleSet([self.rule()], commute=self.commute)
+        return RewritePass(rule_set)(model)
+
+
+# Partial application of function used to partially modify pattern-based rule
+# set definitions
+from functools import partial
+
+
+class RewriteRuleSet(Transformation, ABC):
+    """Base class for pattern-based rewrite rule set transformation passes."""
+
+    @abstractmethod
+    def pattern(self):
+        """List of target patterns to be matched."""
+        raise NotImplementedError(
+            "Method 'pattern' must be implemented by derived class."
+        )
+
+    @abstractmethod
+    def rewrite(self):
+        """The replacement patterns to be inserted into the graph"""
+        raise NotImplementedError(
+            "Method 'rewrite' must be implemented by derived class."
+        )
+
+    def check(self) -> list[Callable[..., MatchResult]]:
+        """Match conditions to decide whether to rewrite a matched pattern."""
+        return [
+            lambda *args, **kwargs: MatchResult() for _ in self.pattern()
+        ]
+
+    @property
+    def commute(self) -> bool:
+        """Allow patterns of commutative ops to commute."""
+        return False
+
+    def rules(self):
+        """Assembles the rewrite rule set pass from the class definition."""
+
+        def _check(check, op, *args, **kwargs):  # noqa: Duplicate
+            """Check to prevent rewriting inside functions."""
+            if isinstance(op.graph_or_function, ir.Function):
+                return False
+            return check(op, *args, **kwargs)
+
+        check = [partial(_check, check) for check in self.check()]
+        rules = zip(self.pattern(), self.rewrite(), check)
+
+        return [
+            pattern.RewriteRule(
+                *rule, remove_nodes=False,
+                verbose=self.config.logging.verbose
+            )
+            for rule in rules
+        ]
+
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        """Applies the rewrite rule set to the model."""
+        rule_set = pattern.RewriteRuleSet(self.rules(), commute=self.commute)
+        return RewritePass(rule_set)(model)
