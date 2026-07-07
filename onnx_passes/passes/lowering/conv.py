@@ -182,11 +182,14 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
 
             # Split the input tensor into groups along the channel axis for
             # parallel convolution groups: C input channels
-            xs = op.Split(
-                x, op.Constant(
-                    value=ir.tensor([C // groups for _ in range(groups)])
-                ), axis=-1, _outputs=groups
-            )
+            xs = x
+
+            if groups > 1:
+                xs = op.Split(
+                    x, op.Constant(
+                        value=ir.tensor([C // groups for _ in range(groups)])
+                    ), axis=-1, _outputs=groups
+                )
 
             # Transpose weight tensor to channel-last layout on the input side,
             # keeping the M output channels first
@@ -202,11 +205,14 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
 
             # Split the weight tensor into groups along the channel axis for
             # parallel convolution groups: M output channels
-            ws = op.Split(
-                w, op.Constant(
-                    value=ir.tensor([M // groups for _ in range(groups)])
-                ), axis=1, _outputs=groups
-            )
+            ws = w
+
+            if groups > 1:
+                ws = op.Split(
+                    w, op.Constant(
+                        value=ir.tensor([M // groups for _ in range(groups)])
+                    ), axis=1, _outputs=groups
+                )
 
             # Wrap splits in list if there are no groups to simplify the pattern
             # generation below (allows to use the loop even for no groups)
