@@ -289,3 +289,40 @@ class EliminateComplementationAdd(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x):
         return op.Expand(op.CastLike(op.Constant(value_int=0), x), op.Shape(x))
+
+
+@passes.verify.equality
+@passes.register("algebraic")
+class InferClip(Transformation, RewriteRulePass):
+    def pattern(self, op, x, minimum, maximum):
+        return op.Where(
+            op.Less(
+                op.Where(
+                    op.Greater(x, maximum), maximum, x
+                ),
+                minimum
+            ),
+            minimum,
+            op.Where(
+                op.Greater(x, maximum), maximum, x
+            )
+        )
+
+    def check(self, op, x, minimum, maximum):
+        if minimum.shape is not None and minimum.shape.is_static():
+            if maximum.shape is not None and maximum.shape.is_static():
+                return np.prod(minimum.shape) == np.prod(maximum.shape) == 1
+        return False
+
+    def rewrite(self, op, x, minimum, maximum):
+        return op.Clip(x, minimum, maximum)
+
+
+@passes.verify.equality
+@passes.register("algebraic")
+class MoveRoundPastClip(Transformation, RewriteRulePass):
+    def pattern(self, op, x, minimum, maximum):
+        return op.Clip(op.Round(x), minimum, maximum)
+
+    def rewrite(self, op, x, minimum, maximum):
+        return op.Round(op.Clip(x, op.Round(minimum), op.Round(maximum)))
