@@ -460,7 +460,7 @@ class Sequential(Pass, ABC):
     passes : list
         List of unresolved passes, can be classes, modules or string identifiers
     exhaustive : bool = False
-        Apply th sequence exhaustively until the model stops changing
+        Apply the sequence exhaustively until the model stops changing
     """
 
     passes: list
