@@ -466,6 +466,14 @@ class Sequential(Pass, ABC):
     passes: list
     exhaustive: bool = False
 
+    @property
+    def in_place(self) -> bool:
+        return all(p.in_place for p in self.passes)
+
+    @property
+    def changes_input(self) -> bool:
+        return any(p.changes_input for p in self.passes)
+
     def __init__(self, config: Config = Config()):
         """Initializes the sequence by resolving and configuring the passes."""
         super().__init__(config)
