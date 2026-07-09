@@ -102,7 +102,7 @@ class Verify(Pass, ABC):
         if not self.config.verify:
             if self.config.logging.verbose:
                 print(
-                    f"Skipping verification of {self.__class__.__name__}:"
+                    f"Skipping verification of {self.identifier}:"
                     f" Verification not enabled"
                 )
             return
@@ -130,7 +130,7 @@ class Verify(Pass, ABC):
                 self._expected, _ = _evaluate_model(model, self._inputs)
             except RuntimeError as e:
                 raise VerificationError(
-                    f"Verification of pass '{self.__class__.__name__}' failed"
+                    f"Verification of pass '{self.identifier}' failed"
                 ) from e
 
     def verify(self, result: ir.passes.PassResult):
@@ -141,7 +141,7 @@ class Verify(Pass, ABC):
         if not self.config.verify:
             if self.config.logging.verbose:
                 print(
-                    f"Skipping verification of {self.__class__.__name__}:"
+                    f"Skipping verification of {self.identifier}:"
                     f" Verification not enabled"
                 )
             return
@@ -149,7 +149,7 @@ class Verify(Pass, ABC):
         if not result.modified:
             if self.config.logging.verbose:
                 print(
-                    f"Skipping verification of {self.__class__.__name__}:"
+                    f"Skipping verification of {self.identifier}:"
                     f" Model not modified"
                 )
             return
@@ -160,7 +160,7 @@ class Verify(Pass, ABC):
             self._outputs, context = _evaluate_model(result.model, self._inputs)
         except RuntimeError as e:
             raise VerificationError(
-                f"Verification of pass '{self.__class__.__name__}' failed"
+                f"Verification of pass '{self.identifier}' failed"
             ) from e
 
         # Discard the full execution context if not requested for debugging
@@ -218,7 +218,7 @@ class Verify(Pass, ABC):
 
         if self.config.logging.verbose:
             print(
-                f"Successfully verified model after {self.__class__.__name__}"
+                f"Successfully verified model after {self.identifier}"
             )
 
 

@@ -97,7 +97,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise ir.passes.PreconditionError(
-                f"Pre-condition for pass '{self.__class__.__name__}' failed"
+                f"Pre-condition for pass '{self.identifier}' failed"
             ) from e
 
         # Prepares the model and state for verification, e.g., by computing
@@ -108,7 +108,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise VerificationError(
-                f"Verification of pass '{self.__class__.__name__}' failed"
+                f"Verification of pass '{self.identifier}' failed"
             ) from e
 
         # Call the pass implementation (provided by the specialization) on the
@@ -119,7 +119,7 @@ class Pass(ir.passes.PassBase, ABC):
         # PassResult and not simply a model or something entirely different
         if not isinstance(result, ir.passes.PassResult):
             raise TypeError(
-                f"The result of the pass '{self.__class__.__name__}' should be"
+                f"The result of the pass '{self.identifier}' should be"
                 f" type PassResult."
                 f" Please create one with ir.passes.PassResult()."
             )
@@ -128,7 +128,7 @@ class Pass(ir.passes.PassBase, ABC):
         # regarding in-place pass application
         if self.in_place and result.model is not model:
             raise ir.passes.PassError(
-                f"The pass '{self.__class__.__name__}' is declared in-place,"
+                f"The pass '{self.identifier}' is declared in-place,"
                 f" but the model returned is *not* the same object as the input"
                 f" model. Pass developer: Pass should return the same model"
                 f" object or the in_place property should return False."
@@ -136,7 +136,7 @@ class Pass(ir.passes.PassBase, ABC):
 
         if not self.in_place and result.model is model:
             raise ir.passes.PassError(
-                f"The pass '{self.__class__.__name__}' is declared not"
+                f"The pass '{self.identifier}' is declared not"
                 f" in-place, but the model returned *is* the same object as the"
                 f" input model. Pass developer: Pass should return a new model"
                 f" object or the in_place property should return True."
@@ -158,6 +158,17 @@ class Pass(ir.passes.PassBase, ABC):
             # Save the model checkpoint
             ir.save(result.model, filename)
 
+        # If the pass modified the model, apply the ONNX checker pass to check
+        # the consistency of the model
+        if result.modified:
+            if self.config.logging.verbose:
+                print(f"Checking modified model after {self.identifier}")
+
+            ir.passes.common.CheckerPass(full_check=True)(result.model)
+
+            if self.config.logging.verbose:
+                print(f"Successfully checked model after {self.identifier}")
+
         # Evaluate the postcondition on the pass result (model and indication on
         # whether the model has been modified), which raises an exception to
         # indicate failure. Pass through any PostconditionError and wrap all
@@ -168,7 +179,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise ir.passes.PostconditionError(
-                f"Post-condition for pass '{self.__class__.__name__}' failed"
+                f"Post-condition for pass '{self.identifier}' failed"
             ) from e
 
         # Finish verification of the transformed model, e.g., by comparing to
@@ -179,7 +190,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise VerificationError(
-                f"Verification of pass '{self.__class__.__name__}' failed"
+                f"Verification of pass '{self.identifier}' failed"
             ) from e
 
         # Final log message when leaving the pass
