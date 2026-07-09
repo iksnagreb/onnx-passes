@@ -329,6 +329,79 @@ def resolve_module(identifier: str):
 import onnx_ir.passes.common
 
 
+def _give_canonical_names(model: ir.Model,
+                          inplace: bool = True) -> ir.passes.PassResult:
+    """Assigns canonical names to all nodes and values in the model graph."""
+
+    # Optionally apply this to a deep copy of the model and keep the original
+    # model unmodified. Deep copy to not entangle the metadata stores.
+    if not inplace:
+        model = model.clone(deep_copy=True)
+
+    # Keep track of whether the model is actually modified, i.e., at least one
+    # name (node or value) is changed
+    modified = False
+
+    # Give canonical names to all nodes in the graph based on their op-type and
+    # the order of appearance, i.e., first Add will be Add_0, second Add_1, ...
+    counts_per_op_type = {}
+
+    for node in ir.traversal.RecursiveGraphIterator(model.graph):
+        count = counts_per_op_type.setdefault(node.op_type, 0)
+        counts_per_op_type[node.op_type] += 1
+
+        new_name = f"{node.op_type}_{count}"
+        modified = modified or new_name != node.name
+        node.name = new_name
+
+    # Give canonical names to all values derived by their producer's name or, in
+    # case of constant values without producer, their consumers' names, i.e.,
+    # the first output of Add_0 will be Add_0_output_0, etc.
+    for name, value in ir.convenience.create_value_mapping(model.graph).items():
+        if value in model.graph.inputs:
+            index = model.graph.inputs.index(value)
+
+            new_name = f"global_input__{index}"
+            modified = modified or name != value.name
+            value.name = new_name
+
+            continue
+
+        if value in model.graph.outputs:
+            index = model.graph.outputs.index(value)
+
+            new_name = f"global_output__{index}"
+            modified = modified or name != value.name
+            value.name = new_name
+
+            continue
+
+        if (producer := value.producer()) is not None:
+            index = producer.outputs.index(value)
+
+            new_name = f"{producer.name}_output_{index}"
+            modified = modified or name != value.name
+            value.name = new_name
+
+            continue
+
+        # Neither global input or output, nor produced in the graph: Must be a
+        # constant initializer value: Name derived from all consumers in order.
+        if value.consumers():
+            new_names = []
+
+            for consumer in value.consumers():
+                index = consumer.inputs.index(value)
+                new_names.append(f"{consumer.name}_input_{index}")
+
+            new_name = "_".join(new_names)
+
+            modified = modified or name != value.name
+            value.name = new_name
+
+    return ir.passes.PassResult(model, modified)
+
+
 class Transformation(Pass, ABC):
     """Base class for deriving transformation passes modifying the model."""
 
@@ -351,14 +424,16 @@ class Transformation(Pass, ABC):
                 ir.passes.common.RemoveUnusedNodesPass(),
                 ir.passes.common.RemoveUnusedFunctionsPass(),
                 ir.passes.common.RemoveUnusedOpsetsPass(),
-                ir.passes.common.LiftConstantsToInitializersPass(),
+                # Lift all constants without any size limit
+                ir.passes.common.LiftConstantsToInitializersPass(True, 0),
                 ir.passes.common.RemoveInitializersFromInputsPass(),
                 ir.passes.common.DeduplicateInitializersPass(),
                 ir.passes.common.ShapeInferencePass()
-                # TODO: Give canonical names pass...
             ])
 
-            return ir.passes.PassResult(cleanup(result.model).model, True)
+            _give_canonical_names(cleanup(result.model).model, inplace=True)
+
+            return ir.passes.PassResult(result.model, True)
 
         return result
 
