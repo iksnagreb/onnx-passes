@@ -427,6 +427,7 @@ class Transformation(Pass, ABC):
                 # Lift all constants without any size limit
                 ir.passes.common.LiftConstantsToInitializersPass(True, 0),
                 ir.passes.common.RemoveInitializersFromInputsPass(),
+                ir.passes.common.LiftSubgraphInitializersToMainGraphPass(),
                 ir.passes.common.DeduplicateInitializersPass(),
                 ir.passes.common.ShapeInferencePass()
             ])
