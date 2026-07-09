@@ -13,6 +13,10 @@ from typing import Any, Callable
 # ONNX intermediate representation
 import onnx_ir as ir
 
+# Common cleanup passes already implemented in ONNX IR, used here without any
+# custom infrastructure.
+import onnx_ir.passes.common
+
 # Pass configuration and state tracking structures
 from onnx_passes.passes._config import Config
 from onnx_passes.passes._state import State
@@ -333,11 +337,6 @@ def resolve_module(identifier: str):
             return import_module(f"{identifier}")
         except ModuleNotFoundError:
             return None
-
-
-# Common cleanup passes already implemented in ONNX IR, used here without any
-# custom infrastructure.
-import onnx_ir.passes.common
 
 
 def _give_canonical_names(model: ir.Model,
