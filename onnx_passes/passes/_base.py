@@ -429,6 +429,9 @@ class Transformation(Pass, ABC):
         # Apply basic ONNX IR cleanup transformations to the model if the result
         # indicates the model to be modified, skip cleaning up unchanged models
         if result.modified:
+            if self.config.logging.verbose:
+                print(f"Cleaning up after {self.identifier}")
+
             cleanup = ir.passes.PassManager([
                 ir.passes.common.TopologicalSortPass(),
                 ir.passes.common.RemoveUnusedNodesPass(),
