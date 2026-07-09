@@ -11,8 +11,8 @@ bits_x = 4
 bits_w = 4
 
 # Minimum and maximum quantized input, signed integer
-min_x = -2 ** (bits_w - 1)
-max_x = +2 ** (bits_w - 1) - 1
+min_x = 0
+max_x = 2 ** bits_x - 1
 
 # Minimum and maximum quantized weight, signed narrow range integer
 min_w = -2 ** (bits_w - 1) + 1
