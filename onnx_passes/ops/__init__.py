@@ -645,6 +645,37 @@ class Ulp_v1(OnnxOperator):
         return ulp
 
 
+class PowerQuantMatMul_v1(OnnxOperator):
+    """Matrix multiplication resulting from PowerQuant.
+
+    See: https://arxiv.org/abs/2301.09858
+    """
+
+    @staticmethod
+    def script(op: Opset):
+        """Generate an ONNX Script function implementing PowerQuantMatMul."""
+
+        def power_quant_matmul(x, y, alpha):
+            return op.MatMul(
+                op.Mul(
+                    op.Sign(x),
+                    op.Pow(
+                        op.Abs(x),
+                        op.Reciprocal(alpha)
+                    )
+                ),
+                op.Mul(
+                    op.Sign(y),
+                    op.Pow(
+                        op.Abs(y),
+                        op.Reciprocal(alpha)
+                    )
+                ),
+            )
+
+        return power_quant_matmul
+
+
 def link_ops_from_graph(model: ir.Model, graph: ir.Graph) -> ir.Model:
     """Links functions implementing custom-Ops into the ONNX model."""
 
