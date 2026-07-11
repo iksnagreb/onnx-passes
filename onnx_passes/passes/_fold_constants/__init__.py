@@ -113,13 +113,16 @@ def _fold_constants(model: ir.Model,
 class FoldConstantCastLike_v1(RewriteRule, Verify):
     """Folds CastLike into Cast if the target dtype is known."""
 
-    def pattern(self, op, x, target):
+    @staticmethod
+    def pattern(op, x, target):
         return op.CastLike(x, target)
 
-    def check(self, op, x, target):
+    @staticmethod
+    def check(op, x, target):
         return target.dtype is not None
 
-    def rewrite(self, op, x, target):
+    @staticmethod
+    def rewrite(op, x, target):
         return op.Cast(x, to=target.dtype.value)
 
 
@@ -156,13 +159,16 @@ class FoldConstantShape_v1(RewriteRule, Verify):
 class FoldConstantSize_v1(RewriteRule, Verify):
     """Folds Size operators if the input shape is known."""
 
-    def pattern(self, op, x):
+    @staticmethod
+    def pattern(op, x):
         return op.Size(x)
 
-    def check(self, _, x: ir.Value):
+    @staticmethod
+    def check(op, x: ir.Value):
         return x.shape is not None and x.shape.is_static()  # noqa: Never None
 
-    def rewrite(self, op, x):
+    @staticmethod
+    def rewrite(op, x):
         return op.Constant(value_int=int(np.prod(x.shape)))
 
 
@@ -175,16 +181,19 @@ class FoldConstantGatherElements_v1(RewriteRule, Verify):
     along the axis).
     """
 
-    def pattern(self, op, x, indices):
+    @staticmethod
+    def pattern(op, x, indices):
         return op.GatherElements(x, indices, _outputs=["y"])
 
-    def check(self, op, x, indices, y):
+    @staticmethod
+    def check(op, x, indices, y):
         if ir.convenience.get_const_tensor(x) is not None:
             if ir.convenience.get_const_tensor(indices) is not None:
                 return True
         return False
 
-    def rewrite(self, op, x, indices, y):
+    @staticmethod
+    def rewrite(op, x, indices, y):
         # Default axis is 0, according to ONNX operators reference:
         #   https://onnx.ai/onnx/operators/onnx__GatherElements.html
         if (axis := y.producer().attributes.get("axis")) is None:
