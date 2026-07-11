@@ -518,18 +518,6 @@ def getattr_v(obj: object, name: str, version: int) -> Any:
 class RewriteRule(Transformation, ABC):
     """Base class for pattern-based rewrite rule transformation passes."""
 
-    def pattern(self, *args, **kwargs):
-        """The target pattern to be matched."""
-        raise NotImplementedError(
-            "Method 'pattern' must be implemented by derived class."
-        )
-
-    def rewrite(self, *args, **kwargs):
-        """The replacement pattern to be inserted into the graph"""
-        raise NotImplementedError(
-            "Method 'rewrite' must be implemented by derived class."
-        )
-
     def check(self, *args, **kwargs) -> rewriter.MatchResult:  # noqa: static
         """Match condition to decide whether to rewrite the matched pattern."""
         return rewriter.MatchResult()
@@ -546,9 +534,12 @@ class RewriteRule(Transformation, ABC):
         # the standard domain is given
         version = model.opset_imports[""] if model is not None else -1
 
-        pattern = getattr_v(self, "pattern", version)
-        check = getattr_v(self, "check", version)
-        rewrite = getattr_v(self, "rewrite", version)
+        try:
+            pattern = getattr_v(self, "pattern", version)
+            check = getattr_v(self, "check", version)
+            rewrite = getattr_v(self, "rewrite", version)
+        except AttributeError:
+            return None
 
         def _check(op, *args, **kwargs):
             """Check to prevent rewriting inside functions."""
@@ -564,8 +555,17 @@ class RewriteRule(Transformation, ABC):
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         """Applies the rewrite rule to the model."""
-        rule = rewriter.RewriteRuleSet([self.rule(model)], commute=self.commute)
-        return rewriter.RewritePass(rule)(model)
+        if (rule := self.rule(model)) is not None:
+            rule = rewriter.RewriteRuleSet([rule], commute=self.commute)
+            return rewriter.RewritePass(rule)(model)
+
+        if self.config.logging.verbose:
+            print(
+                f"Skipping {self.identifier}: No applicable rule for"
+                f" v{model.opset_imports['']} of the standard opset"
+            )
+
+        return ir.passes.PassResult(model, False)
 
 
 # Partial application of function used to partially modify pattern-based rule
@@ -575,18 +575,6 @@ from functools import partial
 
 class RewriteRuleSet(Transformation, ABC):
     """Base class for pattern-based rewrite rule set transformation passes."""
-
-    def pattern(self):
-        """List of target patterns to be matched."""
-        raise NotImplementedError(
-            "Method 'pattern' must be implemented by derived class."
-        )
-
-    def rewrite(self):
-        """The replacement patterns to be inserted into the graph"""
-        raise NotImplementedError(
-            "Method 'rewrite' must be implemented by derived class."
-        )
 
     def check(self) -> list[Callable[..., rewriter.MatchResult]]:
         """Match conditions to decide whether to rewrite a matched pattern."""
@@ -604,9 +592,12 @@ class RewriteRuleSet(Transformation, ABC):
         # the standard domain is given
         version = model.opset_imports[""] if model is not None else -1
 
-        pattern = getattr_v(self, "pattern", version)
-        check = getattr_v(self, "check", version)
-        rewrite = getattr_v(self, "rewrite", version)
+        try:
+            pattern = getattr_v(self, "pattern", version)
+            check = getattr_v(self, "check", version)
+            rewrite = getattr_v(self, "rewrite", version)
+        except AttributeError:
+            return None
 
         def _check(check, op, *args, **kwargs):  # noqa: Duplicate
             """Check to prevent rewriting inside functions."""
@@ -636,5 +627,14 @@ class RewriteRuleSet(Transformation, ABC):
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         """Applies the rewrite rule set to the model."""
-        rules = rewriter.RewriteRuleSet(self.rules(model), commute=self.commute)
-        return rewriter.RewritePass(rules)(model)
+        if (rules := self.rules(model)) is not None:
+            rules = rewriter.RewriteRuleSet(rules, commute=self.commute)
+            return rewriter.RewritePass(rules)(model)
+
+        if self.config.logging.verbose:
+            print(
+                f"Skipping {self.identifier}: No applicable rules for"
+                f" v{model.opset_imports['']} of the standard opset"
+            )
+
+        return ir.passes.PassResult(model, False)
