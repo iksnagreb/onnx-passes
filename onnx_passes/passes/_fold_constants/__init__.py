@@ -126,14 +126,16 @@ class FoldConstantCastLike_v1(RewriteRule, Verify):
 class FoldConstantShape_v1(RewriteRule, Verify):
     """Folds Shape operators if the input shape is known."""
 
-    def pattern(self, op, x):
+    @staticmethod
+    def pattern(op, x):
         return op.Shape(x, _outputs=["y"])
 
-    def check(self, _, x: ir.Value, y):
+    @staticmethod
+    def check(op, x: ir.Value, y):
         return x.shape is not None and x.shape.is_static()  # noqa: Never None
 
     @staticmethod
-    def rewrite_v13(op, x, y):
+    def rewrite_v1(op, x, y):
         return op.Constant(value_ints=x.shape[:])
 
     @staticmethod
