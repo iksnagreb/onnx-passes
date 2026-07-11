@@ -619,10 +619,13 @@ class RewriteRuleSet(Transformation, ABC):
 
         check = [partial(_check, check) for check in check()]
 
+        pattern = pattern()
+        rewrite = rewrite()
+
         if len(check) < len(pattern):
             check = [*check, *[partial(_check, default_check) for _ in pattern]]
 
-        rules = zip(pattern(), rewrite(), check)
+        rules = zip(pattern, rewrite, check)
 
         return [
             rewriter.RewriteRule(
