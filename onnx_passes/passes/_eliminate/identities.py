@@ -202,24 +202,22 @@ class EliminateIdentityMatMul_v1(RewriteRuleSet, Verify):
     @staticmethod
     def pattern():
         return [
-            lambda op, x, eye: op.MatMul(x, identity_matrix, _outputs=["out"]),
-            lambda op, x, eye: op.MatMul(identity_matrix, x, _outputs=["out"]),
+            lambda op, x: op.MatMul(x, identity_matrix, _outputs=["out"]),
+            lambda op, x: op.MatMul(identity_matrix, x, _outputs=["out"]),
         ]
 
     def check(self):
         return [
-            lambda op, x, eye, out: \
-                out.shape is not None and out.shape.is_static(),
-            lambda op, x, eye, out: \
-                out.shape is not None and out.shape.is_static(),
+            lambda op, x, out: out.shape is not None and out.shape.is_static(),
+            lambda op, x, out: out.shape is not None and out.shape.is_static(),
         ]
 
     @staticmethod
     def rewrite():
         return [
-            lambda op, x, eye, out: \
+            lambda op, x, out: \
                 op.Expand(x, op.Constant(value_ints=list(out.shape))),
-            lambda op, x, eye, out: \
+            lambda op, x, out: \
                 op.Expand(x, op.Constant(value_ints=list(out.shape))),
         ]
 
