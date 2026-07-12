@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import RewriteRuleSet, Sequential, Transformation
+from onnx_passes.passes._base import RewriteRuleSet
 from onnx_passes.passes._verify import Verify
 
 
