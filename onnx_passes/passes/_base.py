@@ -406,6 +406,13 @@ def _give_canonical_names(model: ir.Model,
 
             new_name = "_".join(new_names)
 
+            # If there already is an initializer of this name, rename to
+            # the initializer to avoid a conflict
+            if new_name in model.graph.initializers:
+                if model.graph.initializers[new_name] != value:
+                    model.graph.initializers[new_name].name = \
+                        f"{new_name}_initializer"
+
             modified = modified or name != value.name
             value.name = new_name
 
