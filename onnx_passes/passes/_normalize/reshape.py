@@ -180,6 +180,25 @@ class RewriteUnsqueezeAsReshape_v1(RewriteRule, Verify):
         return op.Reshape(x, shape)
 
 
+class RewriteExpandAsReshape_v1(RewriteRule, Verify):
+    """Rewrite Expand operations as Reshape if expand effectively unsqueezes."""
+
+    @staticmethod
+    def pattern(op, x, shape):
+        return op.Expand(x, shape)
+
+    @staticmethod
+    def check(op, x, shape):
+        if (shape := ir.convenience.get_const_tensor(shape)) is not None:
+            if x.shape is not None and x.shape.is_static():
+                return np.prod(shape.numpy()) == np.prod(x.shape.numpy())
+        return False
+
+    @staticmethod
+    def rewrite(op, x, shape):
+        return op.Reshape(x, shape)
+
+
 class FuseConsecutiveReshapes_v1(RewriteRule, Verify):
     """Fuses two consecutive reshape operations into a single reshape."""
 
