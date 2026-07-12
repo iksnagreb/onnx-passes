@@ -5,6 +5,10 @@ from onnx_passes.passes._verify import Verify
 class PrimitiveBooleanToDNF_v1(RewriteRuleSet, Verify):
     """Converts primitive boolean expressions to disjunctive normal form."""
 
+    @property
+    def commute(self) -> bool:
+        return True
+
     @staticmethod
     def pattern():
         return [
