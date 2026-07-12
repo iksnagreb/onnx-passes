@@ -1,14 +1,15 @@
-from onnx_passes.passes._base import Transformation
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes._base import Transformation, Sequential
 
-import onnx_ir as ir
-
-# Common passes already implemented in ONNX IR
-import onnx_ir.passes.common
+from onnx_passes.passes._normalize import attributes
+from onnx_passes.passes._normalize import reshape
 
 
-class AddDefaultAttributes_v1(Transformation, Verify):
-    """Add default values for optional attributes not present in nodes."""
+class Normalize_v1(Sequential, Transformation):
+    """Exhaustively applies common normalization transformations."""
 
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.common.AddDefaultAttributesPass()(model)
+    passes = [
+        attributes,
+        reshape
+    ]
+
+    exhaustive = True
