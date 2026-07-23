@@ -1,6 +1,8 @@
 from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
 from onnx_passes.passes._verify import Verify, tolerance
 
+from onnx_passes.ops import link_ops
+
 import onnx_ir as ir
 import numpy as np
 
@@ -54,6 +56,10 @@ def _fold_constants(model: ir.Model,
     # model unmodified. Deep copy to not entangle the metadata stores.
     if not inplace:
         model = model.clone(deep_copy=True)
+
+    # Link all missing custom operator functions from out domains into the model
+    # graph
+    model = link_ops(model)
 
     # Convert all functions currently linked into the model to proto
     # representation to make them available to the reference evaluator

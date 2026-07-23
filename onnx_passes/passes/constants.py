@@ -15,6 +15,9 @@ import onnx_passes.passes as passes
 # rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
 
+# Custom operators implemented via ONNX Script functions
+from onnx_passes.ops import link_ops
+
 # Use the ONNX reference evaluator to evaluate nodes for constant folding
 from onnx.reference import ReferenceEvaluator
 
@@ -61,6 +64,10 @@ def _fold_constants(model: ir.Model,
     # model unmodified. Deep copy to not entangle the metadata stores.
     if not inplace:
         model = model.clone(deep_copy=True)
+
+    # Link all missing custom operator functions from out domains into the model
+    # graph
+    model = link_ops(model)
 
     # Convert all functions currently linked into the model to proto
     # representation to make them available to the reference evaluator
