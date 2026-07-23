@@ -1,9 +1,9 @@
 # ir.Value, ir.conve
 import onnx_ir as ir
 
-# All algebraic passes are transformations derived from pattern-based rewrite
-# rules
+# Base classes for transformations and compositions from rewrite rules
 from onnx_passes.passes.base import Transformation, RewriteRulePass
+from onnx_passes.passes.compose import ComposePass
 
 # Need to import the passes module to set up the registry and make the
 # @passes.register decorator work
@@ -26,7 +26,8 @@ class FusePowerQuant(Transformation, RewriteRulePass):
     def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, w, b, alpha, alpha_inverse, sx, sw, min_w, max_w):
+    def pattern(self, op, x, w, b, alpha, alpha_inverse, sx, sw, min_x, max_x,
+                min_w, max_w):
         """Match MatMul with PowerQuant quantizers at the inputs."""
         return op.MatMul(
             # Input dequantization: Scale, power and bias (instead of Abs-Sign
@@ -35,7 +36,22 @@ class FusePowerQuant(Transformation, RewriteRulePass):
             op.Add(
                 op.Pow(
                     op.Mul(
-                        x,
+                        op.Clip(
+                            op.Round(
+                                op.Div(
+                                    op.Pow(
+                                        op.Sub(
+                                            x,
+                                            b
+                                        ),
+                                        alpha
+                                    ),
+                                    sx
+                                ),
+                            ),
+                            min_x,
+                            max_x
+                        ),
                         sx
                     ),
                     alpha_inverse
@@ -74,7 +90,8 @@ class FusePowerQuant(Transformation, RewriteRulePass):
             )
         )
 
-    def check(self, op, x, w, b, alpha, alpha_inverse, sx, sw, min_w, max_w):
+    def check(self, op, x, w, b, alpha, alpha_inverse, sx, sw, min_x, max_x,
+              min_w, max_w):
         """Check whether this is a valid PowerQuant for transformation."""
 
         # The inverse power as part of the fused dequantizer must be a scalar
@@ -83,7 +100,8 @@ class FusePowerQuant(Transformation, RewriteRulePass):
             return np.prod(a.shape) == 1
         return False
 
-    def rewrite(self, op, x, w, b, alpha, alpha_inverse, sx, sw, min_w, max_w):
+    def rewrite(self, op, x, w, b, alpha, alpha_inverse, sx, sw, min_x, max_x,
+                min_w, max_w):
         """Rewrite the fused and reordered PowerQuantMatMul pattern."""
         return op.Add(
             op.Mul(
@@ -101,7 +119,27 @@ class FusePowerQuant(Transformation, RewriteRulePass):
                 # reinserted into the graph
                 op.Mul(
                     op.PowerQuantMatMul(
-                        x,
+                        op.Clip(
+                            op.Round(
+                                op.Div(
+                                    # Rewrite (x-b)^alpha as e^(alpha*(x-b))
+                                    op.Exp(
+                                        op.Mul(
+                                            alpha,
+                                            op.Log(
+                                                op.Sub(
+                                                    x,
+                                                    b
+                                                )
+                                            )
+                                        )
+                                    ),
+                                    sx
+                                ),
+                            ),
+                            min_x,
+                            max_x
+                        ),
                         op.Clip(
                             op.Round(
                                 op.Div(
@@ -177,3 +215,24 @@ class FusePowerQuant(Transformation, RewriteRulePass):
                 )
             )
         )
+
+
+@passes.verify.tolerance
+@passes.register()
+class PowerQuantAdapter(Transformation, ComposePass):
+    """PowerQuant adapter passes composition."""
+
+    __passes__ = [
+        "shape-inference",
+        "cleanup",
+        FusePowerQuant,
+        passes.streamline.algebraic.numeric.MoveRoundPastClip,
+        "link-ops",
+        "shape-inference",
+        "fold-constants",
+        "eliminate",
+        "shape-inference",
+        "cleanup",
+        "checker",
+        "verify"
+    ]
