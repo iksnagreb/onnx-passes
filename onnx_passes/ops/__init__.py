@@ -656,21 +656,34 @@ class PowerQuantMatMul_v1(OnnxOperator):
         """Generate an ONNX Script function implementing PowerQuantMatMul."""
 
         def power_quant_matmul(x, y, alpha):
-            return op.MatMul(
-                op.Mul(
-                    op.Sign(x),
-                    op.Pow(
-                        op.Abs(x),
-                        op.Reciprocal(alpha)
+            return op.Mul(
+                op.MatMul(
+                    op.Round(
+                        op.Mul(
+                            op.Mul(
+                                op.Sign(x),
+                                op.Pow(
+                                    op.Abs(x),
+                                    op.Reciprocal(alpha)
+                                )
+                            ),
+                            op.Constant(value_float=2 ** 23)
+                        )
+                    ),
+                    op.Round(
+                        op.Mul(
+                            op.Mul(
+                                op.Sign(y),
+                                op.Pow(
+                                    op.Abs(y),
+                                    op.Reciprocal(alpha)
+                                )
+                            ),
+                            op.Constant(value_float=2 ** 23)
+                        )
                     )
                 ),
-                op.Mul(
-                    op.Sign(y),
-                    op.Pow(
-                        op.Abs(y),
-                        op.Reciprocal(alpha)
-                    )
-                ),
+                op.Constant(value_float=2 ** -23)
             )
 
         return power_quant_matmul

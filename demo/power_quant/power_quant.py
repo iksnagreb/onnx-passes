@@ -99,26 +99,29 @@ class FusePowerQuant(Transformation, RewriteRulePass):
                 # Extracted PowerQuant matrix multiplication: Dequantization is
                 # absorbed into the custom operator, weight quantization is
                 # reinserted into the graph
-                op.PowerQuantMatMul(
-                    x,
-                    op.Clip(
-                        op.Round(
-                            op.Div(
-                                op.Mul(
-                                    op.Sign(w),
-                                    op.Pow(
-                                        op.Abs(w),
-                                        alpha
-                                    )
-                                ),
-                                sw
-                            )
+                op.Mul(
+                    op.PowerQuantMatMul(
+                        x,
+                        op.Clip(
+                            op.Round(
+                                op.Div(
+                                    op.Mul(
+                                        op.Sign(w),
+                                        op.Pow(
+                                            op.Abs(w),
+                                            alpha
+                                        )
+                                    ),
+                                    sw
+                                )
+                            ),
+                            min_w,
+                            max_w
                         ),
-                        min_w,
-                        max_w
+                        op.Reciprocal(alpha_inverse),
+                        _domain=CUSTOM_DOMAIN
                     ),
-                    op.Reciprocal(alpha_inverse),
-                    _domain=CUSTOM_DOMAIN
+                    op.Constant(value_float=2 ** -23)
                 )
             ),
             # Reorder the input dequantization bias to follow the matrix
