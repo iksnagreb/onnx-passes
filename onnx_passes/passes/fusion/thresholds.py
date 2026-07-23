@@ -194,7 +194,10 @@ class FuseThresholdSegments(Transformation, RewriteRulePass):
         # Match the root of an optionally inverted tree of Xor operations. Well,
         # actually we want to match a single wide Xor, but ONNX Xor not n-ary...
         steps = OrValue(
-            [op.Xor(lhs, rhs), op.Not(op.Xor(lhs, rhs))], tag_var="inverted"
+            [
+                op.Xor(lhs, rhs), op.Not(op.Xor(lhs, rhs)), op.Not(lhs)
+            ],
+            tag_var="inverted"
         )
 
         # Type-casting turns boolean unit steps to reducible floats followed by
@@ -207,6 +210,10 @@ class FuseThresholdSegments(Transformation, RewriteRulePass):
         return op.ReduceSum(steps, axes, keepdims=0)
 
     def _collect(self, value: ir.Value):
+        # Empty branch might result from the op.Not(lhs) pattern above
+        if value is None:
+            return []
+
         # Terminate if the value has no producer, i.e., we reached a constant
         # input instead of a comparison
         if value.producer() is None:
