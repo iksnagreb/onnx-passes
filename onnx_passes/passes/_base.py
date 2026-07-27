@@ -13,6 +13,10 @@ from typing import Any, Callable
 # ONNX intermediate representation
 import onnx_ir as ir
 
+# Common cleanup passes already implemented in ONNX IR, used here without any
+# custom infrastructure.
+import onnx_ir.passes.common
+
 # Pass configuration and state tracking structures
 from onnx_passes.passes._config import Config
 from onnx_passes.passes._state import State
@@ -97,7 +101,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise ir.passes.PreconditionError(
-                f"Pre-condition for pass '{self.__class__.__name__}' failed"
+                f"Pre-condition for pass '{self.identifier}' failed"
             ) from e
 
         # Prepares the model and state for verification, e.g., by computing
@@ -108,7 +112,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise VerificationError(
-                f"Verification of pass '{self.__class__.__name__}' failed"
+                f"Verification of pass '{self.identifier}' failed"
             ) from e
 
         # Call the pass implementation (provided by the specialization) on the
@@ -119,7 +123,7 @@ class Pass(ir.passes.PassBase, ABC):
         # PassResult and not simply a model or something entirely different
         if not isinstance(result, ir.passes.PassResult):
             raise TypeError(
-                f"The result of the pass '{self.__class__.__name__}' should be"
+                f"The result of the pass '{self.identifier}' should be"
                 f" type PassResult."
                 f" Please create one with ir.passes.PassResult()."
             )
@@ -128,7 +132,7 @@ class Pass(ir.passes.PassBase, ABC):
         # regarding in-place pass application
         if self.in_place and result.model is not model:
             raise ir.passes.PassError(
-                f"The pass '{self.__class__.__name__}' is declared in-place,"
+                f"The pass '{self.identifier}' is declared in-place,"
                 f" but the model returned is *not* the same object as the input"
                 f" model. Pass developer: Pass should return the same model"
                 f" object or the in_place property should return False."
@@ -136,7 +140,7 @@ class Pass(ir.passes.PassBase, ABC):
 
         if not self.in_place and result.model is model:
             raise ir.passes.PassError(
-                f"The pass '{self.__class__.__name__}' is declared not"
+                f"The pass '{self.identifier}' is declared not"
                 f" in-place, but the model returned *is* the same object as the"
                 f" input model. Pass developer: Pass should return a new model"
                 f" object or the in_place property should return True."
@@ -158,6 +162,17 @@ class Pass(ir.passes.PassBase, ABC):
             # Save the model checkpoint
             ir.save(result.model, filename)
 
+        # If the pass modified the model, apply the ONNX checker pass to check
+        # the consistency of the model
+        if result.modified:
+            if self.config.logging.verbose:
+                print(f"Checking modified model after {self.identifier}")
+
+            ir.passes.common.CheckerPass(full_check=True)(result.model)
+
+            if self.config.logging.verbose:
+                print(f"Successfully checked model after {self.identifier}")
+
         # Evaluate the postcondition on the pass result (model and indication on
         # whether the model has been modified), which raises an exception to
         # indicate failure. Pass through any PostconditionError and wrap all
@@ -168,7 +183,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise ir.passes.PostconditionError(
-                f"Post-condition for pass '{self.__class__.__name__}' failed"
+                f"Post-condition for pass '{self.identifier}' failed"
             ) from e
 
         # Finish verification of the transformed model, e.g., by comparing to
@@ -179,7 +194,7 @@ class Pass(ir.passes.PassBase, ABC):
             raise
         except Exception as e:
             raise VerificationError(
-                f"Verification of pass '{self.__class__.__name__}' failed"
+                f"Verification of pass '{self.identifier}' failed"
             ) from e
 
         # Final log message when leaving the pass
@@ -324,9 +339,84 @@ def resolve_module(identifier: str):
             return None
 
 
-# Common cleanup passes already implemented in ONNX IR, used here without any
-# custom infrastructure.
-import onnx_ir.passes.common
+def _give_canonical_names(model: ir.Model,
+                          inplace: bool = True) -> ir.passes.PassResult:
+    """Assigns canonical names to all nodes and values in the model graph."""
+
+    # Optionally apply this to a deep copy of the model and keep the original
+    # model unmodified. Deep copy to not entangle the metadata stores.
+    if not inplace:
+        model = model.clone(deep_copy=True)
+
+    # Keep track of whether the model is actually modified, i.e., at least one
+    # name (node or value) is changed
+    modified = False
+
+    # Give canonical names to all nodes in the graph based on their op-type and
+    # the order of appearance, i.e., first Add will be Add_0, second Add_1, ...
+    counts_per_op_type = {}
+
+    for node in ir.traversal.RecursiveGraphIterator(model.graph):
+        count = counts_per_op_type.setdefault(node.op_type, 0)
+        counts_per_op_type[node.op_type] += 1
+
+        new_name = f"{node.op_type}_{count}"
+        modified = modified or new_name != node.name
+        node.name = new_name
+
+    # Give canonical names to all values derived by their producer's name or, in
+    # case of constant values without producer, their consumers' names, i.e.,
+    # the first output of Add_0 will be Add_0_output_0, etc.
+    for name, value in ir.convenience.create_value_mapping(model.graph).items():
+        if value in model.graph.inputs:
+            index = model.graph.inputs.index(value)
+
+            new_name = f"global_input__{index}"
+            modified = modified or name != value.name
+            value.name = new_name
+
+            continue
+
+        if value in model.graph.outputs:
+            index = model.graph.outputs.index(value)
+
+            new_name = f"global_output__{index}"
+            modified = modified or name != value.name
+            value.name = new_name
+
+            continue
+
+        if (producer := value.producer()) is not None:
+            index = producer.outputs.index(value)
+
+            new_name = f"{producer.name}_output_{index}"
+            modified = modified or name != value.name
+            value.name = new_name
+
+            continue
+
+        # Neither global input or output, nor produced in the graph: Must be a
+        # constant initializer value: Name derived from all consumers in order.
+        if value.consumers():
+            new_names = []
+
+            for consumer in value.consumers():
+                index = consumer.inputs.index(value)
+                new_names.append(f"{consumer.name}_input_{index}")
+
+            new_name = "_".join(new_names)
+
+            # If there already is an initializer of this name, rename to
+            # the initializer to avoid a conflict
+            if new_name in model.graph.initializers:
+                if model.graph.initializers[new_name] != value:
+                    model.graph.initializers[new_name].name = \
+                        f"{new_name}_initializer"
+
+            modified = modified or name != value.name
+            value.name = new_name
+
+    return ir.passes.PassResult(model, modified)
 
 
 class Transformation(Pass, ABC):
@@ -346,19 +436,25 @@ class Transformation(Pass, ABC):
         # Apply basic ONNX IR cleanup transformations to the model if the result
         # indicates the model to be modified, skip cleaning up unchanged models
         if result.modified:
+            if self.config.logging.verbose:
+                print(f"Cleaning up after {self.identifier}")
+
             cleanup = ir.passes.PassManager([
                 ir.passes.common.TopologicalSortPass(),
                 ir.passes.common.RemoveUnusedNodesPass(),
                 ir.passes.common.RemoveUnusedFunctionsPass(),
                 ir.passes.common.RemoveUnusedOpsetsPass(),
-                ir.passes.common.LiftConstantsToInitializersPass(),
+                # Lift all constants without any size limit
+                ir.passes.common.LiftConstantsToInitializersPass(True, 0),
                 ir.passes.common.RemoveInitializersFromInputsPass(),
+                ir.passes.common.LiftSubgraphInitializersToMainGraphPass(),
                 ir.passes.common.DeduplicateInitializersPass(),
                 ir.passes.common.ShapeInferencePass()
-                # TODO: Give canonical names pass...
             ])
 
-            return ir.passes.PassResult(cleanup(result.model).model, True)
+            _give_canonical_names(cleanup(result.model).model, inplace=True)
+
+            return ir.passes.PassResult(result.model, True)
 
         return result
 
@@ -371,11 +467,19 @@ class Sequential(Pass, ABC):
     passes : list
         List of unresolved passes, can be classes, modules or string identifiers
     exhaustive : bool = False
-        Apply th sequence exhaustively until the model stops changing
+        Apply the sequence exhaustively until the model stops changing
     """
 
     passes: list
     exhaustive: bool = False
+
+    @property
+    def in_place(self) -> bool:
+        return all(p.in_place for p in self.passes)
+
+    @property
+    def changes_input(self) -> bool:
+        return any(p.changes_input for p in self.passes)
 
     def __init__(self, config: Config = Config()):
         """Initializes the sequence by resolving and configuring the passes."""
@@ -421,18 +525,6 @@ def getattr_v(obj: object, name: str, version: int) -> Any:
 class RewriteRule(Transformation, ABC):
     """Base class for pattern-based rewrite rule transformation passes."""
 
-    def pattern(self, *args, **kwargs):
-        """The target pattern to be matched."""
-        raise NotImplementedError(
-            "Method 'pattern' must be implemented by derived class."
-        )
-
-    def rewrite(self, *args, **kwargs):
-        """The replacement pattern to be inserted into the graph"""
-        raise NotImplementedError(
-            "Method 'rewrite' must be implemented by derived class."
-        )
-
     def check(self, *args, **kwargs) -> rewriter.MatchResult:  # noqa: static
         """Match condition to decide whether to rewrite the matched pattern."""
         return rewriter.MatchResult()
@@ -449,9 +541,12 @@ class RewriteRule(Transformation, ABC):
         # the standard domain is given
         version = model.opset_imports[""] if model is not None else -1
 
-        pattern = getattr_v(self, "pattern", version)
-        check = getattr_v(self, "check", version)
-        rewrite = getattr_v(self, "rewrite", version)
+        try:
+            pattern = getattr_v(self, "pattern", version)
+            check = getattr_v(self, "check", version)
+            rewrite = getattr_v(self, "rewrite", version)
+        except AttributeError:
+            return None
 
         def _check(op, *args, **kwargs):
             """Check to prevent rewriting inside functions."""
@@ -467,8 +562,17 @@ class RewriteRule(Transformation, ABC):
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         """Applies the rewrite rule to the model."""
-        rule = rewriter.RewriteRuleSet([self.rule(model)], commute=self.commute)
-        return rewriter.RewritePass(rule)(model)
+        if (rule := self.rule(model)) is not None:
+            rule = rewriter.RewriteRuleSet([rule], commute=self.commute)
+            return rewriter.RewritePass(rule)(model)
+
+        if self.config.logging.verbose:
+            print(
+                f"Skipping {self.identifier}: No applicable rule for"
+                f" v{model.opset_imports['']} of the standard opset"
+            )
+
+        return ir.passes.PassResult(model, False)
 
 
 # Partial application of function used to partially modify pattern-based rule
@@ -478,18 +582,6 @@ from functools import partial
 
 class RewriteRuleSet(Transformation, ABC):
     """Base class for pattern-based rewrite rule set transformation passes."""
-
-    def pattern(self):
-        """List of target patterns to be matched."""
-        raise NotImplementedError(
-            "Method 'pattern' must be implemented by derived class."
-        )
-
-    def rewrite(self):
-        """The replacement patterns to be inserted into the graph"""
-        raise NotImplementedError(
-            "Method 'rewrite' must be implemented by derived class."
-        )
 
     def check(self) -> list[Callable[..., rewriter.MatchResult]]:
         """Match conditions to decide whether to rewrite a matched pattern."""
@@ -507,9 +599,12 @@ class RewriteRuleSet(Transformation, ABC):
         # the standard domain is given
         version = model.opset_imports[""] if model is not None else -1
 
-        pattern = getattr_v(self, "pattern", version)
-        check = getattr_v(self, "check", version)
-        rewrite = getattr_v(self, "rewrite", version)
+        try:
+            pattern = getattr_v(self, "pattern", version)
+            check = getattr_v(self, "check", version)
+            rewrite = getattr_v(self, "rewrite", version)
+        except AttributeError:
+            return None
 
         def _check(check, op, *args, **kwargs):  # noqa: Duplicate
             """Check to prevent rewriting inside functions."""
@@ -522,10 +617,13 @@ class RewriteRuleSet(Transformation, ABC):
 
         check = [partial(_check, check) for check in check()]
 
+        pattern = pattern()
+        rewrite = rewrite()
+
         if len(check) < len(pattern):
             check = [*check, *[partial(_check, default_check) for _ in pattern]]
 
-        rules = zip(pattern(), rewrite(), check)
+        rules = zip(pattern, rewrite, check)
 
         return [
             rewriter.RewriteRule(
@@ -536,5 +634,14 @@ class RewriteRuleSet(Transformation, ABC):
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         """Applies the rewrite rule set to the model."""
-        rules = rewriter.RewriteRuleSet(self.rules(model), commute=self.commute)
-        return rewriter.RewritePass(rules)(model)
+        if (rules := self.rules(model)) is not None:
+            rules = rewriter.RewriteRuleSet(rules, commute=self.commute)
+            return rewriter.RewritePass(rules)(model)
+
+        if self.config.logging.verbose:
+            print(
+                f"Skipping {self.identifier}: No applicable rules for"
+                f" v{model.opset_imports['']} of the standard opset"
+            )
+
+        return ir.passes.PassResult(model, False)

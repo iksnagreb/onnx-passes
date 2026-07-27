@@ -1,22 +1,14 @@
-# ONNX intermediate representation
+from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
+from onnx_passes.passes._verify import Verify, tolerance
+
+from onnx_passes.ops import link_ops
+
 import onnx_ir as ir
-# NumPy used to operate on shapes and constant tensors
 import numpy as np
 
 # Common cleanup passes already implemented in ONNX IR, used here without any
 # custom infrastructure.
 import onnx_ir.passes.common
-
-# Need to import the passes module to set up the registry and make the
-# @passes.register decorator work
-import onnx_passes.passes as passes
-
-# Derive Transformations (allowed to modify the graph) from pattern-based
-# rewrite rules
-from onnx_passes.passes.base import Transformation, RewriteRulePass
-
-# Custom operators implemented via ONNX Script functions
-from onnx_passes.ops import link_ops
 
 # Use the ONNX reference evaluator to evaluate nodes for constant folding
 from onnx.reference import ReferenceEvaluator
@@ -124,54 +116,69 @@ def _fold_constants(model: ir.Model,
     return ir.passes.PassResult(result.model, result.modified or modified)
 
 
-@passes.verify.equality
-@passes.register("fold-constants")
-class FoldConstantCastLike(Transformation, RewriteRulePass):
+class FoldConstantCastLike_v1(RewriteRule, Verify):
     """Folds CastLike into Cast if the target dtype is known."""
 
-    def pattern(self, op, x, target):
+    @staticmethod
+    def pattern(op, x, target):
         return op.CastLike(x, target)
 
-    def check(self, op, x, target):
+    @staticmethod
+    def check(op, x, target):
         return target.dtype is not None
 
-    def rewrite(self, op, x, target):
+    @staticmethod
+    def rewrite(op, x, target):
         return op.Cast(x, to=target.dtype.value)
 
 
-@passes.verify.equality
-@passes.register("fold-constants")
-class FoldConstantShape(Transformation, RewriteRulePass):
+class FoldConstantShape_v1(RewriteRule, Verify):
     """Folds Shape operators if the input shape is known."""
 
-    def pattern(self, op, x):
-        return op.Shape(x)
+    @staticmethod
+    def pattern(op, x):
+        return op.Shape(x, _outputs=["y"])
 
-    def check(self, _, x: ir.Value):
+    @staticmethod
+    def check(op, x: ir.Value, y):
         return x.shape is not None and x.shape.is_static()  # noqa: Never None
 
-    def rewrite(self, op, x):
-        return op.Constant(value_ints=list(x.shape))
+    @staticmethod
+    def rewrite_v1(op, x, y):
+        return op.Constant(value_ints=x.shape[:])
+
+    @staticmethod
+    def rewrite_v15(op, x, y):
+        # Default start axis is 0, according to ONNX operators reference:
+        #   https://onnx.ai/onnx/operators/onnx__Shape.html#shape-15
+        if (start := y.producer().attributes.get("start")) is None:
+            start = ir.Attr("start", ir.AttributeType.INT, 0)
+
+        # Default end axis is None, according to ONNX operators reference:
+        #   https://onnx.ai/onnx/operators/onnx__Shape.html#shape-15
+        if (end := y.producer().attributes.get("end")) is None:
+            end = ir.Attr("end", ir.AttributeType.INT, None)
+
+        return op.Constant(value_ints=x.shape[start.as_int():end.as_int()])
 
 
-@passes.verify.equality
-@passes.register("fold-constants")
-class FoldConstantSize(Transformation, RewriteRulePass):
+class FoldConstantSize_v1(RewriteRule, Verify):
     """Folds Size operators if the input shape is known."""
 
-    def pattern(self, op, x):
+    @staticmethod
+    def pattern(op, x):
         return op.Size(x)
 
-    def check(self, _, x: ir.Value):
+    @staticmethod
+    def check(op, x: ir.Value):
         return x.shape is not None and x.shape.is_static()  # noqa: Never None
 
-    def rewrite(self, op, x):
+    @staticmethod
+    def rewrite(op, x):
         return op.Constant(value_int=int(np.prod(x.shape)))
 
 
-@passes.verify.equality
-@passes.register("fold-constants")
-class FoldConstantGatherElements(Transformation, RewriteRulePass):
+class FoldConstantGatherElements_v1(RewriteRule, Verify):
     """Folds GatherElements with both inputs constant.
 
     Note: This addresses some issue with the ONNX reference evaluator used for
@@ -180,16 +187,19 @@ class FoldConstantGatherElements(Transformation, RewriteRulePass):
     along the axis).
     """
 
-    def pattern(self, op, x, indices):
+    @staticmethod
+    def pattern(op, x, indices):
         return op.GatherElements(x, indices, _outputs=["y"])
 
-    def check(self, op, x, indices, y):
+    @staticmethod
+    def check(op, x, indices, y):
         if ir.convenience.get_const_tensor(x) is not None:
             if ir.convenience.get_const_tensor(indices) is not None:
                 return True
         return False
 
-    def rewrite(self, op, x, indices, y):
+    @staticmethod
+    def rewrite(op, x, indices, y):
         # Default axis is 0, according to ONNX operators reference:
         #   https://onnx.ai/onnx/operators/onnx__GatherElements.html
         if (axis := y.producer().attributes.get("axis")) is None:
@@ -222,10 +232,23 @@ class FoldConstantGatherElements(Transformation, RewriteRulePass):
         return op.Constant(value=ir.tensor(y))
 
 
-@passes.verify.tolerance
-@passes.register("fold-constants")
-class FoldConstants(Transformation):
+@tolerance
+class FoldConstants_v1(Transformation, Verify):
     """Applies constant folding to the model."""
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return _fold_constants(model, inplace=True)
+
+
+class FoldConstantsLoop_v1(Sequential, Transformation):
+    """Exhaustively applies constant folding to the model."""
+
+    passes = [
+        FoldConstantCastLike_v1,
+        FoldConstantShape_v1,
+        FoldConstantSize_v1,
+        FoldConstantGatherElements_v1,
+        FoldConstants_v1
+    ]
+
+    exhaustive = True
