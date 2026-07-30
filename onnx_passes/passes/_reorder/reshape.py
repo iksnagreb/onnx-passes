@@ -1,15 +1,10 @@
 from onnx_passes.passes._base import RewriteRule
 from onnx_passes.passes._verify import Verify
 
-from onnx_passes.traits.elementwise import is_elementwise
+from onnx_passes.traits.elementwise import produced_by_elementwise
 
 import numpy as np
 import onnx_ir as ir
-
-
-def _produced_by_elementwise(_, value: ir.Value) -> bool:
-    """Check whether value is produced by an elementwise operation."""
-    return (node := value.producer()) is not None and is_elementwise(node)
 
 
 class MoveElementwisePastReshape_v1(RewriteRule, Verify):
@@ -17,7 +12,7 @@ class MoveElementwisePastReshape_v1(RewriteRule, Verify):
 
     @staticmethod
     def pattern(op, shape):
-        return op.Reshape(_produced_by_elementwise, shape, _outputs=["out"])
+        return op.Reshape(produced_by_elementwise, shape, _outputs=["out"])
 
     @staticmethod
     def rewrite(op, shape, out):

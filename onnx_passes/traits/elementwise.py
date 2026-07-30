@@ -97,29 +97,33 @@ ELEMENTWISE_NARY = {
     "Sum"
 }
 
-# ONNX IR operator node representation
-from onnx_ir import Node
+import onnx_ir as ir
 
 
-def is_elementwise_unary(op: str | Node):
-    if isinstance(op, Node):
+def is_elementwise_unary(op: str | ir.Node):
+    if isinstance(op, ir.Node):
         return op.op_type in ELEMENTWISE_UNARY
     return op in ELEMENTWISE_UNARY
 
 
-def is_elementwise_binary(op: str | Node):
-    if isinstance(op, Node):
+def is_elementwise_binary(op: str | ir.Node):
+    if isinstance(op, ir.Node):
         return op.op_type in ELEMENTWISE_BINARY
     return op in ELEMENTWISE_BINARY
 
 
-def is_elementwise_ternary(op: str | Node):
-    if isinstance(op, Node):
+def is_elementwise_ternary(op: str | ir.Node):
+    if isinstance(op, ir.Node):
         return op.op_type in ELEMENTWISE_TERNARY
     return op in ELEMENTWISE_TERNARY
 
 
-def is_elementwise(op: str | Node):
-    if isinstance(op, Node):
+def is_elementwise(op: str | ir.Node):
+    if isinstance(op, ir.Node):
         return op.op_type in ELEMENTWISE_NARY
     return op in ELEMENTWISE_NARY
+
+
+def produced_by_elementwise(_, value: ir.Value) -> bool:
+    """Check whether value is produced by an elementwise operation."""
+    return (node := value.producer()) is not None and is_elementwise(node)
