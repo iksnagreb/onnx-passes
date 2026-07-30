@@ -419,6 +419,30 @@ def _give_canonical_names(model: ir.Model,
     return ir.passes.PassResult(model, modified)
 
 
+def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
+    """Performs basic cleanup of the model graph."""
+
+    # Optionally cleanup a deep copy of the model and keep the original
+    # model unmodified. Deep copy to not entangle the metadata stores.
+    if not inplace:
+        model = model.clone(deep_copy=True)
+
+    cleanup = ir.passes.PassManager([
+        ir.passes.common.TopologicalSortPass(),
+        ir.passes.common.RemoveUnusedNodesPass(),
+        ir.passes.common.RemoveUnusedFunctionsPass(),
+        ir.passes.common.RemoveUnusedOpsetsPass(),
+        # Lift all constants without any size limit
+        ir.passes.common.LiftConstantsToInitializersPass(True, 0),
+        ir.passes.common.RemoveInitializersFromInputsPass(),
+        ir.passes.common.LiftSubgraphInitializersToMainGraphPass(),
+        ir.passes.common.DeduplicateInitializersPass(),
+        ir.passes.common.ShapeInferencePass()
+    ])
+
+    return cleanup(model)
+
+
 class Transformation(Pass, ABC):
     """Base class for deriving transformation passes modifying the model."""
 
@@ -439,20 +463,8 @@ class Transformation(Pass, ABC):
             if self.config.logging.verbose:
                 print(f"Cleaning up after {self.identifier}")
 
-            cleanup = ir.passes.PassManager([
-                ir.passes.common.TopologicalSortPass(),
-                ir.passes.common.RemoveUnusedNodesPass(),
-                ir.passes.common.RemoveUnusedFunctionsPass(),
-                ir.passes.common.RemoveUnusedOpsetsPass(),
-                # Lift all constants without any size limit
-                ir.passes.common.LiftConstantsToInitializersPass(True, 0),
-                ir.passes.common.RemoveInitializersFromInputsPass(),
-                ir.passes.common.LiftSubgraphInitializersToMainGraphPass(),
-                ir.passes.common.DeduplicateInitializersPass(),
-                ir.passes.common.ShapeInferencePass()
-            ])
-
-            _give_canonical_names(cleanup(result.model).model, inplace=True)
+            _cleanup(result.model, inplace=True)
+            _give_canonical_names(result.model, inplace=True)
 
             return ir.passes.PassResult(result.model, True)
 

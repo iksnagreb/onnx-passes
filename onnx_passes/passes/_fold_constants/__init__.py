@@ -1,4 +1,6 @@
-from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
+from onnx_passes.passes._base import (
+    RewriteRule, Transformation, Sequential, _cleanup
+)
 from onnx_passes.passes._verify import Verify, tolerance
 
 from onnx_passes.ops import link_ops
@@ -15,32 +17,6 @@ from onnx.reference import ReferenceEvaluator
 
 # Imperative builder for constructing ONNX IR graphs
 from onnxscript import GraphBuilder
-
-
-def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
-    """Performs basic cleanup of the model graph."""
-
-    # Optionally cleanup a deep copy of the model and keep the original
-    # model unmodified. Deep copy to not entangle the metadata stores.
-    if not inplace:
-        model = model.clone(deep_copy=True)
-
-    # Run a sequence of ONNX IR cleanup passes, starting with the graph in
-    # topological order (which is itself required in a cleaned-up) to not miss
-    # any disconnected, unused nodes.
-    cleanup = ir.passes.PassManager([
-        ir.passes.common.TopologicalSortPass(),
-        ir.passes.common.RemoveUnusedNodesPass(),
-        ir.passes.common.RemoveUnusedFunctionsPass(),
-        ir.passes.common.RemoveUnusedOpsetsPass(),
-        ir.passes.common.LiftConstantsToInitializersPass(),
-        ir.passes.common.RemoveInitializersFromInputsPass(),
-        ir.passes.common.DeduplicateInitializersPass(),
-        ir.passes.common.ShapeInferencePass()
-    ])
-
-    return cleanup(model)
-
 
 # Backlists operator types from evaluation-based constant folding
 BLACKLIST: set[str] = {
