@@ -1,6 +1,7 @@
 from onnx_passes.passes._base import Transformation, Sequential
 
 from onnx_passes.passes._reorder import reshape
+from onnx_passes.passes._reorder import slice
 from onnx_passes.passes._reorder import transpose
 
 from onnx_passes.passes import _normalize
@@ -12,6 +13,7 @@ class Reorder_v1(Sequential, Transformation):
 
     passes = [
         reshape,
+        slice,
         transpose,
         _fold_constants,
         _normalize,
