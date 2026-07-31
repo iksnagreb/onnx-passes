@@ -37,6 +37,4 @@ class MoveElementwisePastTranspose_v1(RewriteRule, Verify):
 
         # Insert the replacement pattern with attributes transplanted from the
         # elementwise operator
-        return op.op(
-            elementwise.op_type, inputs, attributes=elementwise.attributes
-        )
+        return op.op(elementwise.op_type, *inputs, **elementwise.attributes)
