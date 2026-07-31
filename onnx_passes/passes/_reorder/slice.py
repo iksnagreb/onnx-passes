@@ -44,3 +44,27 @@ class MoveElementwisePastSlice_v1(RewriteRule, Verify):
         # Insert the replacement pattern with attributes transplanted from the
         # elementwise operator
         return op.op(elementwise.op_type, *inputs, **elementwise.attributes)
+
+
+class MoveTransposePastSlice_v1(RewriteRule, Verify):
+    """Reorder transpose operations to follow slicing where applicable."""
+
+    @staticmethod
+    def pattern(op, x, perm, starts, ends, axes, steps):
+        return op.Slice(op.Transpose(x, perm=perm), starts, ends, axes, steps)
+
+    @staticmethod
+    def rewrite(op, x, perm, starts, ends, axes, steps):
+        return op.Transpose(
+            op.Slice(
+                x,
+                starts,
+                ends,
+                op.Gather(
+                    op.Constant(value_ints=perm.as_ints()),
+                    axes
+                ),
+                steps
+            ),
+            perm=perm
+        )
