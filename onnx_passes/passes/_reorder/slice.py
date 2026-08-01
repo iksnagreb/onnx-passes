@@ -89,11 +89,19 @@ class MoveMatMulPastSlice_v1(RewriteRule, Verify):
             ),
             op.Sub(
                 axes,
-                op.Size(
-                    op.Shape(
-                        op.MatMul(x, y)
+                op.Max(
+                    op.Size(
+                        op.Shape(
+                            op.MatMul(x, y)
+                        )
+                    ),
+                    op.Size(
+                        op.Shape(x)
+                    ),
+                    op.Size(
+                        op.Shape(y)
                     )
-                ),
+                )
             ),
             axes
         )
@@ -141,22 +149,46 @@ class MoveMatMulPastSlice_v1(RewriteRule, Verify):
             )
         )
 
+        # Remove any broadcastable axes with singleton 1 in the shape as slicing
+        # these from any non-zero start results in out of bounds access.
+        singleton_lhs = op.Equal(
+            op.Gather(
+                op.Shape(x),
+                op.Compress(
+                    axes,
+                    lhs
+                )
+            ),
+            op.Constant(value_int=1)
+        )
+
+        singleton_rhs = op.Equal(
+            op.Gather(
+                op.Shape(y),
+                op.Compress(
+                    axes,
+                    rhs
+                )
+            ),
+            op.Constant(value_int=1)
+        )
+
         # Replacement pattern: Slice inputs before the matrix multiplication,
         # selecting from the <starts,ends,axes,steps> according to rules above.
         return op.MatMul(
-            op.Slice(
+            op.Slice(  # noqa: Dumplicate
                 x,
                 # Note: Compress selects from an input given a condition
-                op.Compress(starts, lhs),
-                op.Compress(ends, lhs),
-                op.Compress(axes, lhs),
-                op.Compress(steps, lhs)
+                op.Compress(op.Compress(starts, lhs), op.Not(singleton_lhs)),
+                op.Compress(op.Compress(ends, lhs), op.Not(singleton_lhs)),
+                op.Compress(op.Compress(axes, lhs), op.Not(singleton_lhs)),
+                op.Compress(op.Compress(steps, lhs), op.Not(singleton_lhs)),
             ),
-            op.Slice(
+            op.Slice(  # noqa: Dumplicate
                 y,
-                op.Compress(starts, rhs),
-                op.Compress(ends, rhs),
-                op.Compress(axes, rhs),
-                op.Compress(steps, rhs)
+                op.Compress(op.Compress(starts, rhs), op.Not(singleton_rhs)),
+                op.Compress(op.Compress(ends, rhs), op.Not(singleton_rhs)),
+                op.Compress(op.Compress(axes, rhs), op.Not(singleton_rhs)),
+                op.Compress(op.Compress(steps, rhs), op.Not(singleton_rhs)),
             )
         )
