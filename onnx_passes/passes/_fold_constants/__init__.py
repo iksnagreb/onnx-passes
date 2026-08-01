@@ -121,7 +121,9 @@ class FoldConstantShape_v1(RewriteRule, Verify):
 
     @staticmethod
     def rewrite_v1(op, x, y):
-        return op.Constant(value_ints=x.shape[:])
+        return op.Constant(
+            value_ints=ir.Attr("value_ints", ir.AttributeType.INTS, x.shape[:])
+        )
 
     @staticmethod
     def rewrite_v15(op, x, y):
@@ -135,7 +137,11 @@ class FoldConstantShape_v1(RewriteRule, Verify):
         if (end := y.producer().attributes.get("end")) is None:
             end = ir.Attr("end", ir.AttributeType.INT, None)
 
-        return op.Constant(value_ints=x.shape[start.as_int():end.as_int()])
+        shape = x.shape[start.as_int():end.as_int()]
+
+        return op.Constant(
+            value_ints=ir.Attr("value_ints", ir.AttributeType.INTS, shape)
+        )
 
 
 class FoldConstantSize_v1(RewriteRule, Verify):
