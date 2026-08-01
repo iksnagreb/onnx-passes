@@ -11,13 +11,13 @@ class MoveElementwisePastSlice_v1(RewriteRule, Verify):
     """Reorder elementwise operations to follow slicing where applicable."""
 
     @staticmethod
-    def pattern(op, starts, ends, axes, steps):
+    def pattern_v10(op, starts, ends, axes, steps):
         return op.Slice(
             produced_by_elementwise, starts, ends, axes, steps, _outputs=["out"]
         )
 
     @staticmethod
-    def rewrite(op, starts, ends, axes, steps, out):
+    def rewrite_v10(op, starts, ends, axes, steps, out):
         # Find the elementwise operator which produces the input to the matched
         # reshape operator (the value level check guarantees this exists and is
         # indeed the node we are interested in).
@@ -50,11 +50,11 @@ class MoveTransposePastSlice_v1(RewriteRule, Verify):
     """Reorder transpose operations to follow slicing where applicable."""
 
     @staticmethod
-    def pattern(op, x, perm, starts, ends, axes, steps):
+    def pattern_v10(op, x, perm, starts, ends, axes, steps):
         return op.Slice(op.Transpose(x, perm=perm), starts, ends, axes, steps)
 
     @staticmethod
-    def rewrite(op, x, perm, starts, ends, axes, steps):
+    def rewrite_v10(op, x, perm, starts, ends, axes, steps):
         return op.Transpose(
             op.Slice(
                 x,
