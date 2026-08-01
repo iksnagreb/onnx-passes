@@ -1,5 +1,5 @@
 from onnx_passes.passes._base import RewriteRule
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes._verify import Verify, tolerance
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 
@@ -67,4 +67,96 @@ class MoveTransposePastSlice_v1(RewriteRule, Verify):
                 steps
             ),
             perm=perm
+        )
+
+
+@tolerance
+class MoveMatMulPastSlice_v1(RewriteRule, Verify):
+    """Reorder matrix multiplications to follow slicing where applicable."""
+
+    @staticmethod
+    def pattern_v10(op, x, y, starts, ends, axes, steps):
+        return op.Slice(op.MatMul(x, y), starts, ends, axes, steps)
+
+    @staticmethod
+    def rewrite_v10(op, x, y, starts, ends, axes, steps):
+        # Turn all axis indices negative as it is easier to express the axis
+        # selection for each input when counting from the back
+        axes = op.Where(
+            op.GreaterOrEqual(
+                axes,
+                op.Constant(value_int=0)
+            ),
+            op.Sub(
+                axes,
+                op.Size(
+                    op.Shape(
+                        op.MatMul(x, y)
+                    )
+                ),
+            ),
+            axes
+        )
+
+        # Map each output axis, counting from the back to a corresponding input
+        # axis and the input side where it is coming from:
+        #
+        #   -1 -> -1 (rhs)
+        #   -2 -> -2 (lhs)
+        #   -n -> -n (lhs, rhs) for n >= 3, broadcastable batch dimensions
+        #
+        # Drop any axis which would be out of bounds without broadcasting the
+        # inputs, i.e., when n > rank(<input>).
+        lhs = op.And(
+            op.Or(
+                op.Equal(
+                    axes,
+                    op.Constant(value_int=-2)
+                ),
+                op.LessOrEqual(
+                    axes,
+                    op.Constant(value_int=-3)
+                )
+            ),
+            op.LessOrEqual(
+                op.Abs(axes),
+                op.Size(op.Shape(x))  # ~ rank(x)
+            )
+        )
+
+        rhs = op.And(
+            op.Or(
+                op.Equal(
+                    axes,
+                    op.Constant(value_int=-1)
+                ),
+                op.LessOrEqual(
+                    axes,
+                    op.Constant(value_int=-3)
+                )
+            ),
+            op.LessOrEqual(
+                op.Abs(axes),
+                op.Size(op.Shape(y))  # ~ rank(y)
+            )
+        )
+
+        # Replacement pattern: Slice inputs before the matrix multiplication,
+        # selecting from the <starts,ends,axes,steps> according to rules above.
+        return op.MatMul(
+            op.Slice(
+                x,
+                # Note: Compress selects from an input given a condition
+                op.Compress(starts, lhs),
+                op.Compress(ends, lhs),
+                op.Compress(axes, lhs),
+                op.Compress(steps, lhs)
+            ),
+            op.Slice(
+                y,
+                op.Compress(starts, rhs),
+                op.Compress(ends, rhs),
+                op.Compress(axes, rhs),
+                op.Compress(steps, rhs)
+            )
         )
