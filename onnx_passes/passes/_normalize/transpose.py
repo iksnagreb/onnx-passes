@@ -32,3 +32,45 @@ class FuseConsecutiveTransposes_v1(RewriteRule, Verify):
         return op.Transpose(
             x, perm=[perm1.as_ints()[i] for i in perm2.as_ints()]
         )
+
+
+def _remove_singleton_transpose(perm, shape: tuple[int, ...]):
+    """Remove permutations of singleton dimensions."""
+
+    # Find permutations of singleton dimensions
+    singleton_perm = {}
+
+    for axis in perm:
+        if shape[axis] == shape[perm[axis]] == 1:
+            if axis != perm[axis]:
+                singleton_perm[axis] = perm[axis]
+
+    # Revert permutations of singleton dimensions
+    perm = list(perm)
+
+    for i, axis in enumerate(perm):
+        if axis in singleton_perm:
+            perm[i] = singleton_perm[axis]
+
+    return tuple(perm)
+
+
+class RemoveSingletonTranspose_v1(RewriteRule, Verify):
+    """Removes permutations of singleton axes from transpose."""
+
+    @staticmethod
+    def pattern(op, x, perm):
+        return op.Transpose(x, perm=perm)
+
+    @staticmethod
+    def check(op, x, perm):
+        if x.shape is not None and x.shape.is_static():
+            perm = perm.as_ints()
+            return _remove_singleton_transpose(perm, x.shape) != perm
+        return False
+
+    @staticmethod
+    def rewrite(op, x, perm):
+        return op.Transpose(
+            x, perm=_remove_singleton_transpose(perm.as_ints(), x.shape)
+        )
