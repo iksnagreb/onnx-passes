@@ -13,11 +13,15 @@ REDUCTIONS = [
     "ReduceSumSquare",
 ]
 
-# ONNX IR operator node representation
-from onnx_ir import Node
+import onnx_ir as ir
 
 
-def is_reduction(op: str | Node):
-    if isinstance(op, Node):
+def is_reduction(op: str | ir.Node):
+    if isinstance(op, ir.Node):
         return op.op_type in REDUCTIONS
     return op in REDUCTIONS
+
+
+def produced_by_reduction(_, value: ir.Value) -> bool:
+    """Check whether value is produced by a reduction operation."""
+    return (node := value.producer()) is not None and is_reduction(node)

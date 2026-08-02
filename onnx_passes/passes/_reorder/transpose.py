@@ -2,6 +2,7 @@ from onnx_passes.passes._base import RewriteRule
 from onnx_passes.passes._verify import Verify, tolerance
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
+from onnx_passes.traits.reduction import produced_by_reduction
 
 import numpy as np
 import onnx_ir as ir
@@ -196,3 +197,84 @@ class MoveMatMulPastTranspose_v1(RewriteRule, Verify):
             return op.MatMul(y, x)
 
         return op.MatMul(x, y)
+
+
+class MoveReducePastTranspose_v1(RewriteRule, Verify):
+    """Reorder reduction operations to follow transpose where applicable."""
+
+    @staticmethod
+    def pattern(op, perm):
+        return op.Transpose(produced_by_reduction, perm=perm, _outputs=["out"])
+
+    @staticmethod
+    def check(op, perm, out):
+        # Find the reduction operator which produces the input to the matched
+        # transpose operator (the value level check guarantees this exists and
+        # is indeed the node we are interested in).
+        reduce = out.producer().inputs[0].producer()
+
+        # If reduced dimensions are removed from the shape, the permutation will
+        # not match the input rank. To fill in missing dimensions in this case,
+        # the input shape and reduction axes must be statically.
+        x, axes = reduce.inputs
+
+        if (keepdims := reduce.attributes.get("keepdims", None)) is None:
+            keepdims = ir.Attr("keepdims", ir.AttributeType.INT, 1)
+
+        if keepdims.as_int() == 0:
+            if x.shape is not None and x.shape.is_static():
+                return ir.convenience.get_const_tensor(axes) is not None
+
+        return True
+
+    @staticmethod
+    def rewrite(op, perm, out):
+        # Find the reduction operator which produces the input to the matched
+        # transpose operator (the value level check guarantees this exists and
+        # is indeed the node we are interested in).
+        reduce = out.producer().inputs[0].producer()
+
+        if (keepdims := reduce.attributes.get("keepdims", None)) is None:
+            keepdims = ir.Attr("keepdims", ir.AttributeType.INT, 1)
+
+        perm = perm.as_ints()
+        x, axes = reduce.inputs
+
+        # If Reduce deletes the reduction axes, the transpose permutation must
+        # be adjusted by filling in missing dimensions at the end.
+        if keepdims.as_int() == 0:
+            # Get the static reduction axes and normalize to positive indices as
+            # permutations cannot use negative indexing
+            axes = ir.convenience.get_const_tensor(axes).numpy()  # noqa: Const
+            axes = np.where(axes < 0, len(x.shape) + axes, axes)
+
+            # Insert reduction axes into the permutation and adjust all axes
+            # already present by shifting them up accounting for dimensions
+            # inserted below
+            for axis in axes:
+                perm = np.asarray(perm)
+                perm = list(np.where(axis <= perm, perm + 1, perm))
+                perm.insert(axis, axis)
+
+            perm = [int(i) for i in perm]
+
+            # When the output is a full reduction to a scalar, the permutation
+            # might be empty (if empty axes and noop_with_empty_axes)
+            if not perm:
+                perm = list(range(len(x.shape)))
+
+        # Insert the replacement pattern with attributes transplanted from the
+        # reduction operator and input and reduction axes permuted
+        return op.op(
+            reduce.op_type,
+            op.Transpose(
+                reduce.inputs[0],
+                perm=perm
+            ),
+            # Transpose axes via gathering from the permutation list
+            op.Gather(
+                op.Constant(value_ints=perm),
+                reduce.inputs[1]
+            ),
+            **reduce.attributes
+        )
