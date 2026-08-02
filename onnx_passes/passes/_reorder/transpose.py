@@ -74,18 +74,6 @@ class MoveMatMulPastTranspose_v1(RewriteRule, Verify):
             x = op.Transpose(x, perm=[int(i) + len(perm) for i in perm])
             y = op.Transpose(y, perm=[int(i) + len(perm) for i in perm])
 
-        # 1d - 2d: Output is 1d, nothing is transposed
-        # TODO: Remove this, we should never end up here...
-        if signature == (1, 2):
-            x = x
-            y = y
-
-        # 2d - 1d: Output is 1d, nothing is transposed
-        # TODO: Remove this, we should never end up here...
-        if signature == (2, 1):
-            x = x
-            y = y
-
         # 1d - Nd: Transpose right hand side with added permutation axis as this
         # product yields (N-1)d at outputs.
         if signature[0] == 1 and signature[1] > 2:
