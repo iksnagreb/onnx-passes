@@ -207,7 +207,7 @@ class MoveReducePastSlice_v1(RewriteRule, Verify):
     @staticmethod
     def rewrite(op, starts, ends, axes, steps, out):
         # Find the reduction operator which produces the input to the matched
-        # transpose operator (the value level check guarantees this exists and
+        # slice operator (the value level check guarantees this exists and
         # is indeed the node we are interested in).
         reduce = out.producer().inputs[0].producer()
 
