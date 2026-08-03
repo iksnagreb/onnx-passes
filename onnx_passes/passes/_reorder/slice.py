@@ -2,6 +2,7 @@ from onnx_passes.passes._base import RewriteRule
 from onnx_passes.passes._verify import Verify, tolerance
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
+from onnx_passes.traits.reduction import produced_by_reduction
 
 import numpy as np
 import onnx_ir as ir
@@ -190,5 +191,132 @@ class MoveMatMulPastSlice_v1(RewriteRule, Verify):
                 op.Compress(op.Compress(ends, rhs), op.Not(singleton_rhs)),
                 op.Compress(op.Compress(axes, rhs), op.Not(singleton_rhs)),
                 op.Compress(op.Compress(steps, rhs), op.Not(singleton_rhs)),
+            )
+        )
+
+
+class MoveReducePastSlice_v1(RewriteRule, Verify):
+    """Reorder reduction operations to follow slicing where applicable."""
+
+    @staticmethod
+    def pattern(op, starts, ends, axes, steps):
+        return op.Slice(
+            produced_by_reduction, starts, ends, axes, steps, _outputs=["out"]
+        )
+
+    @staticmethod
+    def rewrite(op, starts, ends, axes, steps, out):
+        # Find the reduction operator which produces the input to the matched
+        # transpose operator (the value level check guarantees this exists and
+        # is indeed the node we are interested in).
+        reduce = out.producer().inputs[0].producer()
+
+        if (keepdims := reduce.attributes.get("keepdims", None)) is None:
+            keepdims = ir.Attr("keepdims", ir.AttributeType.INT, 1)
+
+        x, reduction_axes = reduce.inputs
+        reduced = reduce.outputs[0]
+
+        new_axes = axes
+
+        # If reduce deletes the reduction axes, the slice axes must be adjusted
+        # by reindexing to account for missing dimensions.
+        if keepdims.as_int() == 0:
+            new_axes = op.Gather(
+                # Select non-reduction axes from the input shape
+                op.Compress(
+                    # Generate all input axes
+                    op.Range(
+                        op.Constant(value_int=0),
+                        op.Size(op.Shape(x)),
+                        op.Constant(value_int=1)
+                    ),
+                    # Mark non-reduction axes
+                    op.Not(
+                        op.Cast(
+                            op.ReduceMax(
+                                op.OneHot(
+                                    reduction_axes,
+                                    op.Size(op.Shape(x)),
+                                    op.Constant(value_ints=[0, 1])
+                                ),
+                                op.Constant(value_ints=[0]),
+                                keepdims=0
+                            ),
+                            to=ir.DataType.BOOL
+                        )
+                    )
+                ),
+                axes
+            )
+
+        # Avoid slicing reduced axes - these values must contribute to the
+        # reduction. Extend slice for reduced axes to the full extent.
+        new_starts = op.Where(
+            # Reduced axes are those for which the size before/after reduction
+            # differs. With keepdims=0 this will always be false as it is
+            # impossible to express a slice over reduced axes.
+            reduced_axes := op.Not(
+                op.Equal(
+                    op.Gather(
+                        op.Shape(x),
+                        new_axes
+                    ),
+                    op.Gather(
+                        op.Shape(reduced),
+                        axes
+                    )
+                )
+            ),
+            op.Constant(value_int=0),
+            starts
+        )
+
+        new_ends = op.Where(
+            reduced_axes,
+            op.Gather(
+                op.Shape(x),
+                new_axes
+            ),
+            ends
+        )
+
+        new_steps = op.Where(
+            reduced_axes,
+            op.Constant(value_int=1),
+            steps
+        )
+
+        # Insert the replacement pattern with attributes transplanted from the
+        # reduction operator and input and reduction axes permuted
+        return op.Where(
+            # Result of slicing might be an empty tensor: In this case it is not
+            # safe to reorder due to shape mismatch but also straightforward to
+            # replace the pattern with an empty constant tensor.
+            op.Equal(
+                op.Size(
+                    empty := op.Slice(
+                        op.ConstantOfShape(op.Shape(reduced)),
+                        starts,
+                        ends,
+                        axes,  # Note: Use the old axes/starts/ends/steps
+                        steps
+                    )
+                ),
+                op.Constant(value_int=0)
+            ),
+            empty,
+            # Insert the reordered Slice-Reduce replacement pattern
+            op.op(
+                reduce.op_type,
+                op.Slice(
+                    x,
+                    new_starts,
+                    new_ends,
+                    new_axes,
+                    new_steps
+                ),
+                reduction_axes,
+                **reduce.attributes
             )
         )

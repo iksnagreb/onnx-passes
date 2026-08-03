@@ -6,6 +6,7 @@ from onnx_passes.passes._reorder import transpose
 
 from onnx_passes.passes import _normalize
 from onnx_passes.passes import _fold_constants
+from onnx_passes.passes import _eliminate
 
 
 class Reorder_v1(Sequential, Transformation):
@@ -17,6 +18,7 @@ class Reorder_v1(Sequential, Transformation):
         transpose,
         _fold_constants,
         _normalize,
+        _eliminate
     ]
 
     exhaustive = True
