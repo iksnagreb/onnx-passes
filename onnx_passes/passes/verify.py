@@ -70,6 +70,11 @@ def top_5_accuracy(produced: list, expected: list) -> float:
 def count_mispredictions(produced: list, expected: list) -> float:
     # Unwrap the single probability and expected probabilities tensors
     probabilities, expected = produced[0], expected[0]
+
+    # Do not count for empty outputs
+    if probabilities.size == 0:
+        return expected.size
+
     # Count instances where the predicted and expected class differ
     return np.sum(probabilities.argmax(axis=-1) != expected.argmax(axis=-1))
 
