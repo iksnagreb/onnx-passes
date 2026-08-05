@@ -47,3 +47,19 @@ class RewriteNegAsMul_v1(RewriteRule, Verify):
     @staticmethod
     def rewrite(op, x):
         return op.Mul(op.CastLike(op.Constant(value_int=-1), x), x)
+
+
+@tolerance
+class RewriteSumAsAdd_v1(RewriteRule, Verify):
+    """Rewrite multi-input Sum as a tree/chain of binary Add operations."""
+
+    @staticmethod
+    def pattern(op, x):
+        return op.Sum(x, _allow_other_inputs=True, _outputs=["out"])
+
+    @staticmethod
+    def rewrite(op, x, out):
+        for value in out.producer().inputs[1:]:
+            x = op.Add(x, value)
+
+        return x
