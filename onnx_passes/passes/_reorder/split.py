@@ -73,7 +73,7 @@ class MoveElementwisePastSplit_v1(Transformation, Verify):
                         getattr(op, elementwise.op_type)(  # noqa: not None
                             *xs, **elementwise.attributes  # noqa: not None
                         ),
-                        True  # Replace graph outputs as well
+                        replace_graph_outputs=True
                     )
 
                 modified = True
