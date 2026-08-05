@@ -8,10 +8,6 @@ from onnx_passes.ops import link_ops
 import onnx_ir as ir
 import numpy as np
 
-# Common cleanup passes already implemented in ONNX IR, used here without any
-# custom infrastructure.
-import onnx_ir.passes.common
-
 # Use the ONNX reference evaluator to evaluate nodes for constant folding
 from onnx.reference import ReferenceEvaluator
 
@@ -212,6 +208,26 @@ class FoldConstantGatherElements_v1(RewriteRule, Verify):
 
         # Constant tensor replacement pattern
         return op.Constant(value=ir.tensor(y))
+
+
+class FoldConstantEmptyOutput_v1(RewriteRule, Verify):
+    """Folds any operator producing an empty tensor as its single output."""
+
+    @staticmethod
+    def pattern(op):
+        return op.submodule("")(_allow_other_inputs=True, _outputs=["out"])
+
+    @staticmethod
+    def check(op, out):
+        if out.producer() is not None:
+            if out.producer().op_type not in {"Constant", "ConstantOfShape"}:
+                if out.shape is not None and out.shape.is_static():
+                    return np.prod(out.shape) == 0
+        return False
+
+    @staticmethod
+    def rewrite(op, out):
+        return op.ConstantOfShape(op.Constant(value_ints=out.shape[:]))
 
 
 @tolerance
