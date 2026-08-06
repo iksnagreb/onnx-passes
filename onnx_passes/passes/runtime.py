@@ -7,6 +7,9 @@ import onnx_ir as ir
 # The runtime simply builds a wrapper around ONNX Runtime for model execution
 import onnxruntime
 
+# Link custom operators into the model as ONNX functions
+from onnx_passes.ops import link_ops
+
 # Load DLLs to make the CUDA execution provider available
 try:
     # Try loading DLLs via PyTorch
@@ -22,6 +25,10 @@ except ModuleNotFoundError:
 # Evaluates the model on the inputs via ONNX Runtime inference session
 def evaluate_model(model: ir.Model, inputs: list,
                    full_context_dump: bool = False, **kwargs):
+    # Link all required custom operators into the model graph so ONNX Runtime
+    # can execute these
+    model = link_ops(model)
+
     # Sanitize the providers field if present - must be either just a list of
     # strings or a list of tuples of string and dict
     def _sanitize(provider):

@@ -522,7 +522,6 @@ import inspect
 
 # Custom ONNX operator domain and the unit in the last place (ULP) operator
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-from onnx_passes.ops.ulp import Ulp  # noqa: Used via registry
 
 
 # Absorbs a function into the constant side of a comparison operator based on a
@@ -776,12 +775,6 @@ class AbsorbSigmoidIntoComparison(_AbsorbFunctionIntoComparison):
                 max_like(op, x)
             )
         )
-
-
-# Inverse Silu is defined in the custom domain and needs to be made available as
-# an ONNX Script function once used
-from onnx_passes.ops.inverse_swish import InverseSilu  # noqa: Used via registry
-from onnx_passes.ops.swish import Silu  # noqa: Used via registry
 
 
 @passes.verify.tolerance

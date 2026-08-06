@@ -9,7 +9,6 @@ import onnx_passes.passes as passes
 # Fused Silu is defined in the custom domain and needs to be made available as
 # an ONNX Script function once used
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-from onnx_passes.ops.swish import Silu  # noqa: Used via registry
 
 
 @passes.verify.equality

@@ -276,7 +276,7 @@ class FuseReshape(Transformation, RewriteRulePass):
 
             # Update the output shape with pass-through entries gathered from
             # the intermediate shape
-            shape = op.ScatterElements(shape2, i, op.GatherElements(shape1, i))
+            shape = op.ScatterElements(shape2, i, op.Gather(shape1, i))
 
         # Fused reshape keeping the allowzero attribute of the second reshape
         return op.Reshape(x, shape, allowzero=allowzero.as_int())
