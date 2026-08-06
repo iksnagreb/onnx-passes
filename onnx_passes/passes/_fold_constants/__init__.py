@@ -226,8 +226,11 @@ class FoldConstantEmptyOutput_v1(RewriteRule, Verify):
         return False
 
     @staticmethod
-    def rewrite(op, out):
-        return op.ConstantOfShape(op.Constant(value_ints=out.shape[:]))
+    def rewrite(op, out: ir.Value):
+        return op.ConstantOfShape(
+            op.Constant(value_ints=list(out.shape)),  # noqa: shape is not None
+            value=ir.tensor([0], dtype=out.dtype)
+        )
 
 
 @tolerance
