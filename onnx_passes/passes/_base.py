@@ -629,8 +629,8 @@ class RewriteRuleSet(Transformation, ABC):
 
         check = [partial(_check, check) for check in check()]
 
-        pattern = pattern()
-        rewrite = rewrite()
+        pattern = list(pattern())
+        rewrite = list(rewrite())
 
         if len(check) < len(pattern):
             check = [*check, *[partial(_check, default_check) for _ in pattern]]
@@ -657,3 +657,64 @@ class RewriteRuleSet(Transformation, ABC):
             )
 
         return ir.passes.PassResult(model, False)
+
+
+class RewriteRuleSetTemplate(RewriteRuleSet, ABC):
+    """Template of pattern-based rewrite rule set transformation passes."""
+
+    patterns: tuple
+    rewrites: tuple | None = None
+
+    def check(self, *args, **kwargs) -> rewriter.MatchResult:  # noqa: static
+        """Match condition to decide whether to rewrite the matched pattern."""
+        return rewriter.MatchResult()
+
+    def rules(self, model: ir.Model | None = None):
+        """Assembles the rewrite rule set pass from the class definition."""
+
+        # Versioned lookup of rewrite rules if a model with an opset import for
+        # the standard domain is given
+        version = model.opset_imports[""] if model is not None else -1
+
+        try:
+            pattern = getattr_v(self, "pattern", version)
+            check = getattr_v(self, "check", version)
+            rewrite = getattr_v(self, "rewrite", version)
+        except AttributeError:
+            return None
+
+        # Instantiate the pattern/check/rewrite templates for all patterns
+        # listed in the template specialization
+        patterns = self.__class__.patterns
+        rewrites = self.__class__.rewrites
+
+        if rewrites is None:
+            rewrites = patterns
+
+        if len(patterns) != len(rewrites):
+            raise SyntaxError(
+                f"Number of patterns and rewrites for instantiation of"
+                f" RewriteRuleSetTemplate {self.identifier} does not match."
+            )
+
+        pattern = [partial(pattern, _pattern) for _pattern in patterns]
+        rewrite = [partial(rewrite, _rewrite) for _rewrite in rewrites]
+
+        check = len(patterns) * [check]
+
+        def _check(check, op, *args, **kwargs):  # noqa: Duplicate
+            """Check to prevent rewriting inside functions."""
+            if isinstance(op.graph_or_function, ir.Function):
+                return False
+            return check(op, *args, **kwargs)
+
+        check = [partial(_check, check) for check in check]
+
+        rules = zip(pattern, rewrite, check)
+
+        return [
+            rewriter.RewriteRule(
+                *rule, remove_nodes=False, verbose=self.config.logging.verbose
+            )
+            for rule in rules
+        ]
