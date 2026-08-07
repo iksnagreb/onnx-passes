@@ -206,3 +206,37 @@ class ConvertXorToNot(Transformation, RewriteRulePass):
 
     def rewrite(self, op, x, a, _out):
         return op.Expand(op.Not(x), op.Constant(value_ints=list(_out.shape)))
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class MoveXorPastCast(RewriteRulePass, Transformation):
+    def pattern(self, op, a, x, to):
+        return op.Cast(op.Xor(a, x), to=to)
+
+    def check(self, op, a, x, to):
+        if ir.convenience.get_const_tensor(a) is not None:
+            return ((dtype := ir.DataType(to.as_int())).is_integer()
+                    or dtype.is_floating_point())
+        return False
+
+    def rewrite(self, op, a, x, to):
+        return op.Add(
+            op.Mul(
+                op.Cast(x, to=to),
+                op.Where(
+                    a,
+                    op.Constant(value_float=-1.0),
+                    op.Constant(value_float=+1.0)
+                ),
+            ),
+            op.Where(
+                a,
+                op.Constant(value_float=+1.0),
+                op.Constant(value_float=+0.0)
+            ),
+        )
+
+    @property
+    def commute(self):
+        return True
