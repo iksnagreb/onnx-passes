@@ -178,6 +178,34 @@ class EliminateIdentityBitShift_v1(EliminateIdentity, Verify):
         return True
 
 
+class EliminateIdentityMin_v1(EliminateIdentity, Verify):
+    """Eliminate minimum with the identity element."""
+
+    identity = +np.inf
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Min(x, y, *args, **kwargs)
+
+    @property
+    def commute(self) -> bool:
+        return True
+
+
+class EliminateIdentityMax_v1(EliminateIdentity, Verify):
+    """Eliminate maximum with the identity element."""
+
+    identity = -np.inf
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Max(x, y, *args, **kwargs)
+
+    @property
+    def commute(self) -> bool:
+        return True
+
+
 def identity_matrix(_, matrix: ir.Value):
     """Value level checker for the identity matrix in any dimensions."""
 
