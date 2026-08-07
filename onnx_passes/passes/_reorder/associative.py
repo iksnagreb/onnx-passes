@@ -48,7 +48,7 @@ class ReorderAssociative_v1(RewriteRuleSetTemplate, Verify):
 
 @tolerance
 class ReorderReverseAssociative_v1(RewriteRuleSetTemplate, Verify):
-    """Reorder associative operations to move nesting to the right."""
+    """Reorder associative operations to move nesting to the left."""
 
     patterns = (
         lambda op: op.Add,
