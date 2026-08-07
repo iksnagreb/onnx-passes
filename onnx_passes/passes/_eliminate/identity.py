@@ -9,7 +9,7 @@ from typing import Callable, Any
 
 
 class EliminateIdentity(RewriteRule, ABC):
-    """Template: Eliminates the identity element of the operation."""
+    """Template: Eliminate the identity element of the operation."""
 
     operator: Callable
     identity: Any
@@ -179,7 +179,7 @@ class EliminateIdentityBitShift_v1(EliminateIdentity, Verify):
 
 
 class EliminateIdentityMin_v1(EliminateIdentity, Verify):
-    """Eliminate minimum with the identity element."""
+    """Eliminate minimum identity element, i.e., +infinity."""
 
     identity = +np.inf
 
@@ -193,7 +193,7 @@ class EliminateIdentityMin_v1(EliminateIdentity, Verify):
 
 
 class EliminateIdentityMax_v1(EliminateIdentity, Verify):
-    """Eliminate maximum with the identity element."""
+    """Eliminate maximum identity element, i.e., -infinity."""
 
     identity = -np.inf
 
