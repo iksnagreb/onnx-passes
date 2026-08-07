@@ -9,7 +9,9 @@ from onnx_passes.passes.streamline.algebraic._properties import _Converse
 
 # All algebraic passes are transformations derived from pattern-based rewrite
 # rules
-from onnx_passes.passes.base import Transformation, RewriteRuleSetPass
+from onnx_passes.passes.base import (
+    Transformation, RewriteRulePass, RewriteRuleSetPass
+)
 # Checking ir.Value for being constants and comparing constants to be identical
 from onnx_passes.passes.util import (
     is_constant, true_like, false_like, zeros_like, ones_like
@@ -867,6 +869,98 @@ class AbsorbNegIntoComparison(_AbsorbFunctionIntoComparison):
 
     # Allow the multiplication of the composite representation to commute so we
     # only have to write this pattern once
+    @property
+    def commute(self):
+        return True
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbReciprocalIntoComparison(Transformation, RewriteRulePass):
+    def pattern(self, op, x, y):
+        return op.GreaterOrEqual(
+            OrValue([op.Reciprocal(x), op.Div(1, x)]), y
+        )
+
+    def rewrite(self, op, x, y):
+        return op.Xor(
+            op.Xor(
+                op.GreaterOrEqual(
+                    x, zeros_like(op, x)
+                ),
+                op.GreaterOrEqual(
+                    x, op.Where(
+                        op.Greater(y, zeros_like(op, y)),
+                        op.Add(
+                            op.Reciprocal(y),
+                            op.Ulp(op.Reciprocal(y), _domain=CUSTOM_DOMAIN)
+                        ),
+                        zeros_like(op, y)
+                    )
+                )
+            ),
+            op.Not(
+                op.Xor(
+                    op.GreaterOrEqual(
+                        x, op.Where(
+                            op.Less(y, zeros_like(op, y)),
+                            zeros_like(op, y),
+                            min_like(op, y)
+                        )
+                    ),
+                    op.GreaterOrEqual(
+                        x, op.Where(
+                            op.Less(y, zeros_like(op, y)),
+                            op.Add(
+                                op.Reciprocal(y),
+                                op.Ulp(op.Reciprocal(y), _domain=CUSTOM_DOMAIN)
+                            ),
+                            max_like(op, y)
+                        )
+                    )
+                )
+            )
+        )
+
+
+@passes.verify.tolerance
+@passes.register("algebraic")
+class AbsorbMulIntoGreaterOrEqual(RewriteRulePass, Transformation):
+
+    def pattern(self, op, a, x, b):
+        return op.GreaterOrEqual(op.Mul(a, x), b)
+
+    def check(self, op, a, x, b):
+        return ir.convenience.get_const_tensor(a) is not None
+
+    def rewrite(self, op, a, x, b):
+        return op.Xor(
+            op.GreaterOrEqual(
+                x,
+                op.Where(
+                    op.Less(
+                        a,
+                        op.CastLike(
+                            op.Constant(value_int=0),
+                            a
+                        )
+                    ),
+                    op.Add(
+                        op.Div(b, a),
+                        op.Ulp(op.Div(b, a), _domain=CUSTOM_DOMAIN)
+                    ),
+                    op.Div(b, a)
+                )
+            ),
+            op.Less(
+                a,
+                op.CastLike(
+                    op.Constant(value_int=0),
+                    a
+                )
+            )
+        )
+
     @property
     def commute(self):
         return True

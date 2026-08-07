@@ -267,7 +267,10 @@ class EliminateIdentityMatMulLhs(Transformation, RewriteRulePass):
         return op.MatMul(eye, x, _outputs=["_out"])
 
     def check(self, op, x, eye, _out):
-        return _out.shape is not None and check_identity_matmul(x, eye)
+        if x.shape is not None and x.shape.is_static():
+            if eye.shape is not None and eye.shape.is_static():
+                return _out.shape is not None and check_identity_matmul(x, eye)
+        return False
 
     def rewrite(self, op, x, eye, _out):
         return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
@@ -283,7 +286,10 @@ class EliminateIdentityMatMulRhs(Transformation, RewriteRulePass):
         return op.MatMul(x, eye, _outputs=["_out"])
 
     def check(self, op, x, eye, _out):
-        return _out.shape is not None and check_identity_matmul(x, eye)
+        if x.shape is not None and x.shape.is_static():
+            if eye.shape is not None and eye.shape.is_static():
+                return _out.shape is not None and check_identity_matmul(x, eye)
+        return False
 
     def rewrite(self, op, x, eye, _out):
         return op.Expand(x, op.Constant(value_ints=list(_out.shape)))

@@ -145,13 +145,27 @@ class FoldConstantShape(Transformation, RewriteRulePass):
     """Folds Shape operators if the input shape is known."""
 
     def pattern(self, op, x):
-        return op.Shape(x)
+        return op.Shape(x, _outputs=["y"])
 
-    def check(self, _, x: ir.Value):
+    def check(self, _, x: ir.Value, y):
         return x.shape is not None and x.shape.is_static()  # noqa: Never None
 
-    def rewrite(self, op, x):
-        return op.Constant(value_ints=list(x.shape))
+    def rewrite(self, op, x, y):
+        # Default start axis is 0, according to ONNX operators reference:
+        #   https://onnx.ai/onnx/operators/onnx__Shape.html#shape-15
+        if (start := y.producer().attributes.get("start")) is None:
+            start = ir.Attr("start", ir.AttributeType.INT, 0)
+
+        # Default end axis is None, according to ONNX operators reference:
+        #   https://onnx.ai/onnx/operators/onnx__Shape.html#shape-15
+        if (end := y.producer().attributes.get("end")) is None:
+            end = ir.Attr("end", ir.AttributeType.INT, None)
+
+        shape = x.shape[start.as_int():end.as_int()]
+
+        return op.Constant(
+            value_ints=ir.Attr("value_ints", ir.AttributeType.INTS, shape)
+        )
 
 
 @passes.verify.equality
