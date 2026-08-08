@@ -7,6 +7,7 @@ from onnx_passes.passes._normalize import transpose
 from onnx_passes.passes._normalize import pad
 from onnx_passes.passes._normalize import arithmetic
 from onnx_passes.passes._normalize import comparison
+from onnx_passes.passes._normalize import minmax
 
 
 class Normalize_v1(Sequential, Transformation):
@@ -19,7 +20,8 @@ class Normalize_v1(Sequential, Transformation):
         transpose,
         pad,
         arithmetic,
-        comparison
+        comparison,
+        minmax
     ]
 
     exhaustive = True

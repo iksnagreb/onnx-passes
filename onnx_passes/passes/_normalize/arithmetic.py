@@ -63,37 +63,3 @@ class UnrollSum_v1(RewriteRule, Verify):
             x = op.Add(x, value)
 
         return x
-
-
-class UnrollMin_v1(RewriteRule, Verify):
-    """Rewrite multi-input Min as a tree/chain of binary Min operations."""
-
-    @staticmethod
-    def pattern(op, x, y, z):
-        return op.Min(x, y, z, _allow_other_inputs=True, _outputs=["out"])
-
-    @staticmethod
-    def rewrite(op, x, y, z, out):
-        x = op.Min(op.Min(x, y), z)
-
-        for value in out.producer().inputs[3:]:
-            x = op.Min(x, value)
-
-        return x
-
-
-class UnrollMax_v1(RewriteRule, Verify):
-    """Rewrite multi-input Max as a tree/chain of binary Max operations."""
-
-    @staticmethod
-    def pattern(op, x, y, z):
-        return op.Max(x, y, z, _allow_other_inputs=True, _outputs=["out"])
-
-    @staticmethod
-    def rewrite(op, x, y, z, out):
-        x = op.Max(op.Max(x, y), z)
-
-        for value in out.producer().inputs[3:]:
-            x = op.Max(x, value)
-
-        return x

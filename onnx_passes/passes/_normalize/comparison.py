@@ -3,7 +3,7 @@ from onnx_passes.passes._verify import Verify
 
 
 class RewriteLessAsGreater_v1(RewriteRuleSet, Verify):
-    """Rewrites Less than comparison as Greater than comparison."""
+    """Rewrite Less than comparison as Greater than comparison."""
 
     @staticmethod
     def pattern():
