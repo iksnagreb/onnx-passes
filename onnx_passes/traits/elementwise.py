@@ -76,7 +76,6 @@ ELEMENTWISE_BINARY = {
 # the same function to triples of individual elements from each of the inputs
 # producing a single output.
 ELEMENTWISE_TERNARY = [
-    "Clip",
     "Where"
 ]
 
