@@ -6,12 +6,12 @@ import onnx_ir as ir
 _DISTRIBUTIVE_PATTERNS = (
     lambda op: (op.Mul, op.Add),
     lambda op: (op.Max, op.Min),
-    lambda op: (op.Min, op.Max),
+    # lambda op: (op.Min, op.Max),
     lambda op: (op.And, op.Or),
-    lambda op: (op.Or, op.And),
+    # lambda op: (op.Or, op.And),
     lambda op: (op.And, op.Xor),
     lambda op: (op.BitwiseAnd, op.BitwiseOr),
-    lambda op: (op.BitwiseOr, op.BitwiseAnd),
+    # lambda op: (op.BitwiseOr, op.BitwiseAnd),
     lambda op: (op.BitwiseAnd, op.BitwiseXor),
     # Note: Even though matrix multiplication is distributive over addition,
     # MatMul broadcasting is not. Thus, it is not included here.
