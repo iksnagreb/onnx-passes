@@ -24,7 +24,7 @@ class RewriteXorAsPrimitiveDNF_v1(RewriteRuleSet, Verify):
                 op.And(x, op.Not(y))
             ),
             lambda op, x, y: op.BitwiseOr(
-                op.Bitwisend(op.BitwiseNot(x), y),
+                op.BitwiseAnd(op.BitwiseNot(x), y),
                 op.BitwiseAnd(x, op.BitwiseNot(y))
             )
         ]
