@@ -19,6 +19,9 @@ class EliminateAbsorption_v1(RewriteRuleSetTemplate, Verify):
     #   x . (y * x) -> x    (2)
     #   (x * y) . x -> x    (3)
     #   (y * x) . x -> x    (4)
+    @property
+    def commute(self) -> bool:
+        return True
 
     @staticmethod
     def pattern(partial, op, x, y):
