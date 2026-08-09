@@ -9,6 +9,7 @@ from onnx_passes.passes._eliminate import involution
 from onnx_passes.passes._eliminate import absorption
 from onnx_passes.passes._eliminate import inverse
 from onnx_passes.passes._eliminate import complement
+from onnx_passes.passes._eliminate import comparison
 
 from onnx_passes.passes import _normalize
 from onnx_passes.passes import _fold_constants
@@ -27,6 +28,7 @@ class Eliminate_v1(Sequential, Transformation):
         absorption,
         inverse,
         complement,
+        comparison,
         _fold_constants,
         _normalize,
     ]

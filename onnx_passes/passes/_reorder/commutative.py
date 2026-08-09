@@ -23,6 +23,7 @@ class ReorderCommutative_v1(RewriteRuleSetTemplate, Verify):
         lambda op: op.BitwiseOr,
         lambda op: op.BitwiseAnd,
         lambda op: op.BitwiseXor,
+        lambda op: op.Equal,
     )
 
     @staticmethod

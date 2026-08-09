@@ -718,3 +718,28 @@ class RewriteRuleSetTemplate(RewriteRuleSet, ABC):
             )
             for rule in rules
         ]
+
+
+class ReplaceWithConstantLike(RewriteRule, ABC):
+    """Template to rewrite a pattern by expanding a matching constant.
+
+    Instantiations of the template must implement the pattern according to the
+    RewriteRule with an _outputs=["out"] matched on the final node.
+    """
+
+    constant: Any
+
+    @staticmethod
+    def check(context, *args, out, **kwargs):
+        if out.shape is not None and out.shape.is_static():
+            return out.dtype is not None
+        return False
+
+    def rewrite(self, op, *args, out, **kwargs):
+        return op.Expand(
+            op.Cast(
+                op.Constant(value=ir.tensor(self.constant)),
+                to=out.dtype.value
+            ),
+            op.Constant(value_ints=list(out.shape))
+        )
