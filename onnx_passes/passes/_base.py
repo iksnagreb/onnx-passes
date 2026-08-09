@@ -720,7 +720,7 @@ class RewriteRuleSetTemplate(RewriteRuleSet, ABC):
         ]
 
 
-class ReplaceWithConstantLike(RewriteRule, ABC):
+class RewriteAsConstant(RewriteRule, ABC):
     """Template to rewrite a pattern by expanding a matching constant.
 
     Instantiations of the template must implement the pattern according to the

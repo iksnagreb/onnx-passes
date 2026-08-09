@@ -1,5 +1,5 @@
 from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, ReplaceWithConstantLike
+    RewriteRuleSetTemplate, RewriteAsConstant
 )
 from onnx_passes.passes._verify import Verify
 
@@ -65,7 +65,7 @@ def match_pos_inf(_, value: ir.Value):
     return False
 
 
-class EliminateNegInfComparisonLhs_v1(ReplaceWithConstantLike, Verify):
+class EliminateNegInfComparisonLhs_v1(RewriteAsConstant, Verify):
     """Eliminate comparison with negative infinity on the left."""
 
     @staticmethod
@@ -75,7 +75,7 @@ class EliminateNegInfComparisonLhs_v1(ReplaceWithConstantLike, Verify):
     constant = False
 
 
-class EliminateNegInfComparisonRhs_v1(ReplaceWithConstantLike, Verify):
+class EliminateNegInfComparisonRhs_v1(RewriteAsConstant, Verify):
     """Eliminate comparison with negative infinity on the right."""
 
     @staticmethod
@@ -85,7 +85,7 @@ class EliminateNegInfComparisonRhs_v1(ReplaceWithConstantLike, Verify):
     constant = True
 
 
-class EliminatePosInfComparisonLhs_v1(ReplaceWithConstantLike, Verify):
+class EliminatePosInfComparisonLhs_v1(RewriteAsConstant, Verify):
     """Eliminate comparison with positive infinity on the left."""
 
     @staticmethod
@@ -95,7 +95,7 @@ class EliminatePosInfComparisonLhs_v1(ReplaceWithConstantLike, Verify):
     constant = True
 
 
-class EliminatePosInfComparisonRhs_v1(ReplaceWithConstantLike, Verify):
+class EliminatePosInfComparisonRhs_v1(RewriteAsConstant, Verify):
     """Eliminate comparison with positive infinity on the right."""
 
     @staticmethod
@@ -103,3 +103,53 @@ class EliminatePosInfComparisonRhs_v1(ReplaceWithConstantLike, Verify):
         return op.Greater(x, match_pos_inf, _outputs=["out"])
 
     constant = False
+
+
+class EliminateReflexiveEqual_v1(RewriteAsConstant, Verify):
+    """Eliminate reflexive equality comparison, i.e., x = x -> True."""
+
+    @staticmethod
+    def pattern(op, x):
+        return op.Equal(x, x, _outputs=["out"])
+
+    constant = True
+
+
+class EliminateReflexiveGreater_v1(RewriteAsConstant, Verify):
+    """Eliminate reflexive greater than comparison, i.e., x > x -> False."""
+
+    @staticmethod
+    def pattern(op, x):
+        return op.Greater(x, x, _outputs=["out"])
+
+    constant = False
+
+
+class EliminateReflexiveGreaterOrEqual_v1(RewriteAsConstant, Verify):
+    """Eliminate reflexive greater or equal, i.e., x >= x -> True."""
+
+    @staticmethod
+    def pattern(op, x):
+        return op.GreaterOrEqual(x, x, _outputs=["out"])
+
+    constant = True
+
+
+class EliminateReflexiveLess_v1(RewriteAsConstant, Verify):
+    """Eliminate reflexive less than comparison, i.e., x < x -> False."""
+
+    @staticmethod
+    def pattern(op, x):
+        return op.Less(x, x, _outputs=["out"])
+
+    constant = False
+
+
+class EliminateReflexiveLessOrEqual_v1(RewriteAsConstant, Verify):
+    """Eliminate reflexive less or equal comparison, i.e., x <= x -> True."""
+
+    @staticmethod
+    def pattern(op, x):
+        return op.LessOrEqual(x, x, _outputs=["out"])
+
+    constant = True
