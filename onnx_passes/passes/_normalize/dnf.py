@@ -3,7 +3,7 @@ from onnx_passes.passes._verify import Verify
 
 
 class RewriteXorAsPrimitiveDNF_v1(RewriteRuleSet, Verify):
-    """Rewrites boolean/bitwise Xor as primitives in disjunctive normal form."""
+    """Rewrite boolean/bitwise Xor as primitives in disjunctive normal form."""
 
     @property
     def commute(self) -> bool:
@@ -31,7 +31,7 @@ class RewriteXorAsPrimitiveDNF_v1(RewriteRuleSet, Verify):
 
 
 class PrimitiveBooleanToDNF_v1(RewriteRuleSet, Verify):
-    """Converts primitive boolean expressions to disjunctive normal form."""
+    """Convert primitive boolean expressions to disjunctive normal form."""
 
     @property
     def commute(self) -> bool:
@@ -59,7 +59,7 @@ class PrimitiveBooleanToDNF_v1(RewriteRuleSet, Verify):
 
 
 class PrimitiveBooleanToDNFLoop_v1(Sequential, Transformation):
-    """Exhaustively applies the boolean to DNF term rewriting system."""
+    """Exhaustively apply the boolean to DNF term rewriting system."""
 
     passes = [
         PrimitiveBooleanToDNF_v1
@@ -69,7 +69,7 @@ class PrimitiveBooleanToDNFLoop_v1(Sequential, Transformation):
 
 
 class PrimitiveBitwiseToDNF_v1(RewriteRuleSet, Verify):
-    """Converts primitive bitwise expressions to disjunctive normal form."""
+    """Convert primitive bitwise expressions to disjunctive normal form."""
 
     @property
     def commute(self) -> bool:
@@ -101,7 +101,7 @@ class PrimitiveBitwiseToDNF_v1(RewriteRuleSet, Verify):
 
 
 class PrimitiveBitwiseToDNFLoop_v1(Sequential, Transformation):
-    """Exhaustively applies the bitwise to DNF term rewriting system."""
+    """Exhaustively apply the bitwise to DNF term rewriting system."""
 
     passes = [
         PrimitiveBitwiseToDNF_v1
