@@ -47,6 +47,10 @@ class EliminateInverseAdd_v1(RewriteRule, Verify):
             )
         )
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 @tolerance
 class EliminateInverseMul_v1(RewriteRule, Verify):
@@ -67,3 +71,7 @@ class EliminateInverseMul_v1(RewriteRule, Verify):
                 x
             )
         )
+
+    @property
+    def commute(self) -> bool:
+        return True

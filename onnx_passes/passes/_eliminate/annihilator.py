@@ -46,6 +46,10 @@ class EliminateAnnihilatorMul_v1(EliminateAnnihilator, Verify):
     def operator(op, x, y, *args, **kwargs):
         return op.Mul(x, y, *args, **kwargs)
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 class EliminateAnnihilatorAnd_v1(EliminateAnnihilator, Verify):
     """Eliminate boolean And annihilator, i.e., False"""
@@ -55,6 +59,10 @@ class EliminateAnnihilatorAnd_v1(EliminateAnnihilator, Verify):
     @staticmethod
     def operator(op, x, y, *args, **kwargs):
         return op.And(x, y, *args, **kwargs)
+
+    @property
+    def commute(self) -> bool:
+        return True
 
 
 class EliminateAnnihilatorOr_v1(EliminateAnnihilator, Verify):
@@ -66,6 +74,10 @@ class EliminateAnnihilatorOr_v1(EliminateAnnihilator, Verify):
     def operator(op, x, y, *args, **kwargs):
         return op.Or(x, y, *args, **kwargs)
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 class EliminateAnnihilatorBitwiseAnd_v1(EliminateAnnihilator, Verify):
     """Eliminate bitwise And annihilator, i.e., all bits zero"""
@@ -75,6 +87,10 @@ class EliminateAnnihilatorBitwiseAnd_v1(EliminateAnnihilator, Verify):
     @staticmethod
     def operator(op, x, y, *args, **kwargs):
         return op.BitwiseAnd(x, y, *args, **kwargs)
+
+    @property
+    def commute(self) -> bool:
+        return True
 
 
 class EliminateAnnihilatorBitwiseOr_v1(EliminateAnnihilator, Verify):
@@ -86,6 +102,10 @@ class EliminateAnnihilatorBitwiseOr_v1(EliminateAnnihilator, Verify):
     def operator(op, x, y, *args, **kwargs):
         return op.BitwiseOr(x, y, *args, **kwargs)
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 class EliminateAnnihilatorMin_v1(EliminateAnnihilator, Verify):
     """Eliminate minimum annihilator, i.e., -infinity"""
@@ -96,6 +116,10 @@ class EliminateAnnihilatorMin_v1(EliminateAnnihilator, Verify):
     def operator(op, x, y, *args, **kwargs):
         return op.Min(x, y, *args, **kwargs)
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 class EliminateAnnihilatorMax_v1(EliminateAnnihilator, Verify):
     """Eliminate maximum annihilator, i.e., +infinity"""
@@ -105,3 +129,7 @@ class EliminateAnnihilatorMax_v1(EliminateAnnihilator, Verify):
     @staticmethod
     def operator(op, x, y, *args, **kwargs):
         return op.Max(x, y, *args, **kwargs)
+
+    @property
+    def commute(self) -> bool:
+        return True

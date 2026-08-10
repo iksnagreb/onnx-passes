@@ -45,6 +45,10 @@ class EliminateComplementOr_v1(RewriteRule, Verify):
             )
         )
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 class EliminateComplementXor_v1(RewriteRule, Verify):
     """Eliminate complementation of boolean Xor."""
@@ -64,6 +68,10 @@ class EliminateComplementXor_v1(RewriteRule, Verify):
                 x
             )
         )
+
+    @property
+    def commute(self) -> bool:
+        return True
 
 
 class EliminateComplementBitwiseAnd_v1(RewriteRule, Verify):
@@ -85,6 +93,10 @@ class EliminateComplementBitwiseAnd_v1(RewriteRule, Verify):
             )
         )
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 class EliminateComplementBitwiseOr_v1(RewriteRule, Verify):
     """Eliminate complementation of bitwise Or."""
@@ -104,6 +116,10 @@ class EliminateComplementBitwiseOr_v1(RewriteRule, Verify):
                 x
             )
         )
+
+    @property
+    def commute(self) -> bool:
+        return True
 
 
 class EliminateComplementBitwiseXor_v1(RewriteRule, Verify):
@@ -128,3 +144,7 @@ class EliminateComplementBitwiseXor_v1(RewriteRule, Verify):
                 x
             )
         )
+
+    @property
+    def commute(self) -> bool:
+        return True

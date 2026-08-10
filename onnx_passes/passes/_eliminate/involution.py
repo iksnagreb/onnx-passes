@@ -35,7 +35,7 @@ class EliminateInvolutionXor_v1(RewriteRule, Verify):
             op.Shape(op.Xor(x, y))
         )
 
-    @staticmethod
+    @property
     def commute(self) -> bool:
         return True
 
@@ -54,6 +54,6 @@ class EliminateInvolutionBitwiseXor_v1(RewriteRule, Verify):
             op.Shape(op.BitwiseXor(x, y))
         )
 
-    @staticmethod
+    @property
     def commute(self) -> bool:
         return True
