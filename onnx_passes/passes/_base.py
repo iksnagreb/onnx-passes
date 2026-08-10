@@ -510,13 +510,15 @@ class Sequential(Pass, ABC):
         # run the sequence at least once
         passes = ir.passes.PassManager(self.passes)
         result = passes(model)
+        modified = result.modified
 
         # If the composed pass is marked exhaustive, apply the sequence of
         # passes as long as there are changes to the model
         while self.exhaustive and result.modified:
             result = passes(result.model)
+            modified = modified or result.modified
 
-        return result
+        return ir.passes.PassResult(result.model, modified)
 
 
 # Pattern-based graph rewriting implemented in ONNX Script
