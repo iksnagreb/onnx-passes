@@ -249,6 +249,7 @@ class FoldConstantsLoop_v1(Sequential, Transformation):
         FoldConstantShape_v1,
         FoldConstantSize_v1,
         FoldConstantGatherElements_v1,
+        FoldConstantEmptyOutput_v1,
         FoldConstants_v1
     ]
 
