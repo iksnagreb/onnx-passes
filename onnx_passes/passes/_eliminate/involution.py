@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import RewriteRuleSetTemplate
+from onnx_passes.passes._base import RewriteRuleSetTemplate, RewriteRule
 from onnx_passes.passes._verify import Verify
 
 
@@ -19,3 +19,41 @@ class EliminateInvolution_v1(RewriteRuleSetTemplate, Verify):
     @staticmethod
     def rewrite(partial, op, x):
         return op.Identity(x)
+
+
+class EliminateInvolutionXor_v1(RewriteRule, Verify):
+    """Eliminate involution of the boolean Xor operation."""
+
+    @staticmethod
+    def pattern(op, x, y):
+        return op.Xor(op.Xor(x, y), x)
+
+    @staticmethod
+    def rewrite(op, x, y):
+        return op.Expand(
+            y,
+            op.Shape(op.Xor(x, y))
+        )
+
+    @staticmethod
+    def commute(self) -> bool:
+        return True
+
+
+class EliminateInvolutionBitwiseXor_v1(RewriteRule, Verify):
+    """Eliminate involution of the bitwise Xor operation."""
+
+    @staticmethod
+    def pattern(op, x, y):
+        return op.BitwiseXor(op.BitwiseXor(x, y), x)
+
+    @staticmethod
+    def rewrite(op, x, y):
+        return op.Expand(
+            y,
+            op.Shape(op.BitwiseXor(x, y))
+        )
+
+    @staticmethod
+    def commute(self) -> bool:
+        return True
