@@ -23,6 +23,10 @@ def _extract_common_scale(x: ir.Value) -> float:
         # the scale (candidate scale, check for all other values being integer
         # multiples of this)
         scale = np.sort(np.unique(np.abs(x.numpy())))
+
+        if not np.any(scale > 0.0):
+            return 1.0
+
         scale = scale[np.flatnonzero(scale)[0]]
 
         # Pulling out the scale and multiplying it back must yield the same
