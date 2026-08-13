@@ -154,7 +154,7 @@ class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
         return mul(add(x, y), z)
 
 
-class ReorderAssociativeLoop_v1(Sequential, Transformation):
+class ReorderDistributiveLoop_v1(Sequential, Transformation):
     """Exhaustively apply distributive reordering transformations."""
 
     passes = [
