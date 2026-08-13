@@ -2,7 +2,7 @@ from onnx_passes.passes._base import RewriteRuleSet, Sequential, Transformation
 from onnx_passes.passes._verify import Verify
 
 
-class RewriteXorAsPrimitiveDNF_v1(RewriteRuleSet, Verify):
+class RewriteXorAsDNF_v1(RewriteRuleSet, Verify):
     """Rewrite boolean/bitwise Xor as primitives in disjunctive normal form."""
 
     @property
@@ -30,8 +30,8 @@ class RewriteXorAsPrimitiveDNF_v1(RewriteRuleSet, Verify):
         ]
 
 
-class PrimitiveBooleanToDNF_v1(RewriteRuleSet, Verify):
-    """Convert primitive boolean expressions to disjunctive normal form."""
+class BooleanToDNF_v1(RewriteRuleSet, Verify):
+    """Convert boolean expressions to disjunctive normal form."""
 
     @property
     def commute(self) -> bool:
@@ -58,18 +58,8 @@ class PrimitiveBooleanToDNF_v1(RewriteRuleSet, Verify):
         ]
 
 
-class PrimitiveBooleanToDNFLoop_v1(Sequential, Transformation):
-    """Exhaustively apply the boolean to DNF term rewriting system."""
-
-    passes = [
-        PrimitiveBooleanToDNF_v1
-    ]
-
-    exhaustive = True
-
-
-class PrimitiveBitwiseToDNF_v1(RewriteRuleSet, Verify):
-    """Convert primitive bitwise expressions to disjunctive normal form."""
+class BitwiseToDNF_v1(RewriteRuleSet, Verify):
+    """Convert bitwise expressions to disjunctive normal form."""
 
     @property
     def commute(self) -> bool:
@@ -100,11 +90,32 @@ class PrimitiveBitwiseToDNF_v1(RewriteRuleSet, Verify):
         ]
 
 
-class PrimitiveBitwiseToDNFLoop_v1(Sequential, Transformation):
+# Reuse common reordering passes to arrive at a more minimal representation, but
+# do not use the distributive reordering: here, we always want to distribute and
+# operations to end up with a sum of products.
+from onnx_passes.passes._reorder import commutative
+from onnx_passes.passes._reorder import associative
+
+
+class BooleanToDNFLoop_v1(Sequential, Transformation):
+    """Exhaustively apply the boolean to DNF term rewriting system."""
+
+    passes = [
+        BooleanToDNF_v1,
+        commutative,
+        associative
+    ]
+
+    exhaustive = True
+
+
+class BitwiseToDNFLoop_v1(Sequential, Transformation):
     """Exhaustively apply the bitwise to DNF term rewriting system."""
 
     passes = [
-        PrimitiveBitwiseToDNF_v1
+        BitwiseToDNF_v1,
+        commutative,
+        associative
     ]
 
     exhaustive = True
