@@ -1,7 +1,7 @@
 from onnx_passes.passes._base import (
     RewriteRuleSetTemplate, Transformation, Sequential
 )
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes._verify import Verify, tolerance
 
 import onnx_ir as ir
 
@@ -44,6 +44,7 @@ class ReorderCommutative_v1(RewriteRuleSetTemplate, Verify):
         return partial(op)(y, out.producer().inputs[0])
 
 
+@tolerance
 class ReorderWideCommutative_v1(Transformation, Verify):
     """Reorder wide commutative operations to group reoccurring inputs.
 
