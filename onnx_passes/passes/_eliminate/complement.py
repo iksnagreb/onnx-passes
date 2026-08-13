@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import RewriteRule
+from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
 from onnx_passes.passes._verify import Verify
 
 from onnxscript.rewriter.pattern import OrValue
@@ -148,3 +148,18 @@ class EliminateComplementBitwiseXor_v1(RewriteRule, Verify):
     @property
     def commute(self) -> bool:
         return True
+
+
+class EliminateComplementLoop_v1(Sequential, Transformation):
+    """Exhaustively apply complement elimination transformations."""
+
+    passes = [
+        EliminateComplementAnd_v1,
+        EliminateComplementOr_v1,
+        EliminateComplementXor_v1,
+        EliminateComplementBitwiseAnd_v1,
+        EliminateComplementBitwiseOr_v1,
+        EliminateComplementBitwiseXor_v1
+    ]
+
+    exhaustive = True

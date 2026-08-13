@@ -1,4 +1,6 @@
-from onnx_passes.passes._base import RewriteRuleSetTemplate, RewriteRule
+from onnx_passes.passes._base import (
+    RewriteRuleSetTemplate, RewriteRule, Transformation, Sequential
+)
 from onnx_passes.passes._verify import Verify
 
 
@@ -57,3 +59,15 @@ class EliminateInvolutionBitwiseXor_v1(RewriteRule, Verify):
     @property
     def commute(self) -> bool:
         return True
+
+
+class EliminateInvolutionLoop_v1(Sequential, Transformation):
+    """Exhaustively apply involution elimination transformations."""
+
+    passes = [
+        EliminateInvolution_v1,
+        EliminateInvolutionXor_v1,
+        EliminateInvolutionBitwiseXor_v1
+    ]
+
+    exhaustive = True

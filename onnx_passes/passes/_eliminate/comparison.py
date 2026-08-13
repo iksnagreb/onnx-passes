@@ -1,5 +1,5 @@
 from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, RewriteAsConstant
+    RewriteRuleSetTemplate, RewriteAsConstant, Transformation, Sequential
 )
 from onnx_passes.passes._verify import Verify
 
@@ -153,3 +153,22 @@ class EliminateReflexiveLessOrEqual_v1(RewriteAsConstant, Verify):
         return op.LessOrEqual(x, x, _outputs=["out"])
 
     constant = True
+
+
+class EliminateComparisonLoop_v1(Sequential, Transformation):
+    """Exhaustively apply comparison elimination transformations."""
+
+    passes = [
+        EliminateNaNComparison_v1,
+        EliminateNegInfComparisonLhs_v1,
+        EliminateNegInfComparisonRhs_v1,
+        EliminatePosInfComparisonLhs_v1,
+        EliminatePosInfComparisonRhs_v1,
+        EliminateReflexiveEqual_v1,
+        EliminateReflexiveGreater_v1,
+        EliminateReflexiveGreaterOrEqual_v1,
+        EliminateReflexiveLess_v1,
+        EliminateReflexiveLessOrEqual_v1
+    ]
+
+    exhaustive = True

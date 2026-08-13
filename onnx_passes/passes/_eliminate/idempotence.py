@@ -1,4 +1,6 @@
-from onnx_passes.passes._base import RewriteRuleSetTemplate
+from onnx_passes.passes._base import (
+    RewriteRuleSetTemplate, Transformation, Sequential
+)
 from onnx_passes.passes._verify import Verify
 
 
@@ -44,3 +46,14 @@ class EliminateBinaryIdempotence_v1(RewriteRuleSetTemplate, Verify):
     @staticmethod
     def rewrite(partial, op, x):
         return op.Identity(x)
+
+
+class EliminateIdempotenceLoop_v1(Sequential, Transformation):
+    """Exhaustively apply idempotence elimination transformations."""
+
+    passes = [
+        EliminateIdempotence_v1,
+        EliminateBinaryIdempotence_v1
+    ]
+
+    exhaustive = True

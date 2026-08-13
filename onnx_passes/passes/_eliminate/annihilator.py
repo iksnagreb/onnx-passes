@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import RewriteRule
+from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
 from onnx_passes.passes._verify import Verify
 
 import onnx_ir as ir
@@ -133,3 +133,19 @@ class EliminateAnnihilatorMax_v1(EliminateAnnihilator, Verify):
     @property
     def commute(self) -> bool:
         return True
+
+
+class EliminateAnnihilatorLoop_v1(Sequential, Transformation):
+    """Exhaustively apply annihilator elimination transformations."""
+
+    passes = [
+        EliminateAnnihilatorMul_v1,
+        EliminateAnnihilatorAnd_v1,
+        EliminateAnnihilatorOr_v1,
+        EliminateAnnihilatorBitwiseAnd_v1,
+        EliminateAnnihilatorBitwiseOr_v1,
+        EliminateAnnihilatorMin_v1,
+        EliminateAnnihilatorMax_v1
+    ]
+
+    exhaustive = True

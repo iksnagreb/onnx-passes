@@ -1,4 +1,6 @@
-from onnx_passes.passes._base import RewriteRule, RewriteRuleSet, Transformation
+from onnx_passes.passes._base import (
+    RewriteRule, RewriteRuleSet, Transformation, Sequential
+)
 from onnx_passes.passes._verify import Verify
 
 import onnx_ir as ir
@@ -372,3 +374,33 @@ class EliminateIdentity_v1(Transformation):
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return IdentityEliminationPass()(model)
+
+
+class EliminateIdentityLoop_v1(Sequential, Transformation):
+    """Exhaustively apply identity elimination transformations."""
+
+    passes = [
+        EliminateIdentityAdd_v1,
+        EliminateIdentitySub_v1,
+        EliminateIdentityMul_v1,
+        EliminateIdentityDiv_v1,
+        EliminateIdentityOr_v1,
+        EliminateIdentityBitwiseOr_v1,
+        EliminateIdentityAnd_v1,
+        EliminateIdentityBitwiseAnd_v1,
+        EliminateIdentityXor_v1,
+        EliminateIdentityBitwiseXor_v1,
+        EliminateIdentityBitShift_v1,
+        EliminateIdentityMin_v1,
+        EliminateIdentityMax_v1,
+        EliminateIdentityMatMul_v1,
+        EliminateIdentityCast_v1,
+        EliminateIdentityCastLike_v1,
+        EliminateIdentityExpand_v1,
+        EliminateIdentityReshape_v1,
+        EliminateIdentityTranspose_v1,
+        EliminateIdentitySlice_v1,
+        EliminateIdentity_v1
+    ]
+
+    exhaustive = True

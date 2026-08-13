@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import RewriteRule
+from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
 from onnx_passes.passes._verify import Verify
 
 import onnx_ir as ir
@@ -23,3 +23,13 @@ class EliminateWhere_v1(RewriteRule, Verify):
         if np.all(ir.convenience.get_const_tensor(condition).numpy()):
             return op.Expand(lhs, op.Constant(value_ints=list(out.shape)))
         return op.Expand(rhs, op.Constant(value_ints=list(out.shape)))
+
+
+class EliminateBranchesLoop_v1(Sequential, Transformation):
+    """Exhaustively apply branch elimination transformations."""
+
+    passes = [
+        EliminateWhere_v1
+    ]
+
+    exhaustive = True

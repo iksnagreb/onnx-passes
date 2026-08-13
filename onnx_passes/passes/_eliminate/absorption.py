@@ -1,4 +1,6 @@
-from onnx_passes.passes._base import RewriteRuleSetTemplate
+from onnx_passes.passes._base import (
+    RewriteRuleSetTemplate, Transformation, Sequential
+)
 from onnx_passes.passes._verify import Verify
 
 
@@ -30,3 +32,13 @@ class EliminateAbsorption_v1(RewriteRuleSetTemplate, Verify):
     @staticmethod
     def rewrite(partial, op, x, y):
         return op.Expand(x, op.Shape(partial(op)[1](x, y)))
+
+
+class EliminateAbsorptionLoop_v1(Sequential, Transformation):
+    """Exhaustively apply absorption elimination transformations."""
+
+    passes = [
+        EliminateAbsorption_v1
+    ]
+
+    exhaustive = True
