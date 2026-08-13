@@ -608,11 +608,16 @@ class Ulp_v1(OnnxOperator):
             # Round the input down to the nearest power of two and sanitize zero
             # inputs to avoid taking the log of zero
             x = op.Where(
-                x == _0,
-                x,
-                op.Pow(
-                    _2, op.Floor(log2(op.Abs(x) + op.Where(x == _0, _1, _0)))
-                )
+                op.Not(infinity),
+                op.Where(
+                    x == _0,
+                    x,
+                    op.Pow(
+                        _2,
+                        op.Floor(log2(op.Abs(x) + op.Where(x == _0, _1, _0)))
+                    )
+                ),
+                x
             )
 
             # Start searching for the exponent of the Ulp(x) in the middle of
@@ -622,10 +627,14 @@ class Ulp_v1(OnnxOperator):
 
             # Increase the ulp exponent while x + ulp == x, this covers all x
             # for which the Ulp(x) is >=1
-            condition = any(x + op.Pow(_2, exp) == x)
+            condition = any(
+                op.And(x + op.Pow(_2, exp) == x, op.Not(op.IsInf(x)))
+            )
             while condition:
                 exp = exp + op.Where(x + op.Pow(_2, exp) == x, _1, _0)
-                condition = any(x + op.Pow(_2, exp) == x)
+                condition = any(
+                    op.And(x + op.Pow(_2, exp) == x, op.Not(op.IsInf(x)))
+                )
 
             # As the stop condition stops at the exponent where no difference is
             # observed, take back one step to get the Ulp(x)
@@ -633,10 +642,14 @@ class Ulp_v1(OnnxOperator):
 
             # Decrease the ulp exponent while x + ulp > x, this covers all x for
             # which the Ulp(x) is <=1
-            condition = any(x + op.Pow(_2, exp) > x)
+            condition = any(
+                op.And(x + op.Pow(_2, exp) > x, op.Not(op.IsInf(x)))
+            )
             while condition:
                 exp = exp - op.Where(x + op.Pow(_2, exp) > x, _1, _0)
-                condition = any(x + op.Pow(_2, exp) > x)
+                condition = any(
+                    op.And(x + op.Pow(_2, exp) > x, op.Not(op.IsInf(x)))
+                )
 
             # As the stop condition stops at the exponent where no difference is
             # observed, add back one step to get the Ulp(x)
