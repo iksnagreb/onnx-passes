@@ -1,4 +1,6 @@
-from onnx_passes.passes._base import RewriteRuleSetTemplate, Transformation
+from onnx_passes.passes._base import (
+    RewriteRuleSetTemplate, Transformation, Sequential
+)
 from onnx_passes.passes._verify import Verify
 
 import onnx_ir as ir
@@ -149,3 +151,14 @@ class ReorderWideCommutative_v1(Transformation, Verify):
                     modified = True
 
         return ir.passes.PassResult(model, modified)
+
+
+class ReorderCommutativeLoop_v1(Sequential, Transformation):
+    """Exhaustively apply commutative reordering transformations."""
+
+    passes = [
+        ReorderCommutative_v1,
+        ReorderWideCommutative_v1
+    ]
+
+    exhaustive = True

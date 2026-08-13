@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import RewriteRule
+from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
 from onnx_passes.passes._verify import Verify, tolerance
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
@@ -320,3 +320,16 @@ class MoveReducePastSlice_v1(RewriteRule, Verify):
                 **reduce.attributes
             )
         )
+
+
+class ReorderSliceLoop_v1(Sequential, Transformation):
+    """Exhaustively apply slice reordering transformations."""
+
+    passes = [
+        MoveElementwisePastSlice_v1,
+        MoveTransposePastSlice_v1,
+        MoveMatMulPastSlice_v1,
+        MoveReducePastSlice_v1
+    ]
+
+    exhaustive = True

@@ -15,7 +15,7 @@ from onnx_passes.passes import _eliminate
 
 
 class Reorder_v1(Sequential, Transformation):
-    """Exhaustively applies common reordering transformations."""
+    """Exhaustively apply common reordering transformations."""
 
     passes = [
         reshape,

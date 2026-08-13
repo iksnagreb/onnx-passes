@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Transformation
+from onnx_passes.passes._base import Transformation, Sequential
 from onnx_passes.passes._verify import Verify
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
@@ -79,3 +79,13 @@ class MoveElementwisePastSplit_v1(Transformation, Verify):
                 modified = True
 
         return ir.passes.PassResult(model, modified)
+
+
+class ReorderSplitLoop_v1(Sequential, Transformation):
+    """Exhaustively apply split reordering transformations."""
+
+    passes = [
+        MoveElementwisePastSplit_v1
+    ]
+
+    exhaustive = True
