@@ -25,11 +25,30 @@ class EliminateWhere_v1(RewriteRule, Verify):
         return op.Expand(rhs, op.Constant(value_ints=list(out.shape)))
 
 
+class EliminateIdentityWhere_v1(RewriteRule, Verify):
+    """Eliminate Where with two identical branches."""
+
+    @staticmethod
+    def pattern(op, condition, x):
+        return op.Where(condition, x, x, _outputs=["out"])
+
+    @staticmethod
+    def check(op, condition, lhs, rhs, out):
+        if condition := ir.convenience.get_const_tensor(condition):
+            return np.all(condition.numpy()) or not np.any(condition.numpy())
+        return False
+
+    @staticmethod
+    def rewrite(op, condition, x, out):
+        return op.Expand(x, op.Constant(value_ints=list(out.shape)))
+
+
 class EliminateBranchesLoop_v1(Sequential, Transformation):
     """Exhaustively apply branch elimination transformations."""
 
     passes = [
-        EliminateWhere_v1
+        EliminateWhere_v1,
+        EliminateIdentityWhere_v1,
     ]
 
     exhaustive = True
