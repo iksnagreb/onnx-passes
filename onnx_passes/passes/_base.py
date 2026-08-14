@@ -429,6 +429,7 @@ def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
 
     cleanup = ir.passes.PassManager([
         ir.passes.common.TopologicalSortPass(),
+        ir.passes.common.IdentityEliminationPass(),
         ir.passes.common.RemoveUnusedNodesPass(),
         ir.passes.common.RemoveUnusedFunctionsPass(),
         ir.passes.common.RemoveUnusedOpsetsPass(),
