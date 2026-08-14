@@ -58,20 +58,11 @@ class BitwiseToANF_v1(RewriteRuleSet, Verify):
         return True
 
 
-# Reuse common reordering passes to arrive at a more minimal representation, but
-# do not use the distributive reordering: here, we always want to distribute and
-# operations to end up with a sum of products.
-from onnx_passes.passes._reorder import commutative
-from onnx_passes.passes._reorder import associative
-
-
 class BooleanToANFLoop_v1(Sequential, Transformation):
     """Exhaustively apply the boolean to ANF term rewriting system."""
 
     passes = [
         BooleanToANF_v1,
-        commutative,
-        associative,
     ]
 
     exhaustive = True
@@ -82,8 +73,6 @@ class BitwiseToANFLoop_v1(Sequential, Transformation):
 
     passes = [
         BitwiseToANF_v1,
-        commutative,
-        associative
     ]
 
     exhaustive = True
