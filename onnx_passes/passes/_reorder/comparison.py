@@ -106,12 +106,33 @@ class SortConstantComparison_v1(RewriteRuleSetTemplate, Verify):
         )
 
 
+class ReorderTernaryComparison_v1(RewriteRuleSetTemplate, Verify):
+    """Reorder ternary conditional following likewise comparisons."""
+
+    patterns = (
+        lambda op: op.Equal,
+        lambda op: op.Greater,
+        lambda op: op.GreaterOrEqual,
+        lambda op: op.Less,
+        lambda op: op.LessOrEqual,
+    )
+
+    @staticmethod
+    def pattern(partial, op, x, condition, a, b):
+        return op.Where(condition, partial(op)(x, a), partial(op)(x, b))
+
+    @staticmethod
+    def rewrite(partial, op, x, condition, a, b):
+        return partial(op)(x, op.Where(condition, a, b))
+
+
 class ReorderComparisonLoop_v1(Sequential, Transformation):
     """Exhaustively apply comparison reordering transformations."""
 
     passes = [
         ReorderTransitiveEqual_v1,
-        SortConstantComparison_v1
+        SortConstantComparison_v1,
+        ReorderTernaryComparison_v1
     ]
 
     exhaustive = True

@@ -4,6 +4,7 @@ from onnx_passes.passes._verify import Verify
 from onnxscript.rewriter.pattern import OrValue
 
 import onnx_ir as ir
+import numpy as np
 
 
 class EliminateComplementAnd_v1(RewriteRule, Verify):
@@ -150,6 +151,50 @@ class EliminateComplementBitwiseXor_v1(RewriteRule, Verify):
         return True
 
 
+class EliminateComplementTernaryXor_v1(RewriteRule, Verify):
+    """Eliminate boolean Xor of constant complementary And.
+
+    Note: This shortcuts Distributive->Constant Folding->Identity Elimination
+    """
+
+    @staticmethod
+    def pattern(op, a, b, x):
+        return op.Xor(op.And(a, x), op.And(b, x))
+
+    @staticmethod
+    def check(context, a, b, x):
+        if (a := ir.convenience.get_const_tensor(a)) is not None:
+            if (b := ir.convenience.get_const_tensor(b)) is not None:
+                return np.all(a.numpy() != b.numpy())
+        return False
+
+    @staticmethod
+    def rewrite(op, a, b, x):
+        return op.Identity(x)
+
+
+class EliminateComplementTernaryBitwiseXor_v1(RewriteRule, Verify):
+    """Eliminate bitwise Xor of constant complementary And.
+
+    Note: This shortcuts Distributive->Constant Folding->Identity Elimination
+    """
+
+    @staticmethod
+    def pattern(op, a, b, x):
+        return op.BitwiseXor(op.BitwiseAnd(a, x), op.BitwiseAnd(b, x))
+
+    @staticmethod
+    def check(context, a, b, x):
+        if (a := ir.convenience.get_const_tensor(a)) is not None:
+            if (b := ir.convenience.get_const_tensor(b)) is not None:
+                return np.all(a.numpy() == ~b.numpy())
+        return False
+
+    @staticmethod
+    def rewrite(op, a, b, x):
+        return op.Identity(x)
+
+
 class EliminateComplementLoop_v1(Sequential, Transformation):
     """Exhaustively apply complement elimination transformations."""
 
@@ -159,7 +204,9 @@ class EliminateComplementLoop_v1(Sequential, Transformation):
         EliminateComplementXor_v1,
         EliminateComplementBitwiseAnd_v1,
         EliminateComplementBitwiseOr_v1,
-        EliminateComplementBitwiseXor_v1
+        EliminateComplementBitwiseXor_v1,
+        EliminateComplementTernaryXor_v1,
+        EliminateComplementTernaryBitwiseXor_v1
     ]
 
     exhaustive = True
