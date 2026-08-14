@@ -33,10 +33,8 @@ class EliminateIdentityWhere_v1(RewriteRule, Verify):
         return op.Where(condition, x, x, _outputs=["out"])
 
     @staticmethod
-    def check(op, condition, lhs, rhs, out):
-        if condition := ir.convenience.get_const_tensor(condition):
-            return np.all(condition.numpy()) or not np.any(condition.numpy())
-        return False
+    def check(op, condition, x, out):
+        return out.shape is not None and out.shape.is_static()
 
     @staticmethod
     def rewrite(op, condition, x, out):
