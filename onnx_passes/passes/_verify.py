@@ -23,9 +23,15 @@ from onnx_passes.passes._config import Config
 from onnx_passes.passes._state import State
 from onnx_passes.passes._base import Pass, VerificationError
 
+from onnx_passes.ops import link_ops
+
 
 def _evaluate_model(model: ir.Model, inputs: list[Any]):
     """Evaluates the model using the ONNX reference evaluator."""
+
+    # Link all missing custom operator functions from out domains into the model
+    # graph
+    model = link_ops(model)
 
     # Fill the execution context with the input values assuming they
     # correspond to the model graph inputs in correct order
