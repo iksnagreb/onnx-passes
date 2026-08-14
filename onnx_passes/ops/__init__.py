@@ -575,8 +575,28 @@ class Log2_v1(OnnxOperator):
         """Generate an ONNX Script function implementing Log2."""
 
         def log2(x):
-            return op.Log(x) / op.Log(
-                op.CastLike(op.Constant(value_float=2.0), x)
+            return op.Where(
+                op.Equal(
+                    x,
+                    op.Constant(value_float=0.0)
+                ),
+                op.Constant(value_float=-float("inf")),
+                op.Div(
+                    op.Log(
+                        op.Where(
+                            op.Equal(
+                                x,
+                                op.Constant(value_float=0.0)
+                            ),
+                            op.Add(
+                                x,
+                                op.Constant(value_float=1.0)
+                            ),
+                            x
+                        )
+                    ),
+                    op.Log(op.CastLike(op.Constant(value_float=2.0), x))
+                )
             )
 
         return log2
@@ -592,68 +612,27 @@ class Ulp_v1(OnnxOperator):
     def script(op: Opset):
         """Generate an ONNX Script function implementing Ulp."""
 
-        any = Any_v1(op).onnx_function  # noqa: Shadows built-in
         log2 = Log2_v1(op).onnx_function
 
         def ulp(x):
-            # Define basic constants matching the type of the input to keep the
-            # following more terse and readable
-            _0 = op.CastLike(op.Constant(value_float=0.0), x)
-            _1 = op.CastLike(op.Constant(value_float=1.0), x)
-            _2 = op.CastLike(op.Constant(value_float=2.0), x)
-
-            # Get rid of infinities...
-            infinity, x = op.IsInf(x), op.Where(op.IsInf(x), _1, x)
-
-            # Round the input down to the nearest power of two and sanitize zero
-            # inputs to avoid taking the log of zero
-            x = op.Where(
-                op.Not(infinity),
+            return op.Where(
+                op.IsNaN(x),
+                x,
                 op.Where(
-                    x == _0,
-                    x,
+                    op.IsInf(x),
+                    op.Abs(x),
                     op.Pow(
-                        _2,
-                        op.Floor(log2(op.Abs(x) + op.Where(x == _0, _1, _0)))
+                        op.Constant(value_float=2.0),
+                        op.Sub(
+                            op.Max(
+                                op.Floor(log2(op.Abs(x))),
+                                op.Constant(value_float=-126),
+                            ),
+                            op.Constant(value_float=23)
+                        )
                     )
-                ),
-                x
-            )
-
-            # Start searching for the exponent of the Ulp(x) in the middle of
-            # the range, expanding to the full shape of the input, as we want
-            # the ulp per element
-            exp = op.Expand(_0, op.Shape(x))
-
-            # Increase the ulp exponent while x + ulp == x, this covers all x
-            # for which the Ulp(x) is >=1
-            condition = any(
-                op.And(x + op.Pow(_2, exp) == x, op.Not(op.IsInf(x)))
-            )
-            while condition:
-                exp = exp + op.Where(x + op.Pow(_2, exp) == x, _1, _0)
-                condition = any(
-                    op.And(x + op.Pow(_2, exp) == x, op.Not(op.IsInf(x)))
                 )
-
-            # As the stop condition stops at the exponent where no difference is
-            # observed, take back one step to get the Ulp(x)
-            exp = exp - _1
-
-            # Decrease the ulp exponent while x + ulp > x, this covers all x for
-            # which the Ulp(x) is <=1
-            condition = any(
-                op.And(x + op.Pow(_2, exp) > x, op.Not(op.IsInf(x)))
             )
-            while condition:
-                exp = exp - op.Where(x + op.Pow(_2, exp) > x, _1, _0)
-                condition = any(
-                    op.And(x + op.Pow(_2, exp) > x, op.Not(op.IsInf(x)))
-                )
-
-            # As the stop condition stops at the exponent where no difference is
-            # observed, add back one step to get the Ulp(x)
-            return op.Where(infinity, _0, op.Pow(_2, exp + _1))
 
         return ulp
 
