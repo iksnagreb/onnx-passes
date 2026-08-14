@@ -47,7 +47,7 @@ class RewriteWhereAsMax_v1(RewriteRuleSet, Verify):
 
 
 class RewriteClipAsMinMax_v1(RewriteRule, Verify):
-    """Rewrite clipping and minimum-maximum combination."""
+    """Rewrite clipping as minimum-maximum combination."""
 
     @staticmethod
     def pattern(op, x, minimum, maximum):
