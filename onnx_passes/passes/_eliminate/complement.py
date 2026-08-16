@@ -172,6 +172,10 @@ class EliminateComplementTernaryXor_v1(RewriteRule, Verify):
     def rewrite(op, a, b, x):
         return op.Identity(x)
 
+    @property
+    def commute(self) -> bool:
+        return True
+
 
 class EliminateComplementTernaryBitwiseXor_v1(RewriteRule, Verify):
     """Eliminate bitwise Xor of constant complementary And.
@@ -193,6 +197,10 @@ class EliminateComplementTernaryBitwiseXor_v1(RewriteRule, Verify):
     @staticmethod
     def rewrite(op, a, b, x):
         return op.Identity(x)
+
+    @property
+    def commute(self) -> bool:
+        return True
 
 
 class EliminateComplementLoop_v1(Sequential, Transformation):
