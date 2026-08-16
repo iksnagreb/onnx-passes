@@ -106,6 +106,32 @@ class SortConstantComparison_v1(RewriteRuleSetTemplate, Verify):
         )
 
 
+class ReorderConstantComparison_v1(RewriteRuleSetTemplate, Verify):
+    """Reorder comparison to a constant to have the constant on the right."""
+
+    patterns = (
+        lambda op: (op.GreaterOrEqual, op.Greater),
+        lambda op: (op.Greater, op.GreaterOrEqual),
+        lambda op: (op.LessOrEqual, op.Less),
+        lambda op: (op.Less, op.LessOrEqual),
+        lambda op: (op.Equal, op.Equal)
+    )
+
+    @staticmethod
+    def pattern(pattern, op, x, y):
+        return pattern(op)[0](x, y)
+
+    @staticmethod
+    def check(context, x, y):
+        if ir.convenience.get_const_tensor(x) is not None:
+            return ir.convenience.get_const_tensor(y) is None
+        return False
+
+    @staticmethod
+    def rewrite(pattern, op, x, y):
+        return op.Not(pattern(op)[1](y, x))
+
+
 class ReorderTernaryComparison_v1(RewriteRuleSetTemplate, Verify):
     """Reorder ternary conditional following likewise comparisons."""
 
@@ -132,6 +158,7 @@ class ReorderComparisonLoop_v1(Sequential, Transformation):
     passes = [
         ReorderTransitiveEqual_v1,
         SortConstantComparison_v1,
+        ReorderConstantComparison_v1,
         ReorderTernaryComparison_v1
     ]
 

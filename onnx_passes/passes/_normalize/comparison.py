@@ -63,7 +63,7 @@ class RewriteGreaterAsGreaterOrEqual_v1(RewriteRule, Verify):
 
         # Sanitized nextafter calculations in NumPy: (1) wrap around infinity
         # to negative infinity as this is masked to False anyway but x >= -inf
-        # offers potential for constant elimination, (2) avoid avoerflow when
+        # offers potential for constant elimination, (2) avoid overflow when
         # applying nextafter to the maximum non infinity value, and (3) apply
         # nextafter to all other valid inputs.
         y = ir.convenience.get_const_tensor(c).numpy().copy()  # noqa: not None
