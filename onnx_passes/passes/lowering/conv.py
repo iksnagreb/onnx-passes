@@ -288,7 +288,10 @@ class ConvToMatMul(Transformation, RewriteRuleSetPass):
                 ys.append(op.MatMul(im2col, weight))
 
             # Join the parallel convolution branches along the channel axis
-            y = op.Concat(*ys, axis=-1)
+            if groups > 1:
+                y = op.Concat(*ys, axis=-1)
+            else:
+                y = ys[0]
 
             # If the optional bias input is present, expand the bias for
             # broadcasting to the feature map dimensions and add to the output
