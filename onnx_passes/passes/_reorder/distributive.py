@@ -3,6 +3,8 @@ from onnx_passes.passes._base import (
 )
 from onnx_passes.passes._verify import Verify, tolerance
 
+from onnxscript.rewriter.pattern import OrValue
+
 import onnx_ir as ir
 
 _DISTRIBUTIVE_PATTERNS = (
@@ -67,23 +69,34 @@ class ReorderReverseDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
         # as "multiplication distributed over addition", but these two could be
         # any distributive operations.
         mul, add = partial(op)
-        return add(mul(x, y), mul(x, z))
+        return add(OrValue([mul(x, y), x]), OrValue([mul(x, z), x]))
 
     @staticmethod
     def check(context, x, y, z):
         # Reorder configurations pulling out a common term or bringing constants
         # together, decreasing the number of operations:
-        #   xy + yz -> x (y + z)    3 -> 2 operations
+        #   xy + xz -> x (y + z)    3 -> 2 operations
         #   cy + cz -> c (y + z)    3 -> 2 operations, constant left
         #   xy + xc -> x (y + c)    3 -> 2 operations
         #   xc + xz -> x (c + z)    3 -> 2 operations
         #   xc + xc -> x (c + c)    3 -> 1 operations, constant foldable right
         # Note: This is the reverse of ReorderDistributiveLhs_v1
+
+        if y is None or z is None:
+            return True
+
         return not ReorderDistributiveLhs_v1.check(context, x, y, z)
 
     @staticmethod
     def rewrite(partial, op, x, y, z):
         mul, add = partial(op)
+
+        if y is None:
+            y = op.CastLike(op.Constant(value_int=1), x)
+
+        if z is None:
+            z = op.CastLike(op.Constant(value_int=1), x)
+
         return mul(x, add(y, z))
 
 
@@ -134,7 +147,7 @@ class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
         # as "multiplication distributed over addition", but these two could be
         # any distributive operations.
         mul, add = partial(op)
-        return add(mul(x, z), mul(y, z))
+        return add(OrValue([mul(x, z), z]), OrValue([mul(y, z), z]))
 
     @staticmethod
     def check(context, x, y, z):
@@ -146,11 +159,22 @@ class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
         #   cz + yz -> (c + y) z    3 -> 2 operations
         #   cz + cz -> (c + c) z    3 -> 1 operations, constant foldable left
         # Note: This is the reverse of ReorderDistributiveRhs_v1
+
+        if x is None or y is None:
+            return True
+
         return not ReorderDistributiveRhs_v1.check(context, x, y, z)
 
     @staticmethod
     def rewrite(partial, op, x, y, z):
         mul, add = partial(op)
+
+        if x is None:
+            x = op.CastLike(op.Constant(value_int=1), z)
+
+        if y is None:
+            y = op.CastLike(op.Constant(value_int=1), z)
+
         return mul(add(x, y), z)
 
 
