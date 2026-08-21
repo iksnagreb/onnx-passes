@@ -1,6 +1,7 @@
 from onnx_passes.passes._base import Transformation, Sequential
 
 from onnx_passes.passes._reorder import reshape
+from onnx_passes.passes._reorder import expand
 from onnx_passes.passes._reorder import slice
 from onnx_passes.passes._reorder import split
 from onnx_passes.passes._reorder import concat
@@ -21,6 +22,7 @@ class Reorder_v1(Sequential, Transformation):
 
     passes = [
         reshape,
+        expand,
         slice,
         split,
         concat,
