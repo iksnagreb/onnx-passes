@@ -58,6 +58,18 @@ class RewriteClipAsMinMax_v1(RewriteRule, Verify):
         return op.Min(op.Max(x, minimum), maximum)
 
 
+class RewriteReluAsMax_v1(RewriteRule, Verify):
+    """Rewrite Relu activation as Max(x,0) operation."""
+
+    @staticmethod
+    def pattern(op, x):
+        return op.Relu(x)
+
+    @staticmethod
+    def rewrite(op, x):
+        return op.Max(x, op.CastLike(op.Constant(value_float=0.0), x))
+
+
 class UnrollMin_v1(RewriteRule, Verify):
     """Rewrite multi-input Min as a tree/chain of binary Min operations."""
 
