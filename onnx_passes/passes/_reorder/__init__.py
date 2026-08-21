@@ -9,6 +9,7 @@ from onnx_passes.passes._reorder import commutative
 from onnx_passes.passes._reorder import associative
 from onnx_passes.passes._reorder import distributive
 from onnx_passes.passes._reorder import comparison
+from onnx_passes.passes._reorder import arithmetic
 
 from onnx_passes.passes import _normalize
 from onnx_passes.passes import _fold_constants
@@ -28,6 +29,7 @@ class Reorder_v1(Sequential, Transformation):
         commutative,
         associative,
         distributive,
+        arithmetic,
         _fold_constants,
         _normalize,
         _eliminate
