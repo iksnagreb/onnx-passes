@@ -30,7 +30,7 @@ class MoveElementwisePastExpand_v1(RewriteRule, Verify):
         return op.op(elementwise.op_type, *inputs, **elementwise.attributes)
 
 
-class ReorderReshapeLoop_v1(Sequential, Transformation):
+class ReorderExpandLoop_v1(Sequential, Transformation):
     """Exhaustively apply expand reordering transformations."""
 
     passes = [
