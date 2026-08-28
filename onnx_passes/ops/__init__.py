@@ -541,7 +541,7 @@ class MultiThreshold_v1(OnnxOperator):
             # input dimensions to match the threshold parameter shape via
             # broadcasting
             steps = op.GreaterOrEqual(op.Unsqueeze(x, axes=[-1]), thresholds)
-            # Type-casing turns boolean unit steps to reducible floats
+            # Type-casting turns boolean unit steps to reducible floats
             steps = op.Cast(steps, to=ir.DataType.FLOAT)
             # Finally the multi-threshold output reduces over all steps removing
             # the previously expanded dimension

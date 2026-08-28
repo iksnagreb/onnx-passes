@@ -196,7 +196,7 @@ class SortConstantComparison_v2(RewriteRuleSetTemplate, Verify):
         else:
             a2 = np.asarray(True)
 
-        # Comparison constants are not optional, both must be resent to decide
+        # Comparison constants are not optional, both must be present to decide
         # whether we need to continue swapping neighboring comparisons.
         if (c1 := ir.convenience.get_const_tensor(c1)) is None:
             return False
