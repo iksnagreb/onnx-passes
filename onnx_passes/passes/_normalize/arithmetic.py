@@ -1,6 +1,8 @@
 from onnx_passes.passes._base import RewriteRule
 from onnx_passes.passes._verify import Verify, tolerance
 
+from onnxscript.rewriter.pattern import OrValue
+
 
 @tolerance
 class RewriteSubAsAdd_v1(RewriteRule, Verify):
@@ -47,6 +49,54 @@ class RewriteNegAsMul_v1(RewriteRule, Verify):
     @staticmethod
     def rewrite(op, x):
         return op.Mul(op.CastLike(op.Constant(value_int=-1), x), x)
+
+
+@tolerance
+class RewriteMulAsPow_v1(RewriteRule, Verify):
+    """Rewrite multiplication (x ** y) * (x ** z) as power x ** (y + z).
+
+    The matched powers y and z are optional, i.e., implicitly 1 so x * x is
+    rewritten as x ** 2.
+    """
+
+    @staticmethod
+    def pattern(op, x, y, z):
+        return op.Mul(
+            OrValue([op.Pow(x, y), x]),
+            OrValue([op.Pow(x, z), x])
+        )
+
+    @staticmethod
+    def rewrite(op, x, y, z):
+        if y is not None:
+            if z is not None:
+                return op.Pow(
+                    x, op.Add(y, z)
+                )
+
+            return op.Pow(
+                x, op.Add(y, op.CastLike(op.Constant(value_float=1.0), y))
+            )
+
+        if z is not None:
+            return op.Pow(
+                x, op.Add(z, op.CastLike(op.Constant(value_float=1.0), z))
+            )
+
+        return op.Pow(x, op.CastLike(op.Constant(value_float=2.0), x))
+
+
+@tolerance
+class FuseConsecutivePows_v1(RewriteRule, Verify):
+    """Fuses two consecutive power operations into a single power."""
+
+    @staticmethod
+    def pattern(op, x, y, z):
+        return op.Pow(op.Pow(x, y), z)
+
+    @staticmethod
+    def rewrite(op, x, y, z):
+        return op.Pow(x, op.Mul(y, z))
 
 
 @tolerance
