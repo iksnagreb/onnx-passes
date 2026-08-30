@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Transformation
+from onnx_passes.passes._base import Transformation, Sequential
 from onnx_passes.passes._verify import Verify
 
 import onnx_ir as ir
@@ -21,3 +21,17 @@ class InlineFunctions_v1(Transformation, Verify):
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.common.InlinePass(_criterion)(model)
+
+
+from onnx_passes.passes._inline import reduce
+
+
+class InlineLoop_v1(Sequential, Transformation):
+    """Exhaustively apply inlining transformations."""
+
+    passes = [
+        InlineFunctions_v1,
+        reduce
+    ]
+
+    exhaustive = True
