@@ -12,6 +12,7 @@ from onnx_passes.passes._reorder import distributive
 from onnx_passes.passes._reorder import comparison
 from onnx_passes.passes._reorder import arithmetic
 from onnx_passes.passes._reorder import reduce
+from onnx_passes.passes._reorder import where
 
 from onnx_passes.passes import _normalize
 from onnx_passes.passes import _fold_constants
@@ -34,6 +35,7 @@ class Reorder_v1(Sequential, Transformation):
         distributive,
         arithmetic,
         reduce,
+        where,
         _fold_constants,
         _normalize,
         _eliminate
