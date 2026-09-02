@@ -22,7 +22,7 @@ class RewriteRoundAsMultiThreshold_v1(RewriteRule, Verify):
         return False
 
     @staticmethod
-    def rewrite(op, x, minimum, maximum):
+    def rewrite_v13(op, x, minimum, maximum):
         return op.Add(
             # Threshold reduction summing the contributions of the individual
             # steps at each threshold.

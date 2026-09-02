@@ -16,7 +16,7 @@ class FuseScaleIntoMultiThreshold_v1(RewriteRule, Verify):
         )
 
     @staticmethod
-    def rewrite(op, x, thresholds, weights, scale):
+    def rewrite_v13(op, x, thresholds, weights, scale):
         return op.MultiThreshold(
             x,
             thresholds,
@@ -47,7 +47,7 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
         )
 
     @staticmethod
-    def rewrite(op, x, thresholds1, weights1, thresholds2, weights2):
+    def rewrite_v15(op, x, thresholds1, weights1, thresholds2, weights2):
         # Expand thresholds and weights on either side to common shape such that
         # there is a 1:1 correspondence, required to stack matching amounts when
         # fusing the two operators.
