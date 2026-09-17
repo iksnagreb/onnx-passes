@@ -284,7 +284,6 @@ class ReorderConstantComparison_v1(RewriteRuleSetTemplate, Verify):
         lambda op: (op.Greater, op.GreaterOrEqual),
         lambda op: (op.LessOrEqual, op.Less),
         lambda op: (op.Less, op.LessOrEqual),
-        lambda op: (op.Equal, op.Equal)
     )
 
     @staticmethod
