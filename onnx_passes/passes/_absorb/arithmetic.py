@@ -151,7 +151,21 @@ class AbsorbMulIntoComparison_v1(RewriteRuleSetTemplate, Verify):
                     ),
                     partial(op)[0](
                         x,
-                        op.Div(c, a)
+                        op.Div(
+                            c,
+                            op.Where(
+                                op.Equal(
+                                    a,
+                                    op.CastLike(
+                                        op.Constant(value_float=0.0), a
+                                    )
+                                ),
+                                op.CastLike(
+                                    op.Constant(value_float=1.0), a
+                                ),
+                                a
+                            )
+                        )
                     )
                 ),
                 # a < 0 & x < c / a
@@ -164,7 +178,21 @@ class AbsorbMulIntoComparison_v1(RewriteRuleSetTemplate, Verify):
                     ),
                     partial(op)[1](
                         x,
-                        op.Div(c, a)
+                        op.Div(
+                            c,
+                            op.Where(
+                                op.Equal(
+                                    a,
+                                    op.CastLike(
+                                        op.Constant(value_float=0.0), a
+                                    )
+                                ),
+                                op.CastLike(
+                                    op.Constant(value_float=1.0), a
+                                ),
+                                a
+                            )
+                        )
                     )
                 )
             )
