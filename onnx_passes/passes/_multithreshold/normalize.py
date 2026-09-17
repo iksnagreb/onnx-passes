@@ -413,7 +413,7 @@ class EliminateDeadThresholds_v1(RewriteRule, Verify):
         for channel in alive:
             while len(channel) < max_steps:
                 # Repeat dead copies of the last threshold
-                channel.append((channel[-1][0], 0))
+                channel.append((channel[-1][0] if channel else 0, 0))
 
         # Reconstruct the actual channel shapes of thresholds and weights and
         # recover the original datatypes
