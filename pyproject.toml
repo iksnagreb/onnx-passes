@@ -29,6 +29,8 @@ dependencies = [
     "PyYAML>=6.0.0",
     "numpy>=1.26.4",
     "networkx>=3.0.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
 ]
 
 [project.urls]

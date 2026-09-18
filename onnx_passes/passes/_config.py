@@ -1,97 +1,62 @@
-# Path to files or directories
+from pydantic import Field
+from pydantic_settings import BaseSettings, CliToggleFlag
+
 from pathlib import Path
-# Define configuration structures as dataclasses
-from dataclasses import dataclass, field
-# Type hints for annotating dataclass members
-from typing import Any
+from typing import Any, Optional, Callable
 
 
-@dataclass(frozen=True)
-class LoggingConfig:
-    """Configuration options for logging pass application.
+class LoggingConfig(BaseSettings, use_attribute_docstrings=True):
+    """Configuration options for logging pass application."""
 
-    Attributes
-    ----------
-    verbose : bool = False
-        Print messages when entering/leaving/verifying/... passes
-    checkpoint : bool | str = False
-        Filename to use for checkpoints (or disable checkpointing)
-    keep_intermediates : bool | Path = False
-        Store intermediate models into this directory after each pass
-    """
+    verbose: CliToggleFlag[bool] = False
+    """Print messages when entering/leaving/verifying/... each pass"""
 
-    verbose: bool = field(default=False)
-    checkpoint: bool | str = field(default=False)
-    keep_intermediates: bool | Path = field(default=False)
+    checkpoint: Optional[str] = None
+    """Filename for checkpoints (or disable checkpointing)"""
+
+    keep_intermediates: Optional[Path] = None
+    """Directory to tore intermediate models after each pass"""
 
 
-@dataclass(frozen=True)
-class VerifyConfig:
-    """Configuration options for pass verification.
+class VerifyConfig(BaseSettings, use_attribute_docstrings=True):
+    """Configuration options for pass verification."""
 
-    Attributes
-    ----------
-    tolerance : Tolerance = Tolerance(rtol=1.0e-5, atol=1.0e-8)
-        Configuration options for tolerance-based pass verification
-    metrics : tuple[Metric, ...] | None = None
-        Configuration options for metrics-based pass verification
-    full_context_dump : bool = False
-        Save the full execution context including intermediate tensors
-    inputs : list[Path | str | Any] = []
-        Path to the verification reference inputs
-    expected : list[Path | str | Any] = []
-        Path to the verification reference outputs
-    """
+    class Tolerance(BaseSettings, use_attribute_docstrings=True):
+        """Configuration options for tolerance-based pass verification."""
 
-    @dataclass(frozen=True)
-    class Tolerance:
-        """Configuration options for tolerance-based pass verification.
+        rtol: float = 1.0e-5
+        """Relative verification tolerance"""
 
-        Attributes
-        ----------
-        rtol : float = 1.0e-5
-            Relative verification tolerance
-        atol : float = 1.0e-8
-            Absolute verification tolerance
-        """
+        atol: float = 1.0e-8
+        """Absolute verification tolerance"""
 
-        rtol: float = field(default=1.0e-5)
-        atol: float = field(default=1.0e-8)
+    class Metric(BaseSettings, use_attribute_docstrings=True):
+        """Configuration options for metrics-based pass verification."""
 
-    @dataclass(frozen=True)
-    class Metric:
-        """Configuration options for metrics-based pass verification.
+        function: str | Callable
+        """Function evaluating the metric given produced and expected outputs"""
 
-        Attributes
-        ----------
-        function : str
-            Function evaluating the metric given produced and expected outputs
-        range : tuple[float, float]
-            Minimum and maximum metric value accepted for verification
-        """
-
-        function: str
         range: tuple[float, float]
+        """Minimum and maximum metric value accepted for verification"""
 
-    tolerance: Tolerance = field(default_factory=Tolerance)
-    metrics: tuple[Metric, ...] | None = field(default=None)
-    full_context_dump: bool = field(default=False)
+    tolerance: Tolerance = Tolerance()
+    metrics: list[Metric] | None = None
 
-    inputs: list[Path | str | Any] = field(default_factory=list)
-    expected: list[Path | str | Any] = field(default_factory=list)
+    full_context_dump: CliToggleFlag[bool] = False
+    """Save the full execution context including intermediate tensors"""
+
+    inputs: list[Path | str | Any] = Field(default_factory=list)
+    """Path to the verification reference inputs"""
+
+    expected: list[Path | str | Any] = Field(default_factory=list)
+    """Path to the verification reference outputs"""
 
 
-@dataclass(frozen=True)
-class Config:
-    """Top-level configuration for pass application.
+class Config(BaseSettings, use_attribute_docstrings=True):
+    """Top-level configuration for pass application."""
 
-    Attributes
-    ----------
-    logging : LoggingConfig
-        Configuration options for logging pass application
-    verify : VerifyConfig | bool
-        Configuration options for pass verification
-    """
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    """Configuration options for logging pass application"""
 
-    logging: LoggingConfig = field(default_factory=LoggingConfig)
-    verify: VerifyConfig | bool = field(default_factory=VerifyConfig)
+    verify: VerifyConfig | bool = Field(default_factory=VerifyConfig)
+    """Configuration options for pass verification"""

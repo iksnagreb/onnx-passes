@@ -2,10 +2,8 @@
 from abc import ABC
 # Path to files or directories
 from pathlib import Path
-# Define configuration structures as dataclasses
-from dataclasses import asdict, astuple
 # Type hints for annotating dataclass members
-from typing import Any
+from typing import Any, Callable
 # Verification styles are selected via enums
 from enum import Enum
 
@@ -61,8 +59,14 @@ def _evaluate_model(model: ir.Model, inputs: list[Any]):
 from importlib import import_module
 
 
-def _resolve_metric(identifier: str):
+def _resolve_metric(identifier: str | Callable):
     """Resolves the metric evaluation function from the identifier."""
+
+    # Pass through already resolved callables
+    if isinstance(identifier, Callable):
+        return identifier
+
+    identifier: str = str(identifier)
 
     # First try to look up the function in the global scope, if it is not there,
     # try interpreting the identifier as a fully qualified name
@@ -180,12 +184,15 @@ class Verify(Pass, ABC):
 
         if self._method == Verify.Method.METRIC:
             for metric in self.config.verify.metrics:  # noqa: Not None
-                key, _ = astuple(metric)
-                function = _resolve_metric(key)
+                function = _resolve_metric(key := metric.function)
+
+                if not isinstance(key, str):
+                    key = f"{key.__module__}.{key.__name__}"  # noqa: __module__
+
                 metrics[key] = function(self._outputs, self._expected)
 
         # Log the verification inputs and outputs to the metadata for debugging
-        # before evaualting the condition and potentially raising expections
+        # before evaluating the condition and potentially raising expections
         result.model.meta.setdefault("passes", State()).log_verification(
             self._inputs, self._outputs, self._expected, context, **metrics
         )
@@ -206,7 +213,7 @@ class Verify(Pass, ABC):
                     result.model.graph.outputs, self._outputs, self._expected
             ):
                 if not np.allclose(
-                        x, y, **asdict(self.config.verify.tolerance)  # noqa
+                        x, y, **self.config.verify.tolerance.model_dump()
                 ):
                     raise VerificationError(
                         f"Output {tensor.name} not within tolerance"
@@ -216,7 +223,11 @@ class Verify(Pass, ABC):
         # exception if not
         if self._method == Verify.Method.METRIC:
             for metric in self.config.verify.metrics:  # noqa: Not None
-                key, (_min, _max) = astuple(metric)
+                key, (_min, _max) = metric.function, metric.range
+
+                if not isinstance(key, str):
+                    key = f"{key.__module__}.{key.__name__}"  # noqa: __module__
+
                 if not _min <= (value := metrics[key]) <= _max:
                     raise VerificationError(
                         f"{key} {value} not within [{_min}, {_max}] as required"
