@@ -193,7 +193,8 @@ class Verify(Pass, ABC):
 
         # Log the verification inputs and outputs to the metadata for debugging
         # before evaluating the condition and potentially raising expections
-        result.model.meta.setdefault("passes", State()).log_verification(
+        result.model.meta.setdefault("passes", State()).log_verified_by(
+            self,
             self._inputs, self._outputs, self._expected, context, **metrics
         )
 

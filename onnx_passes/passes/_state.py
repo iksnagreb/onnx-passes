@@ -45,7 +45,8 @@ class State:
 
     counter: int = field(default=0)
     history: list[type] = field(default_factory=list)
-    verify: dict[str, VerifyState] = field(default_factory=dict)
+    modified_by: list[object] = field(default_factory=list)
+    verified_by: list[tuple[object, VerifyState]] = field(default_factory=list)
 
     @property
     def last(self):
@@ -64,7 +65,19 @@ class State:
         self.counter = self.counter + 1
         self.history.append(type(p))
 
-    def log_verification(self, inputs, outputs, expected, context, **metrics):
+    def log_modified_by(self, p):
+        """Logs the pass p to the state dict as "modified the model"."""
+
+        # Modified can only be logged after applying a pass - the result will be
+        # associated with the last pass
+        if self.last is None:
+            raise RuntimeError(
+                f"Tried to log modified result without ever logging a pass"
+            )
+
+        self.modified_by.append(p)
+
+    def log_verified_by(self, p, inputs, outputs, expected, context, **metrics):
         """Logs a verification result to the state."""
 
         # Verification can only be done and logged after applying a pass - the
@@ -74,8 +87,6 @@ class State:
                 f"Tried to log verification result without ever logging a pass"
             )
 
-        # Applied passes are uniquely identified by the class name and the
-        # running counter
-        self.verify[self.id] = State.VerifyState(  # noqa: Not None
-            inputs, outputs, expected, context, metrics
+        self.verified_by.append(
+            (p, State.VerifyState(inputs, outputs, expected, context, metrics))
         )

@@ -165,6 +165,8 @@ class Pass(ir.passes.PassBase, ABC):
         # If the pass modified the model, apply the ONNX checker pass to check
         # the consistency of the model
         if result.modified:
+            model.meta.setdefault("passes", State()).log_modified_by(self)
+
             if self.config.logging.verbose:
                 print(f"Checking modified model after {self.identifier}")
 
