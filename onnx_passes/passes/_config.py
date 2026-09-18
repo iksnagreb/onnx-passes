@@ -58,5 +58,5 @@ class Config(BaseSettings, use_attribute_docstrings=True):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     """Configuration options for logging pass application"""
 
-    verify: VerifyConfig | bool = Field(default_factory=VerifyConfig)
+    verify: VerifyConfig | bool = False
     """Configuration options for pass verification"""
