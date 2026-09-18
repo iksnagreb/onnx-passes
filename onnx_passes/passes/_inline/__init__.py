@@ -7,7 +7,7 @@ import onnx_ir as ir
 import onnx_ir.passes.common
 
 _BLACKLIST: set[str] = {
-    "Quant"
+    "Quant", "MultiThreshold"
 }
 
 
