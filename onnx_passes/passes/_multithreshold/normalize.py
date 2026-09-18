@@ -276,6 +276,11 @@ class InferMultiThreshold_v1(RewriteRule, Verify):
 
     @staticmethod
     def rewrite_v13(op, x, thresholds, weights, shape, axes, dtype):
+        # Insert implicit positive unit step weights if no weights have been
+        # matched (scalar expanded via broadcasting)
+        if weights is None:
+            weights = op.Cast(op.Constant(value_float=1.0), to=dtype)
+
         return op.MultiThreshold(
             # The matched pattern unsqueezes the thresholding axis at the end
             # but might also do other reshaping (always static): Unsqueeze is
