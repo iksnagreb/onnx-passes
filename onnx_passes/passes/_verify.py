@@ -206,6 +206,7 @@ class Verify(Pass, ABC):
                 if np.any(x != y):
                     raise VerificationError(
                         f"Output '{tensor.name}' not as expected"
+                        f" after '{self.identifier}'"
                     )
 
         # Compare equality within tolerance of *all* values from *all* outputs
@@ -218,6 +219,7 @@ class Verify(Pass, ABC):
                 ):
                     raise VerificationError(
                         f"Output {tensor.name} not within tolerance"
+                        f" after '{self.identifier}'"
                     )
 
         # Check whether all metrics lie within the required range and raise
@@ -232,6 +234,7 @@ class Verify(Pass, ABC):
                 if not _min <= (value := metrics[key]) <= _max:
                     raise VerificationError(
                         f"{key} {value} not within [{_min}, {_max}] as required"
+                        f" after '{self.identifier}'"
                     )
 
         if self.config.logging.verbose:
