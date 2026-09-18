@@ -31,7 +31,14 @@ class EliminateIdentity(RewriteRule, ABC):
 
     @staticmethod
     def rewrite(op, x, out):
-        return op.Expand(x, op.Constant(value_ints=list(out.shape)))
+        return op.Expand(
+            x,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
+        )
 
 
 class EliminateIdentityAdd_v1(EliminateIdentity, Verify):
