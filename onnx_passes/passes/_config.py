@@ -40,7 +40,7 @@ class VerifyConfig(BaseSettings, use_attribute_docstrings=True):
         """Minimum and maximum metric value accepted for verification"""
 
     tolerance: Tolerance = Tolerance()
-    metrics: list[Metric] | None = None
+    metrics: list[Metric] = Field(default_factory=list)
 
     full_context_dump: CliToggleFlag[bool] = False
     """Save the full execution context including intermediate tensors"""

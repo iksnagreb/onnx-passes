@@ -25,12 +25,12 @@ dependencies = [
     "onnxruntime>=1.20.0",
     "onnxscript>=0.7.0",
     "netron>=8.0.0",
-    "click>=8.2.1",
     "PyYAML>=6.0.0",
     "numpy>=1.26.4",
     "networkx>=3.0.0",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    "rich>=15.0.0",
 ]
 
 [project.urls]
@@ -38,7 +38,7 @@ dependencies = [
 GitHub = "https://github.com/iksnagreb/onnx-passes"
 # Script entrypoints which should be registered when installing the project
 [project.scripts]
-onnx-passes = "onnx_passes.__main__:main"
+onnx-passes = "onnx_passes.cli.main:main"
 
 # Build-system configuration: Build the proejct using poetry with dynamic
 # versioning where the version is derived from the latest git tag
