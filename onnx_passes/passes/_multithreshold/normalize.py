@@ -377,7 +377,10 @@ class EliminateDeadThresholds_v1(RewriteRule, Verify):
 
         # There must be at least one dead threshold in each axis to actually
         # reduce the number of thresholds due to homogeneous shape requirement
-        return np.all(np.sum(weights.numpy() == 0, axis=-1))
+        if np.prod(thresholds.shape) > 1:
+            return np.all(np.sum(weights.numpy() == 0, axis=-1))
+
+        return False
 
     @staticmethod
     def rewrite(op, x, thresholds, weights):
@@ -441,6 +444,102 @@ class EliminateDeadThresholds_v1(RewriteRule, Verify):
         return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
 
 
+@tolerance
+class DeduplicateThresholds_v1(RewriteRule, Verify):
+    """Deduplicate redundant thresholds by adding up the weights where possible.
+
+    Note: Due to the homogeneous shape requirement, this eliminates matching
+    amounts of redundant thresholds from all axes.
+    """
+
+    @staticmethod
+    def pattern(op, x, thresholds, weights):
+        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
+
+    @staticmethod
+    def check(context, x, thresholds, weights):
+        if (thresholds := ir.convenience.get_const_tensor(thresholds)) is None:
+            return False
+
+        if (weights := ir.convenience.get_const_tensor(weights)) is None:
+            return False
+
+        # There must be at least one repeated threshold in each axis to actually
+        # reduce the number of thresholds due to homogeneous shape requirement
+        if np.prod((thresholds := thresholds.numpy()).shape) > 1:
+            for ts in thresholds.reshape(-1, thresholds.shape[-1]):
+                if len(np.unique(ts)) == thresholds.shape[-1]:
+                    return False
+
+            return True
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, thresholds, weights):
+        # Extract constant parameter tensors as NumPy arrays: according to the
+        # match conditions these are never None and safe to access.
+        thresholds = ir.convenience.get_const_tensor(thresholds).numpy()  # noqa
+        weights = ir.convenience.get_const_tensor(weights).numpy()  # noqa
+
+        # Broadcast thresholds and weights before eliminating to make indices
+        # compatible. Unbroadcasting will later remove expanded axes.
+        thresholds, weights = np.broadcast_arrays(thresholds, weights)
+
+        shape = thresholds.shape[:-1]
+
+        thresholds_dtype = thresholds.dtype
+        weights_dtype = weights.dtype
+
+        # Collect the unique, i.e., non-repeated thresholds from flattened
+        # channel dimensions
+        thresholds = np.reshape(thresholds, (-1, thresholds.shape[-1]))
+        weights = np.reshape(weights, (-1, weights.shape[-1]))
+
+        unique = []
+
+        for ts, ws in zip(thresholds, weights):
+            channel = {}
+
+            for threshold, weight in zip(ts, ws):
+                if threshold not in channel:
+                    channel[threshold] = 0.0
+                channel[threshold] += weight
+
+            unique.append(channel)
+
+        unique = [list(channel.items()) for channel in unique]
+
+        # Fill up all channels to the same number of thresholds bringing back
+        # some repeated thresholds to have homogeneous shapes
+        max_unique = max(len(channel) for channel in unique)
+
+        for channel in unique:
+            while len(channel) < max_unique:
+                # Repeat dead copies of the last threshold
+                channel.append((channel[-1][0] if channel else 0, 0))
+
+        # Reconstruct the actual channel shapes of thresholds and weights and
+        # recover the original datatypes
+        thresholds, weights = np.split(np.asarray(unique), 2, axis=-1)
+
+        thresholds = thresholds.astype(thresholds_dtype)
+        weights = weights.astype(weights_dtype)
+
+        thresholds = np.reshape(thresholds, (*shape, -1))
+        weights = np.reshape(weights, (*shape, -1))
+
+        thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
+        weights = unbroadcast(weights, axes=range(weights.ndim - 1))
+
+        # Insert MultiThreshold operator with stripped parameter constants back
+        # into the graph
+        thresholds = op.Constant(value=ir.tensor(thresholds))
+        weights = op.Constant(value=ir.tensor(weights))
+
+        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
+
+
 from onnx_passes.passes import _fold_constants
 
 
@@ -452,6 +551,7 @@ class NormalizeMultiThresholdLoop_v1(Sequential, Transformation):
         InferMultiThreshold_v1,
         SortMultiThreshold_v1,
         EliminateDeadThresholds_v1,
+        DeduplicateThresholds_v1,
         _fold_constants
     ]
 
