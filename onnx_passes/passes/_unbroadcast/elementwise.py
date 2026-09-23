@@ -19,7 +19,17 @@ def unbroadcast(x: np.ndarray, squeeze: bool = True, axes=None) -> np.ndarray:
             x = y[:1].swapaxes(0, axis)
 
     if squeeze:
-        x = np.reshape(x, (*dropwhile(lambda size: size == 1, x.shape),))
+        def can_squeeze(axis_and_size: tuple[int, int]) -> bool:
+            if axes:
+                return axis_and_size[0] in axes and axis_and_size[1] == 1
+
+            return axis_and_size[1] == 1
+
+        x = np.reshape(
+            x, (*[
+                size for _, size in dropwhile(can_squeeze, enumerate(x.shape))
+            ],)
+        )
 
     return x
 
