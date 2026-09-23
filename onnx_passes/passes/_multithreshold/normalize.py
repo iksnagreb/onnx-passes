@@ -341,8 +341,8 @@ class SortMultiThreshold_v1(RewriteRule, Verify):
         thresholds = np.take_along_axis(thresholds, order, axis=-1)
         weights = np.take_along_axis(weights, order, axis=-1)
 
-        thresholds = unbroadcast(thresholds)
-        weights = unbroadcast(weights)
+        thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
+        weights = unbroadcast(weights, axes=range(thresholds.ndim - 1))
 
         # Insert MultiThreshold operator with sorted parameter constants back
         # into the graph
