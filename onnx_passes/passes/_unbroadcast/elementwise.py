@@ -9,10 +9,10 @@ import onnx_ir as ir
 import numpy as np
 
 
-def unbroadcast(x: np.ndarray, squeeze: bool = True) -> np.ndarray:
+def unbroadcast(x: np.ndarray, squeeze: bool = True, axes=None) -> np.ndarray:
     """Unbroadcast redundant dimensions from a NumPy array."""
 
-    for axis in range(x.ndim):
+    for axis in axes or range(x.ndim):
         y = x.swapaxes(0, axis)
 
         if np.all(y[:1] == y):

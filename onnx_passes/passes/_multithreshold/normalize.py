@@ -430,8 +430,8 @@ class EliminateDeadThresholds_v1(RewriteRule, Verify):
         thresholds = np.reshape(thresholds, (*shape, -1))
         weights = np.reshape(weights, (*shape, -1))
 
-        thresholds = unbroadcast(thresholds)
-        weights = unbroadcast(weights)
+        thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
+        weights = unbroadcast(weights, axes=range(weights.ndim - 1))
 
         # Insert MultiThreshold operator with stripped parameter constants back
         # into the graph
