@@ -1,8 +1,6 @@
 from onnx_passes.passes._base import RewriteRule
 from onnx_passes.passes._verify import Verify
 
-import numpy as np
-
 
 class InferSliceAxesAndSteps_v1(RewriteRule, Verify):
     """Infers axes to slice if no axes input or attribute is given."""
@@ -37,7 +35,7 @@ class InferSliceAxesAndSteps_v1(RewriteRule, Verify):
         # Explicitly fill in the missing optional axes (enumerating all axes)
         # and steps (all ones) inputs if missing
         if inputs[3] is None:
-            inputs[3] = op.Constant(value_ints=np.arange(len(x.shape)))
+            inputs[3] = op.Constant(value_ints=list(range(len(x.shape))))
 
         if inputs[4] is None:
             inputs[4] = op.Expand(op.Constant(value_int=1), op.Shape(inputs[3]))
