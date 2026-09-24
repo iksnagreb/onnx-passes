@@ -1,4 +1,6 @@
-from onnx_passes.passes._base import RewriteRule, RewriteRuleSet
+from onnx_passes.passes._base import (
+    RewriteRule, RewriteRuleSet, RewriteRuleSetTemplate
+)
 from onnx_passes.passes._verify import Verify
 
 import onnx_ir as ir
@@ -98,51 +100,71 @@ class RewriteGreaterAsGreaterOrEqual_v1(RewriteRule, Verify):
         )
 
 
-class SimplifyCompoundComparison_v1(RewriteRuleSet, Verify):
-    """Simplify compound (And/Or) comparison to a common variable."""
+class SimplifyCompoundComparisonLhs_v1(RewriteRuleSetTemplate, Verify):
+    """Simplify compound (And/Or) comparison to a common variable on the lhs."""
+
+    patterns = (
+        # x < a & x < b -> x < Min(a,b)
+        lambda op: (op.Less, op.And, op.Min),
+        lambda op: (op.LessOrEqual, op.And, op.Min),
+        # x > a & x > b -> x > Max(a,b)
+        lambda op: (op.Greater, op.And, op.Max),
+        lambda op: (op.GreaterOrEqual, op.And, op.Max),
+        # x < a | x < b -> x < Max(a,b)
+        lambda op: (op.Less, op.Or, op.Max),
+        lambda op: (op.LessOrEqual, op.Or, op.Max),
+        # x > a | x > b -> x > Min(a,b)
+        lambda op: (op.Greater, op.Or, op.Min),
+        lambda op: (op.GreaterOrEqual, op.Or, op.Min),
+    )
 
     @staticmethod
-    def pattern():
-        return [
-            # Common variable x on the left side
-            lambda op, x, a, b: op.And(
-                op.Greater(x, a), op.Greater(x, b)
-            ),
-            lambda op, x, a, b: op.And(
-                op.GreaterOrEqual(x, a), op.GreaterOrEqual(x, b)
-            ),
-            lambda op, x, a, b: op.Or(
-                op.Greater(x, a), op.Greater(x, b)
-            ),
-            lambda op, x, a, b: op.Or(
-                op.GreaterOrEqual(x, a), op.GreaterOrEqual(x, b)
-            ),
-            # Common variable x on the right side
-            lambda op, x, a, b: op.And(
-                op.Greater(a, x), op.Greater(b, x)
-            ),
-            lambda op, x, a, b: op.And(
-                op.GreaterOrEqual(a, x), op.GreaterOrEqual(b, x)
-            ),
-            lambda op, x, a, b: op.Or(
-                op.Greater(a, x), op.Greater(b, x)
-            ),
-            lambda op, x, a, b: op.Or(
-                op.GreaterOrEqual(a, x), op.GreaterOrEqual(b, x)
-            )
-        ]
+    def pattern(partial, op, x, a, b):
+        return partial(op)[1](partial(op)[0](x, a), partial(op)[0](x, b))
 
     @staticmethod
-    def rewrite():
-        return [
-            # Common variable x on the left side
-            lambda op, x, a, b: op.Greater(x, op.Max(a, b)),
-            lambda op, x, a, b: op.GreaterOrEqual(x, op.Max(a, b)),
-            lambda op, x, a, b: op.Greater(x, op.Min(a, b)),
-            lambda op, x, a, b: op.GreaterOrEqual(x, op.Min(a, b)),
-            # Common variable x on the right side
-            lambda op, x, a, b: op.Greater(op.Min(a, b), x),
-            lambda op, x, a, b: op.GreaterOrEqual(op.Min(a, b), x),
-            lambda op, x, a, b: op.Greater(op.Max(a, b), x),
-            lambda op, x, a, b: op.GreaterOrEqual(op.Max(a, b), x)
-        ]
+    def check(context, x, a, b):
+        if ir.convenience.get_const_tensor(a) is not None:
+            if ir.convenience.get_const_tensor(b) is not None:
+                return ir.convenience.get_const_tensor(x) is None
+
+        return False
+
+    @staticmethod
+    def rewrite(partial, op, x, a, b):
+        return partial(op)[0](x, partial(op)[2](a, b))
+
+
+class SimplifyCompoundComparisonRhs_v1(RewriteRuleSetTemplate, Verify):
+    """Simplify compound (And/Or) comparison to a common variable on the rhs."""
+
+    patterns = (
+        # a < x & b < x -> Max(a,b) < x
+        lambda op: (op.Less, op.And, op.Max),
+        lambda op: (op.LessOrEqual, op.And, op.Max),
+        # a > x & b > x -> Min(a,b) > x
+        lambda op: (op.Greater, op.And, op.Min),
+        lambda op: (op.GreaterOrEqual, op.And, op.Min),
+        # a < x | b < x -> Min(a,b) < x
+        lambda op: (op.Less, op.Or, op.Min),
+        lambda op: (op.LessOrEqual, op.Or, op.Min),
+        # a > x | b > x -> Max(a,b) > x
+        lambda op: (op.Greater, op.Or, op.Max),
+        lambda op: (op.GreaterOrEqual, op.Or, op.Max),
+    )
+
+    @staticmethod
+    def pattern(partial, op, x, a, b):
+        return partial(op)[1](partial(op)[0](a, x), partial(op)[0](b, x))
+
+    @staticmethod
+    def check(context, x, a, b):
+        if ir.convenience.get_const_tensor(a) is not None:
+            if ir.convenience.get_const_tensor(b) is not None:
+                return ir.convenience.get_const_tensor(x) is None
+
+        return False
+
+    @staticmethod
+    def rewrite(partial, op, x, a, b):
+        return partial(op)[0](partial(op)[2](a, b), x)
