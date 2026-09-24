@@ -48,6 +48,38 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
 
     @staticmethod
     def rewrite_v15(op, x, thresholds1, weights1, thresholds2, weights2):
+        # Extend thresholds to common rank by unsqueezing dimensions of size 1
+        # from the left of both parameter tensors. Weights are extended when
+        # thresholds and weights are broadcast against each other.
+        thresholds1 = op.Unsqueeze(
+            thresholds1,
+            op.Range(
+                op.Size(
+                    op.Shape(thresholds1)
+                ),
+                common_rank := op.Max(
+                    op.Size(
+                        op.Shape(thresholds1)
+                    ),
+                    op.Size(
+                        op.Shape(thresholds2)
+                    )
+                ),
+                op.Constant(value_int=1),
+            )
+        )
+
+        thresholds2 = op.Unsqueeze(
+            thresholds2,
+            op.Range(
+                op.Size(
+                    op.Shape(thresholds2)
+                ),
+                common_rank,
+                op.Constant(value_int=1),
+            )
+        )
+
         # Expand thresholds and weights on either side to common shape such that
         # there is a 1:1 correspondence, required to stack matching amounts when
         # fusing the two operators.
