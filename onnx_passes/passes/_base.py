@@ -8,7 +8,7 @@ from abc import ABC
 # Path to files or directories
 from pathlib import Path
 # Type hints for annotating the interface
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 # ONNX intermediate representation
 import onnx_ir as ir
@@ -600,7 +600,8 @@ from functools import partial
 class RewriteRuleSet(Transformation, ABC):
     """Base class for pattern-based rewrite rule set transformation passes."""
 
-    def check(self) -> list[Callable[..., rewriter.MatchResult]]:
+    @staticmethod
+    def check() -> Iterable[Callable[..., rewriter.MatchResult]]:
         """Match conditions to decide whether to rewrite a matched pattern."""
         return []
 
