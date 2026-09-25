@@ -12,7 +12,11 @@ class BooleanToANF_v1(RewriteRuleSet, Verify):
         return [
             lambda op, x: op.Not(x),
             lambda op, x, y: op.Or(x, y),
-            lambda op, x, y, z: op.And(x, op.Xor(y, z))
+            lambda op, x, y, z: op.And(x, op.Xor(y, z)),
+            lambda op, x: op.Xor(x, x),
+            lambda op, x: op.Xor(x, op.Not(x)),
+            lambda op, x: op.Or(x, x),
+            lambda op, x: op.And(x, x),
         ]
 
     @staticmethod
@@ -20,7 +24,11 @@ class BooleanToANF_v1(RewriteRuleSet, Verify):
         return [
             lambda op, x: op.Xor(op.Constant(value=ir.tensor(True)), x),
             lambda op, x, y: op.Xor(x, op.Xor(y, op.And(x, y))),
-            lambda op, x, y, z: op.Xor(op.And(x, y), op.And(x, z))
+            lambda op, x, y, z: op.Xor(op.And(x, y), op.And(x, z)),
+            lambda op, x: op.Constant(value=ir.tensor(False)),
+            lambda op, x: op.Constant(value=ir.tensor(True)),
+            lambda op, x: op.Identity(x),
+            lambda op, x: op.Identity(x),
         ]
 
     @property
@@ -36,21 +44,29 @@ class BitwiseToANF_v1(RewriteRuleSet, Verify):
         return [
             lambda op, x: op.BitwiseNot(x),
             lambda op, x, y: op.BitwiseOr(x, y),
-            lambda op, x, y, z: op.BitwiseAnd(x, op.BitwiseXor(y, z))
+            lambda op, x, y, z: op.BitwiseAnd(x, op.BitwiseXor(y, z)),
+            lambda op, x: op.BitwiseXor(x, x),
+            lambda op, x: op.BitwiseXor(x, op.BitwiseNot(x)),
+            lambda op, x: op.BitwiseOr(x, x),
+            lambda op, x: op.BitwiseAnd(x, x),
         ]
 
     @staticmethod
     def rewrite():
         return [
             lambda op, x: op.BitwiseXor(
-                op.CastLike(op.Constant(value=ir.tensor(1)), x), x
+                op.CastLike(op.Constant(value=ir.tensor(~0)), x), x
             ),
             lambda op, x, y: op.BitwiseXor(
                 x, op.BitwiseXor(y, op.BitwiseAnd(x, y))
             ),
             lambda op, x, y, z: op.BitwiseXor(
                 op.BitwiseAnd(x, y), op.BitwiseAnd(x, z)
-            )
+            ),
+            lambda op, x: op.CastLike(op.Constant(value=ir.tensor(0)), x),
+            lambda op, x: op.CastLike(op.Constant(value=ir.tensor(~1)), x),
+            lambda op, x: op.Identity(x),
+            lambda op, x: op.Identity(x),
         ]
 
     @property
