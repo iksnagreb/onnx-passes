@@ -540,6 +540,60 @@ class DeduplicateThresholds_v1(RewriteRule, Verify):
         return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
 
 
+class UnbroadcastThresholds_v1(RewriteRule, Verify):
+    """Remove redundant dimensions from constant MultiThreshold parameters."""
+
+    @staticmethod
+    def pattern(op, x, thresholds, weights):
+        return op.MultiThreshold(
+            x, thresholds, weights, _domain=CUSTOM_DOMAIN, _outputs=["out"]
+        )
+
+    @staticmethod
+    def check(context, x, thresholds, weights, out):
+        if (thresholds := ir.convenience.get_const_tensor(thresholds)) is None:
+            return False
+
+        if (weights := ir.convenience.get_const_tensor(weights)) is None:
+            return False
+
+        thresholds = thresholds.numpy()
+        weights = weights.numpy()
+
+        if (unbroadcast(thresholds, axes=range(thresholds.ndim - 1)).shape
+                != thresholds.shape):
+            return out.shape is not None and out.shape.is_static()
+
+        if (unbroadcast(weights, axes=range(weights.ndim - 1)).shape
+                != weights.shape):
+            return out.shape is not None and out.shape.is_static()
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, thresholds, weights, out):
+        # Extract constant parameter tensors as NumPy arrays: according to the
+        # match conditions these are never None and safe to access.
+        thresholds = ir.convenience.get_const_tensor(thresholds).numpy()  # noqa
+        weights = ir.convenience.get_const_tensor(weights).numpy()  # noqa
+
+        # Unbroadcast parameter tensors, keeping the threshold axis intact, and
+        # reinsert the parameter tensors into the graph. Expand the output back
+        # to the original shape to not lose any dimensions.
+        thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
+        weights = unbroadcast(weights, axes=range(weights.ndim - 1))
+
+        thresholds = op.Constant(value=ir.tensor(thresholds))
+        weights = op.Constant(value=ir.tensor(weights))
+
+        return op.Expand(
+            op.MultiThreshold(
+                x, thresholds, weights, _domain=CUSTOM_DOMAIN
+            ),
+            op.Constant(value_ints=out.shape[:])
+        )
+
+
 from onnx_passes.passes import _fold_constants
 
 
@@ -552,6 +606,7 @@ class NormalizeMultiThresholdLoop_v1(Sequential, Transformation):
         SortMultiThreshold_v1,
         EliminateDeadThresholds_v1,
         DeduplicateThresholds_v1,
+        UnbroadcastThresholds_v1,
         _fold_constants
     ]
 
