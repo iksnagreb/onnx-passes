@@ -341,9 +341,6 @@ class SortMultiThreshold_v1(RewriteRule, Verify):
         thresholds = np.take_along_axis(thresholds, order, axis=-1)
         weights = np.take_along_axis(weights, order, axis=-1)
 
-        thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
-        weights = unbroadcast(weights, axes=range(thresholds.ndim - 1))
-
         # Insert MultiThreshold operator with sorted parameter constants back
         # into the graph
         thresholds = op.Constant(value=ir.tensor(thresholds))
@@ -432,9 +429,6 @@ class EliminateDeadThresholds_v1(RewriteRule, Verify):
 
         thresholds = np.reshape(thresholds, (*shape, -1))
         weights = np.reshape(weights, (*shape, -1))
-
-        thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
-        weights = unbroadcast(weights, axes=range(weights.ndim - 1))
 
         # Insert MultiThreshold operator with stripped parameter constants back
         # into the graph
@@ -528,9 +522,6 @@ class DeduplicateThresholds_v1(RewriteRule, Verify):
 
         thresholds = np.reshape(thresholds, (*shape, -1))
         weights = np.reshape(weights, (*shape, -1))
-
-        thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
-        weights = unbroadcast(weights, axes=range(weights.ndim - 1))
 
         # Insert MultiThreshold operator with stripped parameter constants back
         # into the graph
