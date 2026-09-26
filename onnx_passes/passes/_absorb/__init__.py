@@ -5,6 +5,7 @@ from onnx_passes.passes._absorb import minmax
 from onnx_passes.passes._absorb import exp
 from onnx_passes.passes._absorb import log
 from onnx_passes.passes._absorb import abs
+from onnx_passes.passes._absorb import sqrt
 
 from onnx_passes.passes import _reorder
 
@@ -18,6 +19,7 @@ class Absorb_v1(Sequential, Transformation):
         exp,
         log,
         abs,
+        sqrt,
         _reorder,
     ]
 
