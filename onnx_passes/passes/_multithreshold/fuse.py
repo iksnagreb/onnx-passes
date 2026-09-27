@@ -63,7 +63,8 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
                     ),
                     op.Size(
                         op.Shape(thresholds2)
-                    )
+                    ),
+                    op.Constant(value_int=1)
                 ),
                 op.Constant(value_int=1),
             )
