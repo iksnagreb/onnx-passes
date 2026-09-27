@@ -8,6 +8,7 @@ from onnx_passes.passes._absorb import abs
 from onnx_passes.passes._absorb import sqrt
 from onnx_passes.passes._absorb import sigmoid
 from onnx_passes.passes._absorb import tanh
+from onnx_passes.passes._absorb import reciprocal
 
 
 class Absorb_v1(Sequential, Transformation):
@@ -22,6 +23,7 @@ class Absorb_v1(Sequential, Transformation):
         sqrt,
         sigmoid,
         tanh,
+        reciprocal,
     ]
 
     exhaustive = True
