@@ -82,8 +82,16 @@ class ReorderReverseDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
         #   xc + xc -> x (c + c)    3 -> 1 operations, constant foldable right
         # Note: This is the reverse of ReorderDistributiveLhs_v1
 
-        if y is None or z is None:
-            return True
+        if y is None and z is not None:
+            # x + xz -> x (1 + z)
+            return ir.convenience.get_const_tensor(z) is not None
+
+        if z is None and y is not None:
+            # xy + x -> x (y + 1)
+            return ir.convenience.get_const_tensor(y) is not None
+
+        if y is None and z is None:
+            return False
 
         return not ReorderDistributiveLhs_v1.check(context, x, y, z)
 
@@ -160,8 +168,16 @@ class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
         #   cz + cz -> (c + c) z    3 -> 1 operations, constant foldable left
         # Note: This is the reverse of ReorderDistributiveRhs_v1
 
-        if x is None or y is None:
-            return True
+        if x is None and y is not None:
+            # z + yz -> (1 + y) z
+            return ir.convenience.get_const_tensor(y) is not None
+
+        if y is None and x is not None:
+            # xz + z -> (x + 1) z
+            return ir.convenience.get_const_tensor(x) is not None
+
+        if x is None and y is None:
+            return False
 
         return not ReorderDistributiveRhs_v1.check(context, x, y, z)
 
