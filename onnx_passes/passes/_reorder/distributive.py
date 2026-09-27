@@ -91,7 +91,7 @@ class ReorderReverseDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
             return ir.convenience.get_const_tensor(y) is not None
 
         if y is None and z is None:
-            return False
+            return True
 
         return not ReorderDistributiveLhs_v1.check(context, x, y, z)
 
@@ -177,7 +177,7 @@ class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
             return ir.convenience.get_const_tensor(x) is not None
 
         if x is None and y is None:
-            return False
+            return True
 
         return not ReorderDistributiveRhs_v1.check(context, x, y, z)
 
