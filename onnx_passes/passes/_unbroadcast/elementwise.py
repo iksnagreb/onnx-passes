@@ -12,6 +12,9 @@ import numpy as np
 def unbroadcast(x: np.ndarray, squeeze: bool = True, axes=None) -> np.ndarray:
     """Unbroadcast redundant dimensions from a NumPy array."""
 
+    if axes is not None and list(axes) == []:
+        return x
+
     for axis in axes or range(x.ndim):
         y = x.swapaxes(0, axis)
 
