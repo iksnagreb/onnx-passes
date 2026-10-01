@@ -93,10 +93,16 @@ def _check_multithreshold_segments(context, x, y, a1, a2, c1, c2, z=None):
     if (c2 := ir.convenience.get_const_tensor(c2)) is None:
         return False
 
-    # If not extending the pattern recursively, stop with checking whether
-    # weighted threshold segments are sorted.
+    # This is not a valid multithreshold segment if any weights or thresholds
+    # are out of order. This also propagates back to the root when matching a
+    # tree of branching threshold segments.
+    if np.any((a1 < a2) | ((a1 == a2) & (c1.numpy() > c2.numpy()))):
+        return False
+
+    # If not extending the pattern recursively, we matched the complete tree of
+    # branching threshold segments with all segments in sorted order.
     if z is None:
-        return np.all((a1 >= a2) & ((a1 != a2) | (c1.numpy() <= c2.numpy())))
+        return True
 
     # Local pattern matching to recursively extend the context along the chain
     # of threshold segments without ensuring removability of the matched nodes
