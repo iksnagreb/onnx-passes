@@ -21,8 +21,22 @@ class EliminateWhere_v1(RewriteRule, Verify):
     @staticmethod
     def rewrite(op, condition, lhs, rhs, out):
         if np.all(ir.convenience.get_const_tensor(condition).numpy()):
-            return op.Expand(lhs, op.Constant(value_ints=list(out.shape)))
-        return op.Expand(rhs, op.Constant(value_ints=list(out.shape)))
+            return op.Expand(
+                lhs,
+                op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, out.shape[:]
+                    )
+                )
+            )
+        return op.Expand(
+            rhs,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
+        )
 
 
 class EliminateIdentityWhere_v1(RewriteRule, Verify):
@@ -38,7 +52,14 @@ class EliminateIdentityWhere_v1(RewriteRule, Verify):
 
     @staticmethod
     def rewrite(op, condition, x, out):
-        return op.Expand(x, op.Constant(value_ints=list(out.shape)))
+        return op.Expand(
+            x,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
+        )
 
 
 class EliminateBranchesLoop_v1(Sequential, Transformation):

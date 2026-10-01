@@ -77,5 +77,9 @@ class UnbroadcastElementwise_v1(RewriteRule, Verify):
             op.op(
                 elementwise.op_type, *inputs, **elementwise.attributes
             ),
-            op.Constant(value_ints=out.shape[:])
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
         )

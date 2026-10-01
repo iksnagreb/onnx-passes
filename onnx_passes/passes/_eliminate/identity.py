@@ -252,10 +252,22 @@ class EliminateIdentityMatMul_v1(RewriteRuleSet, Verify):
     @staticmethod
     def rewrite():
         return [
-            lambda op, x, out: \
-                op.Expand(x, op.Constant(value_ints=list(out.shape))),
-            lambda op, x, out: \
-                op.Expand(x, op.Constant(value_ints=list(out.shape))),
+            lambda op, x, out: op.Expand(
+                x,
+                op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, out.shape[:]
+                    )
+                )
+            ),
+            lambda op, x, out: op.Expand(
+                x,
+                op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, out.shape[:]
+                    )
+                )
+            ),
         ]
 
 

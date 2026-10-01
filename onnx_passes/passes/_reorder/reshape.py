@@ -104,7 +104,11 @@ class MoveTransposePastReshape_v1(RewriteRule, Verify):
         return op.Transpose(
             op.Reshape(
                 x,
-                op.Constant(value_ints=shape)
+                op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, shape
+                    )
+                )
             ),
             perm=perm,
         )

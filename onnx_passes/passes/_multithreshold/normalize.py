@@ -630,7 +630,11 @@ class UnbroadcastThresholds_v1(RewriteRule, Verify):
             op.MultiThreshold(
                 x, thresholds, weights, _domain=CUSTOM_DOMAIN
             ),
-            op.Constant(value_ints=out.shape[:])
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
         )
 
 

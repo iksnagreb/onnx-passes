@@ -747,5 +747,9 @@ class RewriteAsConstant(RewriteRule, ABC):
                 op.Constant(value=ir.tensor(self.constant)),
                 to=out.dtype.value
             ),
-            op.Constant(value_ints=list(out.shape))
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
         )

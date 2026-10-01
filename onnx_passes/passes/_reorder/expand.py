@@ -49,7 +49,11 @@ class MoveExpandPastElementwise_v1(RewriteRule, Verify):
             op.op(
                 elementwise.op_type, *inputs, **elementwise.attributes
             ),
-            op.Constant(value_ints=out.shape[:])
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
         )
 
 
@@ -108,9 +112,17 @@ class MoveExpandPastReshape_v1(RewriteRule, Verify):
 
         return op.Expand(
             op.Reshape(
-                x, op.Constant(value_ints=reshape)
+                x, op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, reshape
+                    )
+                )
             ),
-            op.Constant(value_ints=expand)
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, expand
+                )
+            )
         )
 
 

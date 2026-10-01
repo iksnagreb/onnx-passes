@@ -33,7 +33,11 @@ class EliminateAnnihilator(RewriteRule, ABC):
                 op.Constant(value=ir.tensor(self.annihilator)),
                 x
             ),
-            op.Constant(value_ints=list(out.shape))
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
         )
 
 
