@@ -203,7 +203,7 @@ class Verify(Pass, ABC):
             for tensor, x, y in zip(
                     result.model.graph.outputs, self._outputs, self._expected
             ):
-                if np.any(x != y):
+                if not np.all((x == y) | np.isnan(y)):
                     raise VerificationError(
                         f"Output '{tensor.name}' not as expected"
                         f" after '{self.identifier}'"
@@ -214,9 +214,9 @@ class Verify(Pass, ABC):
             for tensor, x, y in zip(
                     result.model.graph.outputs, self._outputs, self._expected
             ):
-                if not np.allclose(
-                        x, y, **self.config.verify.tolerance.model_dump()
-                ):
+                kwargs = self.config.verify.tolerance.model_dump()
+
+                if not np.all(np.isclose(x, y, **kwargs) | np.isnan(y)):
                     raise VerificationError(
                         f"Output {tensor.name} not within tolerance"
                         f" after '{self.identifier}'"
