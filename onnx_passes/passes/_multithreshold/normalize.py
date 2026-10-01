@@ -163,13 +163,40 @@ class RewriteMultiThresholdXorAsSum_v1(RewriteRule, Verify):
         if weights is None:
             weights = op.Cast(op.Constant(value_float=1.0), to=dtype)
 
+        weights = op.Expand(
+            weights,
+            # Expand shapes along all branches (recursively) to not use any
+            # steps due to reducing each branch before combining shapes.
+            expanded_shape := op.Shape(
+                op.Or(
+                    op.Or(
+                        y,
+                        op.And(
+                            op.GreaterOrEqual(x, c1),
+                            a1
+                        )
+                    ),
+                    op.And(
+                        op.GreaterOrEqual(x, c2),
+                        a2
+                    )
+                )
+            )
+        )
+
         # Rewrite the first two threshold segments joined by Xor into a direct
         # difference: if lhs >= rhs then Xor(lhs,rhs) = Sub(lhs,rhs)
         x = op.Add(
             op.ReduceSum(
                 op.Mul(
                     op.Cast(
-                        op.GreaterOrEqual(x, c1),
+                        op.GreaterOrEqual(
+                            x,
+                            op.Expand(
+                                c1,
+                                expanded_shape
+                            )
+                        ),
                         to=dtype
                     ),
                     op.Mul(
@@ -189,7 +216,13 @@ class RewriteMultiThresholdXorAsSum_v1(RewriteRule, Verify):
             op.ReduceSum(
                 op.Mul(
                     op.Cast(
-                        op.GreaterOrEqual(x, c2),
+                        op.GreaterOrEqual(
+                            x,
+                            op.Expand(
+                                c2,
+                                expanded_shape
+                            )
+                        ),
                         to=dtype
                     ),
                     op.Neg(
