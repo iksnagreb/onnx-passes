@@ -23,6 +23,9 @@ class Reorder_v1(Sequential, Transformation):
     """Exhaustively apply common reordering transformations."""
 
     passes = [
+        _fold_constants,
+        _normalize,
+        _eliminate,
         reshape,
         expand,
         slice,
@@ -36,9 +39,6 @@ class Reorder_v1(Sequential, Transformation):
         arithmetic,
         reduce,
         where,
-        _fold_constants,
-        _normalize,
-        _eliminate
     ]
 
     exhaustive = True
