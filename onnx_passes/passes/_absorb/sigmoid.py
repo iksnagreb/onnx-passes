@@ -1,12 +1,10 @@
-from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, Sequential, Transformation
-)
+from onnx_passes.passes._base import RewriteRuleSetTemplate
 from onnx_passes.passes._verify import Verify
 
 import onnx_ir as ir
 
 
-class InlineSigmoidIntoComparison_v1(RewriteRuleSetTemplate, Verify):
+class AbsorbSigmoidIntoComparison_v1(RewriteRuleSetTemplate, Verify):
     """Rewrite comparisons to inline and partially solve Sigmoid for x on lhs.
 
     Derived by inlining the definition Sigmoid(x) = 1 / (1 + exp(-x)), and
@@ -46,30 +44,3 @@ class InlineSigmoidIntoComparison_v1(RewriteRuleSetTemplate, Verify):
                 c
             )
         )
-
-
-from onnx_passes.passes._normalize.arithmetic import RewriteNegAsMul_v1
-from onnx_passes.passes._normalize.arithmetic import RewriteSubAsAdd_v1
-
-from onnx_passes.passes._absorb.arithmetic import AbsorbMulIntoComparison_v1
-from onnx_passes.passes._absorb.arithmetic import AbsorbAddIntoComparison_v1
-
-from onnx_passes.passes._absorb.exp import AbsorbExpIntoComparison_v1
-
-from onnx_passes.passes import _fold_constants
-
-
-class AbsorbSigmoidIntoComparison_v1(Sequential, Transformation):
-    """Rewrite comparisons to absorb Sigmoid into constant rhs."""
-
-    passes = [
-        InlineSigmoidIntoComparison_v1,
-        RewriteNegAsMul_v1,
-        RewriteSubAsAdd_v1,
-        _fold_constants,
-        AbsorbMulIntoComparison_v1,
-        AbsorbAddIntoComparison_v1,
-        AbsorbExpIntoComparison_v1,
-    ]
-
-    exhaustive = True
