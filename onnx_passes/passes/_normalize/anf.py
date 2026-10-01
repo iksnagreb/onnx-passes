@@ -25,8 +25,12 @@ class BooleanToANF_v1(RewriteRuleSet, Verify):
             lambda op, x: op.Xor(op.Constant(value=ir.tensor(True)), x),
             lambda op, x, y: op.Xor(x, op.Xor(y, op.And(x, y))),
             lambda op, x, y, z: op.Xor(op.And(x, y), op.And(x, z)),
-            lambda op, x: op.Constant(value=ir.tensor(False)),
-            lambda op, x: op.Constant(value=ir.tensor(True)),
+            lambda op, x: op.Expand(
+                op.Constant(value=ir.tensor(False)), op.Shape(x)
+            ),
+            lambda op, x: op.Expand(
+                op.Constant(value=ir.tensor(True)), op.Shape(x)
+            ),
             lambda op, x: op.Identity(x),
             lambda op, x: op.Identity(x),
         ]
@@ -63,8 +67,12 @@ class BitwiseToANF_v1(RewriteRuleSet, Verify):
             lambda op, x, y, z: op.BitwiseXor(
                 op.BitwiseAnd(x, y), op.BitwiseAnd(x, z)
             ),
-            lambda op, x: op.CastLike(op.Constant(value=ir.tensor(0)), x),
-            lambda op, x: op.CastLike(op.Constant(value=ir.tensor(~1)), x),
+            lambda op, x: op.Expand(
+                op.CastLike(op.Constant(value=ir.tensor(0)), x), op.Shape(x)
+            ),
+            lambda op, x: op.Expand(
+                op.CastLike(op.Constant(value=ir.tensor(~0)), x), op.Shape(x)
+            ),
             lambda op, x: op.Identity(x),
             lambda op, x: op.Identity(x),
         ]
