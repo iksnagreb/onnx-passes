@@ -10,6 +10,9 @@ from onnx_passes.passes._absorb import sigmoid
 from onnx_passes.passes._absorb import tanh
 from onnx_passes.passes._absorb import reciprocal
 from onnx_passes.passes._absorb import pow
+from onnx_passes.passes._absorb import sign
+
+from onnx_passes.passes import _reorder
 
 
 class Absorb_v1(Sequential, Transformation):
@@ -26,6 +29,8 @@ class Absorb_v1(Sequential, Transformation):
         tanh,
         reciprocal,
         pow,
+        sign,
+        _reorder
     ]
 
     exhaustive = True
