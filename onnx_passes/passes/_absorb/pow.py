@@ -160,7 +160,7 @@ class AbsorbPowIntoComparison_v1(RewriteRuleSetTemplate, Verify):
                                 op.Sign(c)
                             )
                         ),
-                        op.Or(
+                        op.Xor(
                             op.And(
                                 c_is_positive,
                                 # Consider both solutions with flipped direction
@@ -185,7 +185,7 @@ class AbsorbPowIntoComparison_v1(RewriteRuleSetTemplate, Verify):
                     # As floats are dyadic rationals, any fractional power or
                     # root has even denominator and odd numerator and thus only
                     # positive inputs 'x' and constant 'c' are allowed.
-                    op.Or(
+                    op.Xor(
                         op.And(
                             op.And(
                                 x_is_positive,

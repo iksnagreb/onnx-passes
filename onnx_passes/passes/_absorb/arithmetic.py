@@ -124,7 +124,7 @@ class AbsorbMulIntoComparison_v1(RewriteRuleSetTemplate, Verify):
 
     @staticmethod
     def rewrite(partial, op, x, a, c):
-        return op.Or(
+        return op.Xor(
             # a = 0 & 0 > c
             op.And(
                 op.Equal(
@@ -140,7 +140,7 @@ class AbsorbMulIntoComparison_v1(RewriteRuleSetTemplate, Verify):
                     c
                 )
             ),
-            op.Or(
+            op.Xor(
                 # a > 0 & x > c / a
                 op.And(
                     op.Greater(

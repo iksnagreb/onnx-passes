@@ -32,7 +32,7 @@ class AbsorbAbsIntoComparison_v1(RewriteRuleSetTemplate, Verify):
 
     @staticmethod
     def rewrite(partial, op, x, c):
-        return op.Or(
+        return op.Xor(
             op.And(
                 op.GreaterOrEqual(
                     x,
@@ -44,7 +44,7 @@ class AbsorbAbsIntoComparison_v1(RewriteRuleSetTemplate, Verify):
                 partial(op)(x, c)
             ),
             op.And(
-                op.LessOrEqual(
+                op.Less(
                     x,
                     op.CastLike(
                         op.Constant(value_float=0.0),
