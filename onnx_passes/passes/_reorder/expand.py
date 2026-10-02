@@ -17,11 +17,15 @@ class MoveExpandPastElementwise_v1(RewriteRule, Verify):
 
     @staticmethod
     def check(context, out):
-        if produced_by_elementwise(context, out):
-            # Accept rewrite as soon as any input is expanded and the overall
-            # output shape is static
-            for x in out.producer().inputs:
-                if produced_by_expand(context, x):
+        # Accept rewrite as soon as any input is expanded and the overall
+        # output shape is static and this is not all constant
+        if not produced_by_elementwise(context, out):
+            return False
+
+        for x in out.producer().inputs:
+            if produced_by_expand(context, x):
+                if any(ir.convenience.get_const_tensor(v) is None
+                       for v in x.producer().inputs):
                     return out.shape is not None and out.shape.is_static()
 
         return False
@@ -39,7 +43,9 @@ class MoveExpandPastElementwise_v1(RewriteRule, Verify):
 
         for inp in elementwise.inputs:
             if produced_by_expand(None, inp):
-                inp = inp.producer().inputs[0]
+                if any(ir.convenience.get_const_tensor(v) is None
+                       for v in inp.producer().inputs):
+                    inp = inp.producer().inputs[0]
 
             inputs.append(inp)
 

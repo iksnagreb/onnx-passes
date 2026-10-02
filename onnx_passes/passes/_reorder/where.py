@@ -27,14 +27,24 @@ class MoveWherePastElementwise_v1(RewriteRule, Verify):
 
     @staticmethod
     def check(context, out):
-        if produced_by_elementwise(context, out):
-            if not produced_by_where(context, out):
-                if out.shape is not None and out.shape.is_static():
-                    for x in out.producer().inputs:
-                        if produced_by_where(context, x):
-                            # Don't reorder boolean expressions (already handled
-                            # as a normalization to Xor)
-                            return x.dtype != ir.DataType.BOOL
+        if not produced_by_elementwise(context, out):
+            return False
+
+        if produced_by_where(context, out):
+            return False
+
+        if out.shape is None or out.shape.is_dynamic():
+            return False
+
+        # As soon as any input is produced by a not constant Where (handled by
+        # constant folding) with non-boolean inputs (handled as a normalization
+        # to Xor), accept this for reordering.
+        for x in out.producer().inputs:
+            if x.dtype != ir.DataType.BOOL:
+                if produced_by_where(context, x):
+                    if any(ir.convenience.get_const_tensor(v) is None
+                           for v in x.producer().inputs):
+                        return True
 
         return False
 
@@ -55,6 +65,13 @@ class MoveWherePastElementwise_v1(RewriteRule, Verify):
             # Extract only the first instance of Where among the elementwise
             # inputs, reinsert each following as is.
             if condition is None and produced_by_where(None, inp):
+                if all(ir.convenience.get_const_tensor(v) is not None
+                       for v in inp.producer().inputs):
+                    lhs.append(inp)
+                    rhs.append(inp)
+
+                    continue
+
                 condition, x, y = inp.producer().inputs
 
                 lhs.append(x)
