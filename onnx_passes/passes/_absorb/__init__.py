@@ -12,6 +12,7 @@ from onnx_passes.passes._absorb import reciprocal
 from onnx_passes.passes._absorb import pow
 from onnx_passes.passes._absorb import sign
 from onnx_passes.passes._absorb import gelu
+from onnx_passes.passes._absorb import silu
 
 from onnx_passes.passes import _reorder
 
@@ -32,6 +33,7 @@ class Absorb_v1(Sequential, Transformation):
         pow,
         sign,
         gelu,
+        silu,
         _reorder
     ]
 
