@@ -25,7 +25,7 @@ class AbsorbAbsIntoComparison_v1(RewriteRuleSetTemplate, Verify):
 
     @staticmethod
     def check(context, x: ir.Value, c):
-        if x.dtype.is_signed():
+        if x.dtype is not None and x.dtype.is_signed():
             return ir.convenience.get_const_tensor(c) is not None
 
         return False
