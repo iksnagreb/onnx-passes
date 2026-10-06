@@ -4,6 +4,7 @@ from onnx_passes.passes._normalize import attributes
 from onnx_passes.passes._normalize import reshape
 from onnx_passes.passes._normalize import slice
 from onnx_passes.passes._normalize import transpose
+from onnx_passes.passes._normalize import conv
 from onnx_passes.passes._normalize import pad
 from onnx_passes.passes._normalize import arithmetic
 from onnx_passes.passes._normalize import comparison
@@ -19,6 +20,7 @@ class Normalize_v1(Sequential, Transformation):
         reshape,
         slice,
         transpose,
+        conv,
         pad,
         arithmetic,
         comparison,
