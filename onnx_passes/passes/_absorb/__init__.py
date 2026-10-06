@@ -1,6 +1,7 @@
 from onnx_passes.passes._base import Transformation, Sequential
 
-from onnx_passes.passes._absorb import arithmetic
+from onnx_passes.passes._absorb import add
+from onnx_passes.passes._absorb import mul
 from onnx_passes.passes._absorb import minmax
 from onnx_passes.passes._absorb import exp
 from onnx_passes.passes._absorb import log
@@ -21,7 +22,8 @@ class Absorb_v1(Sequential, Transformation):
     """Exhaustively applies common absorption transformations."""
 
     passes = [
-        arithmetic,
+        add,
+        mul,
         minmax,
         exp,
         log,

@@ -271,7 +271,7 @@ class RewriteSwishAsSilu_v1(RewriteRule, Verify):
 from onnx_passes.passes._base import Sequential
 
 from onnx_passes.passes import _fold_constants
-from onnx_passes.passes._absorb.arithmetic import AbsorbMulIntoComparison_v1
+from onnx_passes.passes._absorb.mul import AbsorbMulIntoComparison_v1
 
 
 class AbsorbSwishIntoComparison_v1(Sequential):
