@@ -124,8 +124,9 @@ class AbsorbSiluIntoComparison_v1(RewriteRuleSetTemplate, Verify):
         # mask invalid solutions to not propagate NaN into the graph.
         y = ir.convenience.get_const_tensor(c).numpy()
 
-        increasing = silu_inverse(y, "increasing")
-        decreasing = silu_inverse(y, "decreasing")
+        with np.errstate(all="ignore"):
+            increasing = silu_inverse(y, "increasing")
+            decreasing = silu_inverse(y, "decreasing")
 
         valid_increasing = ~np.isnan(increasing)
         valid_decreasing = ~np.isnan(decreasing)

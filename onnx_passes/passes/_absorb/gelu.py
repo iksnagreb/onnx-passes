@@ -227,8 +227,9 @@ class AbsorbGeluIntoComparison_v1(RewriteRuleSetTemplate, Verify):
         # mask invalid solutions to not propagate NaN into the graph.
         y = ir.convenience.get_const_tensor(c).numpy()
 
-        increasing = gelu_inverse(y, "increasing", approximate)
-        decreasing = gelu_inverse(y, "decreasing", approximate)
+        with np.errstate(all="ignore"):
+            increasing = gelu_inverse(y, "increasing", approximate)
+            decreasing = gelu_inverse(y, "decreasing", approximate)
 
         valid_increasing = ~np.isnan(increasing)
         valid_decreasing = ~np.isnan(decreasing)
