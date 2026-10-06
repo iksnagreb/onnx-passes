@@ -1,11 +1,11 @@
 from onnx_passes.passes._base import Sequential
 
 from onnx_passes.passes import _reorder
-from onnx_passes.passes import _absorb
 
 from onnx_passes.passes._normalize import anf
 
 from onnx_passes.passes._multithreshold import convert
+from onnx_passes.passes._multithreshold import absorb
 from onnx_passes.passes._multithreshold import normalize
 from onnx_passes.passes._multithreshold import fuse
 
@@ -24,7 +24,7 @@ class ConvertToMultiThresholds_v1(Sequential):
     passes = [
         _reorder,
         convert,
-        _absorb
+        absorb
     ]
 
     exhaustive = True
