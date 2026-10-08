@@ -561,7 +561,8 @@ class Any_v1(OnnxOperator):
             return op.Greater(
                 op.ReduceMax(
                     op.Abs(op.Cast(x, to=ir.DataType.INT64)), keepdims=0
-                ), 0
+                ),
+                0
             )
 
         return any
@@ -683,6 +684,11 @@ def link_ops_from_graph(model: ir.Model, graph: ir.Graph) -> ir.Model:
         try:
             operator = resolve_op(node.op_type, node.domain, version)
         except KeyError:
+            if node.op_identifier() in model.functions:
+                link_ops_from_graph(
+                    model, model.functions[node.op_identifier()].graph
+                )
+
             continue
 
         # If resolving the operator from the opset import yields a different
