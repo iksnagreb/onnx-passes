@@ -214,6 +214,190 @@ class Im2Col_v1(OnnxOperator):
         return im2col
 
 
+from typing import Sequence
+
+INTS = Sequence[int]
+
+
+class Im2Col_v2(OnnxOperator):
+    """Sliding window generator Im2Col operator."""
+
+    @staticmethod
+    def script(op: Opset):
+        """Generate an ONNX Script function implementing Im2Col."""
+
+        def im2col(x, kernel_shape: INTS, dilations: INTS, strides: INTS):
+            # Im2Col operates in channels last layout, i.e., assumes the input x
+            # to be arranged as N x D1 x D2 x ... x Dn x C, where Di are spatial
+            # dimensions corresponding to k1 x k2 x ... x kn kernel dimensions.
+            #
+            # Im2Col leverages a Conv operator internally to gather pixels via a
+            # one-hot encoded set of filters. As Conv operates in channels first
+            # layout, shuffle the input to N x C x D1 x D2 x ... x Dn.
+            x = op.Reshape(
+                op.Transpose(
+                    op.Reshape(
+                        x,
+                        op.Concat(
+                            op.Shape(x, start=0, end=1),
+                            op.Constant(value_ints=[-1]),
+                            op.Shape(x, start=-1),
+                            axis=0
+                        )
+                    ),
+                    perm=[0, 2, 1]
+                ),
+                op.Concat(
+                    op.Shape(x, start=0, end=1),  # N
+                    op.Shape(x, start=-1),  # C
+                    op.Shape(x, start=1, end=-1),  # D1 x D2 x ... Dn
+                    axis=0
+                )
+            )
+
+            # Kernel shape and number of input channels as ONNX constant (or at
+            # least constant-foldable) nodes.
+            k = op.Constant(value_ints=kernel_shape)
+            c = op.Shape(x, start=1, end=2)
+
+            # Represent each position in the k1 x k2 x ... x kn kernel via a
+            # one-hot encoding: c * Prod{k} x 1 x k1 x k2 x ... x kn
+            #
+            # Applying this as a convolution filter gathers all pixels for each
+            # positioning of the kernel, i.e., this extracts sliding windows of
+            # the kernel shape from one C-plane of the input.
+            #
+            # The general idea of using the one-hot encoding kernel with group
+            # convolution is based on
+            #       https://github.com/f-dangel/unfoldNd/#the-trick
+            gather_kernel = op.Reshape(
+                op.Reshape(
+                    op.OneHot(
+                        op.Expand(
+                            op.Range(
+                                op.Constant(value_int=0),
+                                op.ReduceProd(k),
+                                op.Constant(value_int=1),
+                            ),
+                            op.Concat(
+                                c,
+                                op.Constant(value_ints=[1]),
+                                axis=0
+                            )
+                        ),
+                        op.ReduceProd(
+                            k, keepdims=0
+                        ),
+                        op.Constant(value_ints=[0, 1])
+                    ),
+                    op.Concat(
+                        c,
+                        k,
+                        op.Constant(value_ints=[1]),
+                        k,
+                        axis=0
+                    )
+                ),
+                # Two-step Reshape to the desired kernel shape, otherwise shape
+                # inference chokes on propagating these shapes to the output...
+                op.Concat(
+                    op.Constant(value_ints=[-1, 1]),
+                    k,
+                    axis=0
+                )
+            )
+
+            # All C-planes share kernel index pattern: shuffle the channel axis
+            # into the batch dimension to avoid doing a grouped convolution with
+            # C groups. For a proper grouping we would need to (a) replicate the
+            # gather kernel C times and (b) lift the number of channels from the
+            # shape extracted from the input to the attribute scope (this cannot
+            # be expressed in ONNX).
+            y = op.Conv(
+                op.Reshape(
+                    x,
+                    op.Concat(
+                        op.Constant(value_ints=[-1, 1]),
+                        op.Shape(x, start=2),
+                        axis=0
+                    )
+                ),
+                op.CastLike(
+                    gather_kernel,
+                    x
+                ),
+                kernel_shape=kernel_shape,
+                strides=strides,
+                dilations=dilations
+            )
+
+            y = op.Reshape(
+                op.Slice(
+                    y,
+                    op.Constant(value_ints=[0]),
+                    op.ReduceProd(k),
+                    op.Constant(value_ints=[1]),
+                    op.Constant(value_ints=[1]),
+                ),
+                op.Concat(
+                    op.Shape(x, end=1),  # N
+                    op.Shape(gather_kernel, end=1),  # C * Prod{k}
+                    op.Shape(y, start=2),  # D1' x D2' x ... Dn'
+                    axis=0
+                )
+            )
+
+            # Shuffle each window, i.e., the inner c * Prod{k} dimensions, into
+            # channel-last layout. These dimensions are gathered in flat layout
+            # and must be unflattened, transposed and flattened again.
+            y = op.Reshape(
+                op.Transpose(
+                    op.Reshape(
+                        y,
+                        op.Concat(
+                            op.Shape(y, end=1),
+                            c,
+                            op.ReduceProd(k),
+                            op.Constant(value_ints=[-1]),
+                            axis=0
+                        )
+                    ),
+                    perm=[0, 2, 1, 3]
+                ),
+                op.Concat(
+                    op.Shape(y, end=1),
+                    op.Shape(gather_kernel, end=1),
+                    op.Shape(y, start=2),
+                    axis=0
+                )
+            )
+
+            # Shuffle the output back to channels-last layout such that from the
+            # outside Im2Col appears to operate in channels-last.
+            return op.Reshape(
+                op.Transpose(
+                    op.Reshape(
+                        y,
+                        op.Concat(
+                            op.Shape(y, start=0, end=1),
+                            op.Shape(y, start=1, end=2),
+                            op.Constant(value_ints=[-1]),
+                            axis=0
+                        )
+                    ),
+                    perm=[0, 2, 1]
+                ),
+                op.Concat(
+                    op.Shape(y, start=0, end=1),  # N
+                    op.Shape(y, start=2),  # D1' x D2' x ... Dn'
+                    op.Shape(y, start=1, end=2),  # C * Prod{k1 x k2 x ... x kn}
+                    axis=0
+                )
+            )
+
+        return im2col
+
+
 class Swish_v1(OnnxOperator):
     """Swish function x * Sigmoid(alpha * x)."""
 
