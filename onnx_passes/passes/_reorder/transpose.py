@@ -8,6 +8,7 @@ import numpy as np
 import onnx_ir as ir
 
 
+@tolerance
 class MoveElementwisePastTranspose_v1(RewriteRule, Verify):
     """Reorder elementwise operations to follow transpose where applicable."""
 

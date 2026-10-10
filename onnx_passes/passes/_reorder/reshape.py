@@ -1,5 +1,5 @@
 from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes._verify import Verify, tolerance
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 
@@ -7,6 +7,7 @@ import numpy as np
 import onnx_ir as ir
 
 
+@tolerance
 class MoveElementwisePastReshape_v1(RewriteRule, Verify):
     """Reorder elementwise operations to follow reshape where applicable."""
 

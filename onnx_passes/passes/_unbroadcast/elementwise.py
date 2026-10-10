@@ -1,5 +1,5 @@
 from onnx_passes.passes._base import RewriteRule
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes._verify import Verify, tolerance
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 
@@ -37,6 +37,7 @@ def unbroadcast(x: np.ndarray, squeeze: bool = True, axes=None) -> np.ndarray:
     return x
 
 
+@tolerance
 class UnbroadcastElementwise_v1(RewriteRule, Verify):
     """Remove redundant dimensions from constant elementwise inputs."""
 
