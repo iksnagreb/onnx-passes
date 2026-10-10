@@ -97,10 +97,20 @@ class InferConvPads_v1(RewriteRule, Verify):
 
         dilations = dilations.as_ints()
 
+        if (strides := attributes.get("strides")) is None:
+            strides = ir.Attr(
+                "strides", ir.AttributeType.INTS, len(kernel_shape) * [1]
+            )
+
+        strides = strides.as_ints()
+
         # Pads per dimension such that the output has the same size as the input
         # and distribute pads to beginning/end with uneven amounts distributed
         # according to the SAME_* attribute.
-        pads = [d * (k - 1) for d, k in zip(dilations, kernel_shape)]
+        pads = []
+
+        for s, d, k in zip(strides, dilations, kernel_shape):
+            pads.append(d * (k - 1) + 1 - s)
 
         if auto_pad.as_string() == "SAME_LOWER":
             pads = [*[np.ceil(n / 2) for n in pads], *[n // 2 for n in pads]]
