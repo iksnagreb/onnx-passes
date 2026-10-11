@@ -1,5 +1,5 @@
 from onnx_passes.passes._base import (
-    RewriteRule, RewriteRuleSet, Transformation, Sequential
+    RewriteRule, RewriteRuleSet, RewriteRuleSetTemplate
 )
 from onnx_passes.passes._verify import Verify
 
@@ -384,6 +384,80 @@ class EliminateIdentitySlice_v1(RewriteRule):
         return op.Identity(x)
 
 
+class EliminateIdentityReduce_v1(RewriteRuleSetTemplate, Verify):
+    """Eliminate identity Reduce operations."""
+
+    patterns = (
+        lambda op: op.ReduceL1,
+        lambda op: op.ReduceL2,
+        lambda op: op.ReduceLogSum,
+        lambda op: op.ReduceLogSumExp,
+        lambda op: op.ReduceMax,
+        lambda op: op.ReduceMean,
+        lambda op: op.ReduceMin,
+        lambda op: op.ReduceProd,
+        lambda op: op.ReduceSum,
+        lambda op: op.ReduceSumSquare,
+    )
+
+    @staticmethod
+    def pattern_v18(partial, op, x):
+        return partial(op)(x, _allow_other_inputs=True, _outputs=["out"])
+
+    @staticmethod
+    def check_v18(context, x, out):
+        # Collect original attributes (all Reduce* share supported and defaults
+        # attributes) and infer the default noop_with_empty_axes.
+        attributes = out.producer().attributes
+
+        if not (noop_with_empty_axes := attributes.get("noop_with_empty_axes")):
+            noop_with_empty_axes = ir.Attr(
+                "noop_with_empty_axes", ir.AttributeType.INT, 0
+            )
+
+        # There are two ways in which Reduce can be an identity operation, both
+        # relying on static input and output shapes
+        if x.shape is None or x.shape.is_dynamic():
+            return False
+
+        if out.shape is None or out.shape.is_dynamic():
+            return False
+
+        # A) The reduction axes are empty and the noop_with_empty_axes attribute
+        #    is set to 1
+
+        # Handle both, missing optional and explicitly empty axes input if this
+        # is noop_with_empty_axes=1
+        axes: ir.Value | None = None
+
+        if len(out.producer().inputs) > 1:
+            axes = out.producer().inputs[1]
+
+        if axes is None or axes.shape is not None and np.prod(axes.shape) == 0:
+            return noop_with_empty_axes.as_int() == 1
+
+        # B) The input shape is singleton (i.e., size 1) in all reduction axes
+        #    which for this case must be a constant tensor.
+
+        if (axes := ir.convenience.get_const_tensor(axes)) is not None:
+            return np.all(np.asarray(x.shape)[axes.numpy()] == 1)
+
+        return False
+
+    @staticmethod
+    def rewrite_v18(partial, op, x, out):
+        return op.Reshape(
+            x,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
+        )
+
+
+from onnx_passes.passes._base import Transformation, Sequential
+
 # Common identity elimination pass build into ONNX IR and ONNXScript
 from onnx_ir.passes.common import IdentityEliminationPass
 
@@ -395,7 +469,7 @@ class EliminateIdentity_v1(Transformation):
         return IdentityEliminationPass()(model)
 
 
-class EliminateIdentityLoop_v1(Sequential, Transformation):
+class EliminateIdentityLoop_v1(Sequential):
     """Exhaustively apply identity elimination transformations."""
 
     passes = [
@@ -419,6 +493,7 @@ class EliminateIdentityLoop_v1(Sequential, Transformation):
         EliminateIdentityReshape_v1,
         EliminateIdentityTranspose_v1,
         EliminateIdentitySlice_v1,
+        EliminateIdentityReduce_v1,
         EliminateIdentity_v1
     ]
 
