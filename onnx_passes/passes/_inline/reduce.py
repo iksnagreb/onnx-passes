@@ -1,6 +1,8 @@
 from onnx_passes.passes._base import RewriteRule
 from onnx_passes.passes._verify import Verify, tolerance
 
+import onnx_ir as ir
+
 
 class InlineReduceL1_v1(RewriteRule, Verify):
     """Inline ReduceL1 reduction as Abs-ReduceSum."""
@@ -66,15 +68,51 @@ class InlineReduceMean_v1(RewriteRule, Verify):
 
     @staticmethod
     def rewrite_v18(op, x, axes, out):
+        # Collect original attributes (ReduceMean and ReduceSum share supported
+        # attributes and defaults) and infer the default noop_with_empty_axes.
+        attributes = out.producer().attributes
+
+        if not (noop_with_empty_axes := attributes.get("noop_with_empty_axes")):
+            noop_with_empty_axes = ir.Attr(
+                "noop_with_empty_axes", ir.AttributeType.INT, 0
+            )
+
+        noop_with_empty_axes = noop_with_empty_axes.as_int()
+
         return op.Div(
             op.ReduceSum(
                 x, axes, **out.producer().attributes
             ),
-            op.CastLike(
-                op.ReduceProd(
-                    op.Gather(op.Shape(x), axes)
-                ),
-                x
+            op.Squeeze(
+                op.CastLike(
+                    op.Where(
+                        op.Equal(
+                            op.Constant(value_int=noop_with_empty_axes),
+                            op.Constant(value_int=1)
+                        ),
+                        # Noop with empty axes, i.e., empty axes does not reduce
+                        # and the scale is 1 (empty product is 1).
+                        scale := op.ReduceProd(
+                            op.Gather(
+                                op.Shape(x),
+                                axes
+                            )
+                        ),
+                        # Not noop with empty axes, i.e., empty axes reduce over
+                        # all axes
+                        op.Where(
+                            op.Equal(
+                                op.Size(axes),
+                                op.Constant(value_int=0)
+                            ),
+                            op.ReduceProd(
+                                op.Shape(x)
+                            ),
+                            scale
+                        )
+                    ),
+                    x
+                )
             )
         )
 
