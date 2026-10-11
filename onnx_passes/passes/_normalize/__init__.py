@@ -11,6 +11,7 @@ from onnx_passes.passes._normalize import arithmetic
 from onnx_passes.passes._normalize import comparison
 from onnx_passes.passes._normalize import minmax
 from onnx_passes.passes._normalize import where
+from onnx_passes.passes._normalize import reduce
 
 
 class Normalize_v1(Sequential, Transformation):
@@ -27,7 +28,8 @@ class Normalize_v1(Sequential, Transformation):
         arithmetic,
         comparison,
         minmax,
-        where
+        where,
+        reduce,
     ]
 
     exhaustive = True
