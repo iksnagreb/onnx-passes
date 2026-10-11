@@ -94,6 +94,7 @@ class Verify(Pass, ABC):
     _inputs: list[Any]
     _outputs: list[Any]
     _expected: list[Any]
+    _expected_model: ir.Model
 
     def __init__(self, config: Config = Config()):
         """Initializes the pass with a pass configuration."""
@@ -134,14 +135,7 @@ class Verify(Pass, ABC):
         # Equality- and tolerance-based verification compares before and after
         # results instead of some fixed expectation
         if self._method in {Verify.Method.EQUALITY, Verify.Method.TOLERANCE}:
-            # Use the ONNX reference evaluator to execute the model on the
-            # inputs collecting expected outputs
-            try:
-                self._expected, _ = _evaluate_model(model, self._inputs)
-            except RuntimeError as e:
-                raise VerificationError(
-                    f"Verification of pass '{self.identifier}' failed"
-                ) from e
+            self._expected_model = model.clone(deep_copy=True)
 
     def verify(self, result: ir.passes.PassResult):
         """Verify the model after applying the pass."""
@@ -163,6 +157,20 @@ class Verify(Pass, ABC):
                     f" Model not modified"
                 )
             return
+
+        # Equality- and tolerance-based verification compares before and after
+        # results instead of some fixed expectation
+        if self._method in {Verify.Method.EQUALITY, Verify.Method.TOLERANCE}:
+            # Use the ONNX reference evaluator to execute the expected model on
+            # the inputs collecting expected outputs
+            try:
+                self._expected, _ = _evaluate_model(
+                    self._expected_model, self._inputs
+                )
+            except RuntimeError as e:
+                raise VerificationError(
+                    f"Verification of pass '{self.identifier}' failed"
+                ) from e
 
         # Use the ONNX reference evaluator to execute the model on the inputs
         # collecting outputs and the full execution context as well
