@@ -6,27 +6,23 @@ from onnx_passes.passes._verify import Verify, tolerance
 from onnxscript.rewriter.pattern import OrValue
 
 import onnx_ir as ir
-
-_DISTRIBUTIVE_PATTERNS = (
-    lambda op: (op.Mul, op.Add),
-    lambda op: (op.Max, op.Min),
-    # lambda op: (op.Min, op.Max),
-    lambda op: (op.And, op.Or),
-    # lambda op: (op.Or, op.And),
-    lambda op: (op.And, op.Xor),
-    lambda op: (op.BitwiseAnd, op.BitwiseOr),
-    # lambda op: (op.BitwiseOr, op.BitwiseAnd),
-    lambda op: (op.BitwiseAnd, op.BitwiseXor),
-    # Note: Even though matrix multiplication is distributive over addition,
-    # MatMul broadcasting is not. Thus, it is not included here.
-)
+import numpy as np
 
 
 @tolerance
 class ReorderDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
     """Reorder operations according to left distributivity."""
 
-    patterns = _DISTRIBUTIVE_PATTERNS
+    patterns = (
+        lambda op: (op.Mul, op.Add),
+        lambda op: (op.Max, op.Min),
+        lambda op: (op.And, op.Or),
+        lambda op: (op.And, op.Xor),
+        lambda op: (op.BitwiseAnd, op.BitwiseOr),
+        lambda op: (op.BitwiseAnd, op.BitwiseXor),
+        # Note: Even though matrix multiplication is distributive over addition,
+        # MatMul broadcasting is not. Thus, it is not included here.
+    )
 
     @staticmethod
     def pattern(partial, op, x, y, z):
@@ -61,14 +57,28 @@ class ReorderDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
 class ReorderReverseDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
     """Reorder operations according to reversed left distributivity."""
 
-    patterns = _DISTRIBUTIVE_PATTERNS
+    # Pattern: (mul-like, add-like, identity), where identity is the identity
+    # element to insert for implicit constants
+    patterns = (
+        lambda op: (op.Mul, op.Add, 1),
+        lambda op: (op.Max, op.Min, -np.inf),
+        # lambda op: (op.Min, op.Max),
+        lambda op: (op.And, op.Or, True),
+        # lambda op: (op.Or, op.And),
+        lambda op: (op.And, op.Xor, True),
+        lambda op: (op.BitwiseAnd, op.BitwiseOr, ~0),
+        # lambda op: (op.BitwiseOr, op.BitwiseAnd),
+        lambda op: (op.BitwiseAnd, op.BitwiseXor, ~0),
+        # Note: Even though matrix multiplication is distributive over addition,
+        # MatMul broadcasting is not. Thus, it is not included here.
+    )
 
     @staticmethod
     def pattern(partial, op, x, y, z):
         # Note: Refer to the two operations as multiplication and addition, just
         # as "multiplication distributed over addition", but these two could be
         # any distributive operations.
-        mul, add = partial(op)
+        mul, add, identity = partial(op)
         return add(OrValue([mul(x, y), x]), OrValue([mul(x, z), x]))
 
     @staticmethod
@@ -97,13 +107,13 @@ class ReorderReverseDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
 
     @staticmethod
     def rewrite(partial, op, x, y, z):
-        mul, add = partial(op)
+        mul, add, identity = partial(op)
 
         if y is None:
-            y = op.CastLike(op.Constant(value_int=1), x)
+            y = op.CastLike(op.Constant(value=ir.tensor(identity)), x)
 
         if z is None:
-            z = op.CastLike(op.Constant(value_int=1), x)
+            z = op.CastLike(op.Constant(value=ir.tensor(identity)), x)
 
         return mul(x, add(y, z))
 
@@ -112,7 +122,16 @@ class ReorderReverseDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
 class ReorderDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
     """Reorder operations according to right distributivity."""
 
-    patterns = _DISTRIBUTIVE_PATTERNS
+    patterns = (
+        lambda op: (op.Mul, op.Add),
+        lambda op: (op.Max, op.Min),
+        lambda op: (op.And, op.Or),
+        lambda op: (op.And, op.Xor),
+        lambda op: (op.BitwiseAnd, op.BitwiseOr),
+        lambda op: (op.BitwiseAnd, op.BitwiseXor),
+        # Note: Even though matrix multiplication is distributive over addition,
+        # MatMul broadcasting is not. Thus, it is not included here.
+    )
 
     @staticmethod
     def pattern(partial, op, x, y, z):
@@ -147,14 +166,28 @@ class ReorderDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
 class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
     """Reorder operations according to reversed right distributivity."""
 
-    patterns = _DISTRIBUTIVE_PATTERNS
+    # Pattern: (mul-like, add-like, identity), where identity is the identity
+    # element to insert for implicit constants
+    patterns = (
+        lambda op: (op.Mul, op.Add, 1),
+        lambda op: (op.Max, op.Min, -np.inf),
+        # lambda op: (op.Min, op.Max),
+        lambda op: (op.And, op.Or, True),
+        # lambda op: (op.Or, op.And),
+        lambda op: (op.And, op.Xor, True),
+        lambda op: (op.BitwiseAnd, op.BitwiseOr, ~0),
+        # lambda op: (op.BitwiseOr, op.BitwiseAnd),
+        lambda op: (op.BitwiseAnd, op.BitwiseXor, ~0),
+        # Note: Even though matrix multiplication is distributive over addition,
+        # MatMul broadcasting is not. Thus, it is not included here.
+    )
 
     @staticmethod
     def pattern(partial, op, x, y, z):
         # Note: Refer to the two operations as multiplication and addition, just
         # as "multiplication distributed over addition", but these two could be
         # any distributive operations.
-        mul, add = partial(op)
+        mul, add, identity = partial(op)
         return add(OrValue([mul(x, z), z]), OrValue([mul(y, z), z]))
 
     @staticmethod
@@ -183,13 +216,13 @@ class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
 
     @staticmethod
     def rewrite(partial, op, x, y, z):
-        mul, add = partial(op)
+        mul, add, identity = partial(op)
 
         if x is None:
-            x = op.CastLike(op.Constant(value_int=1), z)
+            x = op.CastLike(op.Constant(value=ir.tensor(identity)), z)
 
         if y is None:
-            y = op.CastLike(op.Constant(value_int=1), z)
+            y = op.CastLike(op.Constant(value=ir.tensor(identity)), z)
 
         return mul(add(x, y), z)
 
