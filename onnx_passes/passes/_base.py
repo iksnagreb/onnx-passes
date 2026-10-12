@@ -439,7 +439,9 @@ def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
         ir.passes.common.LiftConstantsToInitializersPass(True, 0),
         ir.passes.common.RemoveInitializersFromInputsPass(),
         ir.passes.common.LiftSubgraphInitializersToMainGraphPass(),
-        ir.passes.common.DeduplicateInitializersPass(),
+        # Deduplicate all initializers without size limit (2**64 is effectively
+        # no limit...)
+        ir.passes.common.DeduplicateInitializersPass(size_limit=2 ** 64),
         ir.passes.common.ShapeInferencePass()
     ])
 
