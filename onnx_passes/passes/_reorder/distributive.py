@@ -1,5 +1,5 @@
 from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, Transformation, Sequential
+    RewriteRule, RewriteRuleSetTemplate, Sequential
 )
 from onnx_passes.passes._verify import Verify, tolerance
 
@@ -37,7 +37,7 @@ class ReorderDistributiveLhs_v1(RewriteRuleSetTemplate, Verify):
         return mul(x, add(y, z))
 
     @staticmethod
-    def check(op, x, y, z):
+    def check(context, x, y, z):
         # Reorder configurations which bring together constants, allowing for
         # constant propagation without increasing the number of operations:
         #   c (y + c) -> cy + cc    constant foldable on the right
@@ -123,7 +123,7 @@ class ReorderDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
         return mul(add(x, y), z)
 
     @staticmethod
-    def check(op, x, y, z):
+    def check(context, x, y, z):
         # Reorder configurations which bring together constants, allowing for
         # constant propagation without increasing the number of operations:
         #   (x + c) c -> xc + cc    constant foldable on the right
@@ -194,14 +194,155 @@ class ReorderReverseDistributiveRhs_v1(RewriteRuleSetTemplate, Verify):
         return mul(add(x, y), z)
 
 
-class ReorderDistributiveLoop_v1(Sequential, Transformation):
+@tolerance
+class ReorderMatMulDistributiveLhs_v1(RewriteRule, Verify):
+    """Reorder MatMul according to left distributivity."""
+
+    @staticmethod
+    def pattern(op, x, y, z):
+        return op.MatMul(x, op.Add(y, z))
+
+    @staticmethod
+    def check(context, x, y, z):
+        # Reorder configurations which bring together constants, allowing for
+        # constant propagation without increasing the number of operations:
+        #   c (y + c) -> cy + cc    constant foldable on the right
+        #   c (c + z) -> cc + cz    constant foldable on the left
+        x = ir.convenience.get_const_tensor(x) is not None
+        y = ir.convenience.get_const_tensor(y) is not None
+        z = ir.convenience.get_const_tensor(z) is not None
+
+        if (x, y, z) in {(True, False, True), (True, True, False)}:
+            return True
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, y, z):
+        return op.Add(
+            op.MatMul(
+                x,
+                op.Expand(
+                    y,
+                    op.Shape(op.Add(y, z))
+                )
+            ),
+            op.MatMul(
+                x,
+                op.Expand(
+                    z,
+                    op.Shape(op.Add(y, z))
+                )
+            ),
+        )
+
+
+@tolerance
+class ReorderMatMulReverseDistributiveLhs_v1(RewriteRule, Verify):
+    """Reorder MatMul according to reversed left distributivity."""
+
+    @staticmethod
+    def pattern(op, x, y, z):
+        return op.Add(op.MatMul(x, y), op.MatMul(x, z))
+
+    @staticmethod
+    def check(context, x, y, z):
+        # Reorder configurations pulling out a common term or bringing constants
+        # together, decreasing the number of operations:
+        #   xy + xz -> x (y + z)    3 -> 2 operations
+        #   cy + cz -> c (y + z)    3 -> 2 operations, constant left
+        #   xy + xc -> x (y + c)    3 -> 2 operations
+        #   xc + xz -> x (c + z)    3 -> 2 operations
+        #   xc + xc -> x (c + c)    3 -> 1 operations, constant foldable right
+        # Note: This is the reverse of ReorderMatMulDistributiveLhs_v1
+        return not ReorderMatMulDistributiveLhs_v1.check(context, x, y, z)
+
+    @staticmethod
+    def rewrite(op, x, y, z):
+        return op.MatMul(x, op.Add(y, z))
+
+
+@tolerance
+class ReorderMatMulDistributiveRhs_v1(RewriteRule, Verify):
+    """Reorder MatMul according to right distributivity."""
+
+    @staticmethod
+    def pattern(op, x, y, z):
+        return op.MatMul(op.Add(x, y), z)
+
+    @staticmethod
+    def check(context, x, y, z):
+        # Reorder configurations which bring together constants, allowing for
+        # constant propagation without increasing the number of operations:
+        #   (x + c) c -> xc + cc    constant foldable on the right
+        #   (c + y) c -> cc + yc    constant foldable on the left
+        x = ir.convenience.get_const_tensor(x) is not None
+        y = ir.convenience.get_const_tensor(y) is not None
+        z = ir.convenience.get_const_tensor(z) is not None
+
+        if (x, y, z) in {(False, True, True), (True, False, True)}:
+            return True
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, y, z):
+        return op.Add(
+            op.MatMul(
+                op.Expand(
+                    x,
+                    op.Shape(op.Add(x, y))
+                ),
+                z
+            ),
+            op.MatMul(
+                op.Expand(
+                    y,
+                    op.Shape(op.Add(x, y))
+                ),
+                z
+            ),
+
+        )
+
+
+@tolerance
+class ReorderMatMulReverseDistributiveRhs_v1(RewriteRule, Verify):
+    """Reorder MatMul according to reversed right distributivity."""
+
+    @staticmethod
+    def pattern(op, x, y, z):
+        return op.Add(op.MatMul(x, z), op.MatMul(y, z))
+
+    @staticmethod
+    def check(context, x, y, z):
+        # Reorder configurations pulling out a common term or bringing constants
+        # together, decreasing the number of operations:
+        #   xz + yz -> (x + y) z    3 -> 2 operations
+        #   xc + yc -> (x + y) c    3 -> 2 operations, constant right
+        #   xz + cz -> (x + c) z    3 -> 2 operations
+        #   cz + yz -> (c + y) z    3 -> 2 operations
+        #   cz + cz -> (c + c) z    3 -> 1 operations, constant foldable left
+        # Note: This is the reverse of ReorderMatMulDistributiveRhs_v1
+        return not ReorderMatMulDistributiveRhs_v1.check(context, x, y, z)
+
+    @staticmethod
+    def rewrite(op, x, y, z):
+        return op.MatMul(op.Add(x, y), z)
+
+
+class ReorderDistributiveLoop_v1(Sequential):
     """Exhaustively apply distributive reordering transformations."""
 
     passes = [
         ReorderDistributiveLhs_v1,
         ReorderReverseDistributiveLhs_v1,
         ReorderDistributiveRhs_v1,
-        ReorderReverseDistributiveRhs_v1
+        ReorderReverseDistributiveRhs_v1,
+        ReorderMatMulDistributiveLhs_v1,
+        ReorderMatMulReverseDistributiveLhs_v1,
+        ReorderMatMulDistributiveRhs_v1,
+        ReorderMatMulReverseDistributiveRhs_v1
     ]
 
     exhaustive = True
