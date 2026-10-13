@@ -237,6 +237,13 @@ class ReorderMatMulDistributiveLhs_v1(RewriteRule, Verify):
 
     @staticmethod
     def check(context, x, y, z):
+        # Dynamic or missing shapes would lead to endless back and forth between
+        # forward and reverse distributive rules (if we do not force constant
+        # folding as part of every cleanup)
+        if y.shape is None or y.shape.is_dynamic():
+            if z.shape is None or z.shape.is_dynamic():
+                return False
+
         # Reorder configurations which bring together constants, allowing for
         # constant propagation without increasing the number of operations:
         #   c (y + c) -> cy + cc    constant foldable on the right
@@ -252,21 +259,64 @@ class ReorderMatMulDistributiveLhs_v1(RewriteRule, Verify):
 
     @staticmethod
     def rewrite(op, x, y, z):
-        return op.Add(
-            op.MatMul(
-                x,
-                op.Expand(
-                    y,
-                    op.Shape(op.Add(y, z))
+        # Avoid endless back and forth between forward and reverse distributive
+        # rules by statically expanding and computing the constant side.
+        if (value := ir.convenience.get_const_tensor(y)) is not None:
+            return op.Add(
+                op.Constant(
+                    value=ir.tensor(
+                        np.matmul(
+                            ir.convenience.get_const_tensor(x),
+                            np.broadcast_to(
+                                value.numpy(),
+                                common_shape := np.broadcast_shapes(
+                                    y.shape, z.shape
+                                )
+                            )
+                        )
+                    )
+                ),
+                op.MatMul(
+                    x,
+                    op.Expand(
+                        z,
+                        op.Constant(
+                            value_ints=common_shape
+                        )
+                    ),
                 )
-            ),
-            op.MatMul(
-                x,
-                op.Expand(
-                    z,
-                    op.Shape(op.Add(y, z))
-                )
-            ),
+            )
+
+        if (value := ir.convenience.get_const_tensor(z)) is not None:
+            return op.Add(
+                op.MatMul(
+                    x,
+                    op.Expand(
+                        y,
+                        op.Constant(
+                            value_ints=(
+                                common_shape := np.broadcast_shapes(
+                                    y.shape, z.shape
+                                )
+                            )
+                        )
+                    )
+                ),
+                op.Constant(
+                    value=ir.tensor(
+                        np.matmul(
+                            ir.convenience.get_const_tensor(x),
+                            np.broadcast_to(
+                                value.numpy(),
+                                common_shape
+                            )
+                        )
+                    )
+                ),
+            )
+
+        raise RuntimeError(
+            f"Inconsistent rewrite context: either {x} or {y} must be constant"
         )
 
 
@@ -305,6 +355,13 @@ class ReorderMatMulDistributiveRhs_v1(RewriteRule, Verify):
 
     @staticmethod
     def check(context, x, y, z):
+        # Dynamic or missing shapes would lead to endless back and forth between
+        # forward and reverse distributive rules (if we do not force constant
+        # folding as part of every cleanup)
+        if x.shape is None or x.shape.is_dynamic():
+            if y.shape is None or y.shape.is_dynamic():
+                return False
+
         # Reorder configurations which bring together constants, allowing for
         # constant propagation without increasing the number of operations:
         #   (x + c) c -> xc + cc    constant foldable on the right
@@ -320,22 +377,64 @@ class ReorderMatMulDistributiveRhs_v1(RewriteRule, Verify):
 
     @staticmethod
     def rewrite(op, x, y, z):
-        return op.Add(
-            op.MatMul(
-                op.Expand(
-                    x,
-                    op.Shape(op.Add(x, y))
+        # Avoid endless back and forth between forward and reverse distributive
+        # rules by statically expanding and computing the constant side.
+        if (value := ir.convenience.get_const_tensor(x)) is not None:
+            return op.Add(
+                op.Constant(
+                    value=ir.tensor(
+                        np.matmul(
+                            np.broadcast_to(
+                                value.numpy(),
+                                common_shape := np.broadcast_shapes(
+                                    x.shape, y.shape
+                                )
+                            ),
+                            ir.convenience.get_const_tensor(z)
+                        )
+                    )
                 ),
-                z
-            ),
-            op.MatMul(
-                op.Expand(
-                    y,
-                    op.Shape(op.Add(x, y))
-                ),
-                z
-            ),
+                op.MatMul(
+                    op.Expand(
+                        y,
+                        op.Constant(
+                            value_ints=common_shape
+                        )
+                    ),
+                    z
+                )
+            )
 
+        if (value := ir.convenience.get_const_tensor(y)) is not None:
+            return op.Add(
+                op.MatMul(
+                    op.Expand(
+                        x,
+                        op.Constant(
+                            value_ints=(
+                                common_shape := np.broadcast_shapes(
+                                    x.shape, y.shape
+                                )
+                            )
+                        )
+                    ),
+                    z
+                ),
+                op.Constant(
+                    value=ir.tensor(
+                        np.matmul(
+                            np.broadcast_to(
+                                value.numpy(),
+                                common_shape
+                            ),
+                            ir.convenience.get_const_tensor(z)
+                        )
+                    )
+                ),
+            )
+
+        raise RuntimeError(
+            f"Inconsistent rewrite context: either {x} or {y} must be constant"
         )
 
 
