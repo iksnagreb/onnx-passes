@@ -1,9 +1,10 @@
 from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, Transformation, Sequential
+    RewriteRule, RewriteRuleSetTemplate, Transformation, Sequential
 )
 from onnx_passes.passes._verify import Verify, tolerance
 
 import onnx_ir as ir
+import numpy as np
 
 from onnxscript import GraphBuilder
 from onnxscript.rewriter.pattern import Pattern
@@ -154,12 +155,140 @@ class ReorderWideCommutative_v1(Transformation, Verify):
         return ir.passes.PassResult(model, modified)
 
 
+@tolerance
+class MoveMulPastMatMulLhs_v1(RewriteRule, Verify):
+    """Reorder scalar multiplication to follow matrix multiplication."""
+
+    @property
+    def commute(self) -> bool:
+        return True
+
+    @staticmethod
+    def pattern(op, x, y, s):
+        return op.MatMul(op.Mul(s, x), y)
+
+    @staticmethod
+    def check(context, x, y, s):
+        # There are two ways in which s could be a scalar: (a) via static shape
+        # annotation as 1x1x...x1, or (b) as a constant of any shape where all
+        # values are identical (i.e., could be unbroadcast to a scalar)
+        if s.shape is not None and s.shape.is_static():
+            if np.prod(s.shape) == 1:
+                return True
+
+        if (s := ir.convenience.get_const_tensor(s)) is not None:
+            return np.all(s.numpy() == np.reshape(s.numpy(), (-1,))[0])
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, y, s):
+        # Constant all-identical value s is replaced by a new constant selecting
+        # one (the first one) of the value
+        if (value := ir.convenience.get_const_tensor(s)) is not None:
+            return op.Mul(
+                op.Constant(
+                    value=ir.tensor(
+                        np.reshape(value.numpy(), (-1,))[0]
+                    )
+                ),
+                op.MatMul(
+                    # Preserve common shape of bidirectional broadcasting x and
+                    # constant s
+                    op.Expand(
+                        x,
+                        op.Shape(
+                            op.Mul(s, x)
+                        )
+                    ),
+                    y
+                )
+            )
+
+        # Non-constant static and effectively scalar shape can be squeezed to an
+        # empty shape scalar tensor
+        return op.Mul(
+            op.MatMul(
+                # Preserve common shape of bidirectional broadcasting x and
+                # constant s
+                op.Expand(
+                    x,
+                    op.Shape(
+                        op.Mul(s, x)
+                    )
+                ),
+                y
+            ),
+            op.Squeeze(s)
+        )
+
+
+@tolerance
+class MoveMulPastMatMulRhs_v1(RewriteRule, Verify):
+    """Reorder scalar multiplication to follow matrix multiplication."""
+
+    @property
+    def commute(self) -> bool:
+        return True
+
+    @staticmethod
+    def pattern(op, x, y, s):
+        return op.MatMul(x, op.Mul(s, y))
+
+    @staticmethod
+    def check(context, x, y, s):
+        return MoveMulPastMatMulLhs_v1.check(context, x, y, s)
+
+    @staticmethod
+    def rewrite(op, x, y, s):
+        # Constant all-identical value s is replaced by a new constant selecting
+        # one (the first one) of the value
+        if (value := ir.convenience.get_const_tensor(s)) is not None:
+            return op.Mul(
+                op.Constant(
+                    value=ir.tensor(
+                        np.reshape(value.numpy(), (-1,))[0]
+                    )
+                ),
+                op.MatMul(
+                    x,
+                    # Preserve common shape of bidirectional broadcasting y and
+                    # constant s
+                    op.Expand(
+                        y,
+                        op.Shape(
+                            op.Mul(s, y)
+                        )
+                    ),
+                )
+            )
+
+        # Non-constant static and effectively scalar shape can be squeezed to an
+        # empty shape scalar tensor
+        return op.Mul(
+            op.MatMul(
+                x,
+                # Preserve common shape of bidirectional broadcasting y and
+                # constant s
+                op.Expand(
+                    y,
+                    op.Shape(
+                        op.Mul(s, y)
+                    )
+                ),
+            ),
+            op.Squeeze(s)
+        )
+
+
 class ReorderCommutativeLoop_v1(Sequential, Transformation):
     """Exhaustively apply commutative reordering transformations."""
 
     passes = [
         ReorderCommutative_v1,
-        ReorderWideCommutative_v1
+        ReorderWideCommutative_v1,
+        MoveMulPastMatMulLhs_v1,
+        MoveMulPastMatMulRhs_v1,
     ]
 
     exhaustive = True
