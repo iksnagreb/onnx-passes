@@ -43,7 +43,7 @@ class OptimizeMultiThresholds_v1(Sequential):
 class NormalizeMultiThresholds_v1(Sequential):
     """Normalize suitable subgraphs to optimized MultiThreshold operators.
 
-    The resulting MultioThreshold operators are in their generalized form, i.e.,
+    The resulting MultiThreshold operators are in their generalized form, i.e.,
     they can represent arbitrarily weighted/directed steps, as well as arbitrary
     parameter dimensions including multi-directional broadcasting.
     """
