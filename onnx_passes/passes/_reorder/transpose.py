@@ -281,6 +281,37 @@ class MoveReducePastTranspose_v1(RewriteRule, Verify):
         )
 
 
+class MovePadPastTranspose_v1(RewriteRule, Verify):
+    """Reorder padding operations to follow transpose."""
+
+    @staticmethod
+    def pattern(op, x, pads, const_value, axes, mode, perm):
+        return op.Transpose(
+            op.Pad(x, pads, const_value, axes, mode=mode), perm=perm
+        )
+
+    @staticmethod
+    def rewrite(op, x, pads, const_value, axes, mode, perm):
+        return op.Pad(
+            op.Transpose(
+                x, perm=(perm := perm.as_ints())
+            ),
+            pads,
+            const_value,
+            # Permute the padding axes by selecting from the inverse permutation
+            # according to axes as indices.
+            op.Gather(
+                op.Constant(
+                    value_ints=[
+                        perm.index(i) for i in range(len(perm))
+                    ]
+                ),
+                axes
+            ),
+            mode=mode
+        )
+
+
 class ReorderTransposeLoop_v1(Sequential, Transformation):
     """Exhaustively apply transpose reordering transformations."""
 
