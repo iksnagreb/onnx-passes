@@ -285,13 +285,13 @@ class MovePadPastTranspose_v1(RewriteRule, Verify):
     """Reorder padding operations to follow transpose."""
 
     @staticmethod
-    def pattern(op, x, pads, const_value, axes, mode, perm):
+    def pattern_v18(op, x, pads, const_value, axes, mode, perm):
         return op.Transpose(
             op.Pad(x, pads, const_value, axes, mode=mode), perm=perm
         )
 
     @staticmethod
-    def rewrite(op, x, pads, const_value, axes, mode, perm):
+    def rewrite_v18(op, x, pads, const_value, axes, mode, perm):
         return op.Pad(
             op.Transpose(
                 x, perm=(perm := perm.as_ints())
