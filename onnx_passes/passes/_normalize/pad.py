@@ -39,6 +39,46 @@ class InferPadAxes_v1(RewriteRule, Verify):
         )
 
 
+class SortPadAxes_v1(RewriteRule, Verify):
+    """Sort padding axes and pads in increasing axis order."""
+
+    @staticmethod
+    def pattern_v18(op, x, pads, const_value, axes, mode):
+        return op.Pad(x, pads, const_value, axes, mode=mode)
+
+    @staticmethod
+    def check_v18(context, x, pads, const_value, axes, mode):
+        if (axes := ir.convenience.get_const_tensor(axes)) is not None:
+            return np.any(sorted(axes.numpy()) != axes.numpy())
+
+        return False
+
+    @staticmethod
+    def rewrite_v18(op, x, pads, const_value, axes, mode):
+        # Sort axes in increasing order and also keep the indices to sort each
+        # half of the pads (left/right pads) into the same order
+        axes, indices = op.TopK(axes, op.Shape(axes), largest=0, _outputs=2)
+        starts, ends = op.Split(pads, num_outputs=2, _outputs=2)
+
+        return op.Pad(
+            x,
+            op.Concat(
+                op.Gather(
+                    starts,
+                    indices
+                ),
+                op.Gather(
+                    ends,
+                    indices
+                ),
+                axis=0
+            ),
+            const_value,
+            axes,
+            mode=mode
+        )
+
+
 class InferPadConstValue_v1(RewriteRule, Verify):
     """Infer constant value to pad if no const_value input is given."""
 
