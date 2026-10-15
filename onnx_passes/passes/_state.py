@@ -14,7 +14,9 @@ class State:
         Global counter of pass applications
     history : list[type]
         History of applied passes by type
-    verify : dict[str, VerifyState]
+    modified_by : list[object]
+        History of modifications (list of passes that modified the model)
+    verified_by : list[tuple[object, VerifyState]]
         History of verification states (execution context, metrics, etc.)
     """
 
