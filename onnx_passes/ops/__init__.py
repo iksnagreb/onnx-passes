@@ -910,19 +910,3 @@ def link_ops(model: ir.Model) -> ir.Model:
     link_ops_from_graph(model, model.graph)
 
     return model
-
-
-# Need to import the passes module to set up the registry and make the
-# @passes.register decorator work
-import onnx_passes.passes as passes
-
-# Inserting custom ops is considered as an annotation pass as it does not really
-# modify the model graph structure or values
-from onnx_passes.passes.base import Pass, InPlacePass
-
-
-# Annotation pass inserting custom operator functions into the model
-@passes.register("link-ops")
-class LinkCustomOps(Pass, InPlacePass):
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(link_ops(model), False)

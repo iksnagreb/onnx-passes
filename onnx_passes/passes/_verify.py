@@ -298,3 +298,37 @@ class VerifyMetrics_v1(Verify):
 
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return ir.passes.PassResult(model, True)
+
+
+def max_abs_error(produced: list, expected: list) -> float:
+    """Calculate the maximum absolute error between each pair of elements."""
+
+    try:
+        return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
+    except TypeError:
+        # Try fallback interpreting all values as 32-bit floats
+        produced = [x.astype(np.float32) for x in produced]
+        expected = [y.astype(np.float32) for y in expected]
+
+        return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
+
+
+def accuracy(produced: list, expected: list) -> float:
+    """Calculate top-1 classification accuracy for produced probabilities.
+
+    This implementation assumes the model produces a single output tensor with
+    class probabilities along its final axis. Preceding axes may be spatial or
+    batch dimensions and will be flattened.
+    """
+
+    # Assuming a single global output from the model, unwrap the produced and
+    # expected list. If the shape of the expected classes indicates these are
+    # class probabilities as well, summarize these first.
+    probabilities, classes = produced[0], expected[0]
+
+    if classes.shape == probabilities.shape:
+        classes = classes.argmax(axis=-1)
+
+    predictions = probabilities.argmax(axis=-1)
+
+    return float(sum(predictions == classes) / classes.size)
