@@ -21,6 +21,9 @@ import onnx_ir.passes.common
 from onnx_passes.passes._config import Config
 from onnx_passes.passes._state import State
 
+# Link custom operators as functions into the graph
+from onnx_passes.ops import link_ops
+
 
 # Exception indicating verification failure evaluating the model - currently
 # does not do add anything ontop the base Exception.
@@ -467,6 +470,8 @@ class Transformation(Pass, ABC):
         if result.modified:
             if self.config.logging.verbose:
                 print(f"Cleaning up after {self.identifier}")
+
+            link_ops(result.model)
 
             _cleanup(result.model, inplace=True)
             _give_canonical_names(result.model, inplace=True)
