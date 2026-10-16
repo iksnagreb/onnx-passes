@@ -388,107 +388,133 @@ class LayoutConverter_v1(OnnxOperator):
         return layout_converter
 
 
-class Round_v1(OnnxOperator):
-    """Custom rounding function with configurable rounding mode via attribute
-    matching QONNX/Brevitas behavior.
-
-    Primarily meant to be used inside the Quant operator implementation.
-    """
-
-    # Implements configurable rounding mode via string comparison inside the
-    # graph, Equal supports string comparison since opset 19
-    MIN_DEFAULT_OPSET_VERSION: int = 19
-
-    @staticmethod
-    def script(op: Opset):
-        """Generate an ONNX Script function implementing Quant."""
-
-        def round(x, rounding_mode: str = "ROUND"):  # noqa: Shadows built-in
-            # Predefined rounding mode constants for readability...
-            ROUND = op.Constant(value_string="ROUND")
-            CEIL = op.Constant(value_string="CEIL")
-            FLOOR = op.Constant(value_string="FLOOR")
-            ROUND_TO_ZERO = op.Constant(value_string="ROUND_TO_ZERO")
-
-            # It is not possible to return from within If-Else branches, assign
-            # to a temporary within each branch
-            if rounding_mode == ROUND:
-                y = op.Round(x)
-            elif rounding_mode == CEIL:
-                y = op.Ceil(x)
-            elif rounding_mode == FLOOR:
-                y = op.Floor(x)
-            elif rounding_mode == ROUND_TO_ZERO:
-                y = op.Mul(op.Sign(x), op.Floor(op.Abs(x)))
-            else:
-                # Else branch cannot be omitted, and it is not possible to raise
-                # exceptions or assertions - fallback to Round...
-                y = op.Round(x)
-
-            # Return output from branch selected by rounding mode
-            return y
-
-        return round
-
-
 class Quant_v1(OnnxOperator):
-    """QONNX quantizer custom operator implementation to allow models with
-    custom quantization to be executed via ONNX Runtime.
+    """Arbitrary bitwidth integer quantization operator.
 
-    See https://github.com/fastmachinelearning/qonnx for details...
+    Similar to the QONNX integer quantization operator but without selectable
+    rounding mode: Always rounds using the ONNX standard Round operator.
     """
 
     @staticmethod
     def script(op: Opset):
         """Generate an ONNX Script function implementing Quant."""
 
-        round = Round_v1(op).onnx_function  # noqa: Shadows built-in
-
-        def quant(x, scale, zeropoint, bitwidth, signed: int, narrow: int,
-                  rounding_mode: str):
-            # Quantizer attributes are specified as integers but are use in
-            # calculations together with float inputs - inputs to Add, Mul, etc.
-            # must match in type
-            signed = op.Cast(signed, to=ir.DataType.FLOAT)
-            narrow = op.Cast(narrow, to=ir.DataType.FLOAT)
-
-            # Minimum representable integer of signed bitwidth taking narrow
-            # range into account - calculations inlined into the graph, depends
-            # on dynamic bitwidth
-            _min = (- 2.0 ** (bitwidth - signed) + narrow) * signed
-
-            # Maximum representable integer of signed bitwidth taking narrow
-            # range into account - calculations inlined into the graph, depends
-            # on dynamic bitwidth
-            _max = 2.0 ** (bitwidth - signed) - 1 - narrow * (1 - signed)
-
-            # Scale and zero point: Float to Integer
-            q = op.Add(op.Div(x, scale), zeropoint)
-
-            # This simulates if-else branching without an if operator - usually
-            # the condition should eventually evaluate to a constant expression
-            # allowing one branch to be eliminated. op.Where also takes care of
-            # broadcasting.
-            q = op.Where(
-                # Condition: if bitwidth == 1 and signed - signed 1-bit needs
-                # manual fix...
-                op.And(
-                    op.Equal(bitwidth, 1.0),
-                    op.Cast(signed, to=ir.DataType.BOOL)
-                ),
-                # If-branch: Fix 1-bit quantization as manually converted
-                # bipolar encoding
-                op.Where(
-                    op.GreaterOrEqual(q, 0.0), op.CastLike(1.0, q),
-                    op.CastLike(-1.0, q)
-                ),
-                # Else-branch: Clip the integer to the range and round according
-                # to the rounding mode while ensuring the data type to stay the
-                # same
-                round(op.Clip(q, _min, _max), rounding_mode=rounding_mode)
+        def quant(x, scale, zeropoint, bitwidth, signed: int, narrow: int):
+            # Convert signed and narrow mode attributes to tensors matching the
+            # input type to be used in dynamic calculations.
+            signed = op.CastLike(
+                op.Constant(value_int=signed),
+                x
             )
 
-            # Scale and zero point: Integer to Float
+            narrow = op.CastLike(
+                op.Constant(value_int=narrow),
+                x
+            )
+
+            # Minimum clipping range of the integer quantization:
+            #   (-2 ** (bitwidth - signed) + narrow) * signed
+            minimum = op.Mul(
+                op.Add(
+                    op.Neg(
+                        op.Pow(
+                            op.CastLike(
+                                op.Constant(value_float=2.0),
+                                x
+                            ),
+                            op.Sub(
+                                op.CastLike(
+                                    bitwidth,
+                                    x
+                                ),
+                                signed
+                            )
+                        )
+                    ),
+                    narrow
+                ),
+                signed
+            )
+
+            # Maximum clipping range of the integer quantization:
+            #   2 ** (bitwidth - signed) - 1 - narrow * (1 - signed)
+            maximum = op.Sub(
+                op.Sub(
+                    op.Pow(
+                        op.CastLike(
+                            op.Constant(value_float=2.0),
+                            x
+                        ),
+                        op.Sub(
+                            op.CastLike(
+                                bitwidth,
+                                x
+                            ),
+                            signed
+                        )
+                    ),
+                    op.Mul(
+                        narrow,
+                        op.Sub(
+                            op.CastLike(
+                                op.Constant(value_float=1.0),
+                                x
+                            ),
+                            signed
+                        )
+                    )
+                ),
+                op.CastLike(
+                    op.Constant(value_float=1.0),
+                    x
+                )
+            )
+
+            # Divide input by scale and shift by zeropoint: Float to integer
+            # quantization, still with fractional part and can be out of range.
+            q = op.Add(op.Div(x, scale), zeropoint)
+
+            # Clipping and rounding according to the selected rounding mode or
+            # special treatment for signed 1-bit quantization.
+            q = op.Where(
+                # Signed 1-bit quantization: Convert to bipolar encoding
+                # where q >= 0 is encoded as +1 and q < 0 as -1
+                op.And(
+                    op.Equal(
+                        bitwidth,
+                        op.CastLike(
+                            op.Constant(value_int=1),
+                            bitwidth
+                        )
+                    ),
+                    op.Cast(
+                        signed, to=ir.DataType.BOOL
+                    )
+                ),
+                op.Where(
+                    op.GreaterOrEqual(
+                        q,
+                        op.CastLike(
+                            op.Constant(value_float=0.0),
+                            q
+                        )
+                    ),
+                    op.CastLike(
+                        op.Constant(value_float=+1.0),
+                        q
+                    ),
+                    op.CastLike(
+                        op.Constant(value_float=-1.0),
+                        q
+                    )
+                ),
+                # Non-bipolar encodings: Clip to integer bounds and round
+                # according to the rounding mode
+                op.Round(op.Clip(q, minimum, maximum))
+            )
+
+            # Multiply quantized value by scale and shift by zeropoint: Integer
+            # to float dequantization.
             return op.Mul(op.Sub(q, zeropoint), scale)
 
         return quant
@@ -615,7 +641,10 @@ def link_ops_from_graph(model: ir.Model, graph: ir.Graph) -> ir.Model:
         # Resolve the node opset version either from the node or falling back to
         # graph opset imports
         if (version := node.version) is None:
-            version = model.graph.opset_imports[node.domain]
+            try:
+                version = model.graph.opset_imports[node.domain]
+            except KeyError:
+                version = None
 
         # Look up the operator from the registry and skip if there is no special
         # function to be linked for this operator
