@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.base import RewriteRule
+from onnx_passes.passes.verify import Verify, tolerance
 
 import onnx_ir as ir
 

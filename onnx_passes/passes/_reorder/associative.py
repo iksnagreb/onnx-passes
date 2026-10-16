@@ -1,7 +1,5 @@
-from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, Transformation, Sequential
-)
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.base import RewriteRuleSetTemplate, Sequential
+from onnx_passes.passes.verify import Verify, tolerance
 
 import onnx_ir as ir
 
@@ -84,7 +82,7 @@ class ReorderReverseAssociative_v1(RewriteRuleSetTemplate, Verify):
         return partial(op)(partial(op)(x, y), z)
 
 
-class ReorderAssociativeLoop_v1(Sequential, Transformation):
+class ReorderAssociativeLoop_v1(Sequential):
     """Exhaustively apply associative reordering transformations."""
 
     passes = [

@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.base import RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify, tolerance
 
 import onnx_ir as ir
 import numpy as np
@@ -77,7 +77,7 @@ class EliminateInverseMul_v1(RewriteRule, Verify):
         return True
 
 
-class EliminateInverseLoop_v1(Sequential, Transformation):
+class EliminateInverseLoop_v1(Sequential):
     """Exhaustively apply inverse elimination transformations."""
 
     passes = [

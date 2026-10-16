@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Transformation
+from onnx_passes.passes.base import Transformation
 from onnx_passes.passes._layouts import layout_converter_pattern
 
 from onnxscript import GraphBuilder

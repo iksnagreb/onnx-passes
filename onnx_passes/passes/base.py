@@ -18,8 +18,8 @@ import onnx_ir as ir
 import onnx_ir.passes.common
 
 # Pass configuration and state tracking structures
-from onnx_passes.passes._config import Config
-from onnx_passes.passes._state import State
+from onnx_passes.passes.config import Config
+from onnx_passes.passes.state import State
 
 # Link custom operators as functions into the graph
 from onnx_passes.ops import link_ops

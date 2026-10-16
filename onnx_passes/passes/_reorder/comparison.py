@@ -1,7 +1,7 @@
-from onnx_passes.passes._base import (
-    RewriteRule, RewriteRuleSetTemplate, Transformation, Sequential
+from onnx_passes.passes.base import (
+    RewriteRule, RewriteRuleSetTemplate, Sequential
 )
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.verify import Verify, tolerance
 
 from onnxscript.rewriter.pattern import OrValue
 
@@ -321,7 +321,7 @@ class ReorderTernaryComparison_v1(RewriteRuleSetTemplate, Verify):
         return partial(op)(x, op.Where(condition, a, b))
 
 
-class ReorderComparisonLoop_v1(Sequential, Transformation):
+class ReorderComparisonLoop_v1(Sequential):
     """Exhaustively apply comparison reordering transformations."""
 
     passes = [

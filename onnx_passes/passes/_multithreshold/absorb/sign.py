@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import RewriteRule
+from onnx_passes.passes.verify import Verify
 
 
 class RewriteSignAsWhere_v1(RewriteRule, Verify):

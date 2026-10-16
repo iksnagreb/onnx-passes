@@ -1,5 +1,5 @@
-from onnx_passes.passes._config import Config
-from onnx_passes.passes._base import Sequential, VerificationError
+from onnx_passes.passes.config import Config
+from onnx_passes.passes.base import Sequential, VerificationError
 
 from pathlib import Path
 from typing import Optional

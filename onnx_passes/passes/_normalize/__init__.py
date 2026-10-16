@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Transformation, Sequential
+from onnx_passes.passes.base import Sequential
 
 from onnx_passes.passes._normalize import attributes
 from onnx_passes.passes._normalize import reshape
@@ -14,7 +14,7 @@ from onnx_passes.passes._normalize import where
 from onnx_passes.passes._normalize import reduce
 
 
-class Normalize_v1(Sequential, Transformation):
+class Normalize_v1(Sequential):
     """Exhaustively applies common normalization transformations."""
 
     passes = [

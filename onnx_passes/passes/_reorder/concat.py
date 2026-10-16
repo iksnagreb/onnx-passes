@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import Transformation, RewriteRule, Sequential
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import Transformation, RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 
@@ -189,7 +189,7 @@ class MoveElementwisePastConcat_v1(Transformation, Verify):
         return ir.passes.PassResult(model, modified)
 
 
-class ReorderConcatLoop_v1(Sequential, Transformation):
+class ReorderConcatLoop_v1(Sequential):
     """Exhaustively apply concat reordering transformations."""
 
     passes = [

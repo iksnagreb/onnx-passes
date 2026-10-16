@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify
 
 import onnx_ir as ir
 import numpy as np
@@ -62,7 +62,7 @@ class EliminateIdentityWhere_v1(RewriteRule, Verify):
         )
 
 
-class EliminateBranchesLoop_v1(Sequential, Transformation):
+class EliminateBranchesLoop_v1(Sequential):
     """Exhaustively apply branch elimination transformations."""
 
     passes = [

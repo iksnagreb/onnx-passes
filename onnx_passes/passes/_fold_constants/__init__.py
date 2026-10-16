@@ -1,7 +1,7 @@
-from onnx_passes.passes._base import (
+from onnx_passes.passes.base import (
     RewriteRule, Transformation, Sequential, _cleanup
 )
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.verify import Verify, tolerance
 
 from onnx_passes.ops import link_ops
 

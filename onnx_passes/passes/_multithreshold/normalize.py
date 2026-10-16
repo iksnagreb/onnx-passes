@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.base import RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify, tolerance
 
 from onnx_passes.passes._unbroadcast.elementwise import unbroadcast
 
@@ -641,7 +641,7 @@ class UnbroadcastThresholds_v1(RewriteRule, Verify):
 from onnx_passes.passes import _fold_constants
 
 
-class NormalizeMultiThresholdLoop_v1(Sequential, Transformation):
+class NormalizeMultiThresholdLoop_v1(Sequential):
     """Exhaustively apply multithreshold normalization transformations."""
 
     passes = [

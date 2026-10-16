@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Transformation, Sequential
+from onnx_passes.passes.base import Sequential
 
 from onnx_passes.passes._reorder import reshape
 from onnx_passes.passes._reorder import expand
@@ -20,7 +20,7 @@ from onnx_passes.passes import _fold_constants
 from onnx_passes.passes import _eliminate
 
 
-class Reorder_v1(Sequential, Transformation):
+class Reorder_v1(Sequential):
     """Exhaustively apply common reordering transformations."""
 
     passes = [

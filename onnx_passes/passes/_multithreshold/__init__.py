@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Sequential
+from onnx_passes.passes.base import Sequential
 
 from onnx_passes.passes import _reorder
 

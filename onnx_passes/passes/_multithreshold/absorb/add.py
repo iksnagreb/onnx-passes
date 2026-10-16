@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRuleSetTemplate
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import RewriteRuleSetTemplate
+from onnx_passes.passes.verify import Verify
 
 from onnxscript.rewriter.pattern import OrValue
 

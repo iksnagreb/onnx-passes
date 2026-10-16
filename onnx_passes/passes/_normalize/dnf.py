@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRuleSet, Sequential, Transformation
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import RewriteRuleSet, Sequential
+from onnx_passes.passes.verify import Verify
 
 
 class RewriteXorAsDNF_v1(RewriteRuleSet, Verify):
@@ -97,7 +97,7 @@ from onnx_passes.passes._reorder import commutative
 from onnx_passes.passes._reorder import associative
 
 
-class BooleanToDNFLoop_v1(Sequential, Transformation):
+class BooleanToDNFLoop_v1(Sequential):
     """Exhaustively apply the boolean to DNF term rewriting system."""
 
     passes = [
@@ -109,7 +109,7 @@ class BooleanToDNFLoop_v1(Sequential, Transformation):
     exhaustive = True
 
 
-class BitwiseToDNFLoop_v1(Sequential, Transformation):
+class BitwiseToDNFLoop_v1(Sequential):
     """Exhaustively apply the bitwise to DNF term rewriting system."""
 
     passes = [

@@ -17,9 +17,9 @@ from onnx.reference import ReferenceEvaluator
 
 # Pass configuration and state tracking structures and the base class for all
 # passes
-from onnx_passes.passes._config import Config
-from onnx_passes.passes._state import State
-from onnx_passes.passes._base import Pass, VerificationError
+from onnx_passes.passes.config import Config
+from onnx_passes.passes.state import State
+from onnx_passes.passes.base import Pass, VerificationError
 
 from onnx_passes.ops import link_ops
 

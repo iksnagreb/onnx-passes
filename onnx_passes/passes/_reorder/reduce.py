@@ -1,7 +1,7 @@
-from onnx_passes.passes._base import (
-    Transformation, Sequential, RewriteRule, RewriteRuleSetTemplate
+from onnx_passes.passes.base import (
+    Sequential, RewriteRule, RewriteRuleSetTemplate
 )
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.verify import Verify, tolerance
 
 import onnx_ir as ir
 import numpy as np
@@ -195,7 +195,7 @@ class MoveMulPastReduceMax_v1(RewriteRule, Verify):
         )
 
 
-class ReorderReduceLoop_v1(Sequential, Transformation):
+class ReorderReduceLoop_v1(Sequential):
     """Exhaustively apply reduce reordering transformations."""
 
     passes = [

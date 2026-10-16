@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.base import RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify, tolerance
 
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 
@@ -161,7 +161,7 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
 from onnx_passes.passes import _fold_constants
 
 
-class FuseMultiThresholdLoop_v1(Sequential, Transformation):
+class FuseMultiThresholdLoop_v1(Sequential):
     """Exhaustively apply multithreshold fusion transformations."""
 
     passes = [

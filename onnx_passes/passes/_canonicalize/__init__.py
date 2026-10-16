@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Sequential, Transformation
+from onnx_passes.passes.base import Sequential, Transformation
 
 from onnx_passes.passes import _inline, _normalize, _cleanup
 

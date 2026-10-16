@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 from onnx_passes.traits.expand import produced_by_expand
@@ -132,7 +132,7 @@ class MoveExpandPastReshape_v1(RewriteRule, Verify):
         )
 
 
-class ReorderExpandLoop_v1(Sequential, Transformation):
+class ReorderExpandLoop_v1(Sequential):
     """Exhaustively apply expand reordering transformations."""
 
     passes = [

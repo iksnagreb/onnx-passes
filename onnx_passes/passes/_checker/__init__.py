@@ -1,4 +1,4 @@
-from onnx_passes.passes._base import Pass
+from onnx_passes.passes.base import Pass
 
 import onnx_ir as ir
 

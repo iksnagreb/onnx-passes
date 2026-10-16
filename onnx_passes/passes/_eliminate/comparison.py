@@ -1,7 +1,7 @@
-from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, RewriteAsConstant, Transformation, Sequential
+from onnx_passes.passes.base import (
+    RewriteRuleSetTemplate, RewriteAsConstant, Sequential
 )
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.verify import Verify
 
 import onnx_ir as ir
 import numpy as np
@@ -155,7 +155,7 @@ class EliminateReflexiveLessOrEqual_v1(RewriteAsConstant, Verify):
     constant = True
 
 
-class EliminateComparisonLoop_v1(Sequential, Transformation):
+class EliminateComparisonLoop_v1(Sequential):
     """Exhaustively apply comparison elimination transformations."""
 
     passes = [

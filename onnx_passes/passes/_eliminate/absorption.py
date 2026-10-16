@@ -1,7 +1,5 @@
-from onnx_passes.passes._base import (
-    RewriteRuleSetTemplate, Transformation, Sequential
-)
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import RewriteRuleSetTemplate, Sequential
+from onnx_passes.passes.verify import Verify
 
 
 class EliminateAbsorption_v1(RewriteRuleSetTemplate, Verify):
@@ -34,7 +32,7 @@ class EliminateAbsorption_v1(RewriteRuleSetTemplate, Verify):
         return op.Expand(x, op.Shape(partial(op)[1](x, y)))
 
 
-class EliminateAbsorptionLoop_v1(Sequential, Transformation):
+class EliminateAbsorptionLoop_v1(Sequential):
     """Exhaustively apply absorption elimination transformations."""
 
     passes = [

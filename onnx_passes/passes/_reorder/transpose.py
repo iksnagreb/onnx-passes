@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes._verify import Verify, tolerance
+from onnx_passes.passes.base import RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify, tolerance
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 from onnx_passes.traits.reduction import produced_by_reduction
@@ -312,7 +312,7 @@ class MovePadPastTranspose_v1(RewriteRule, Verify):
         )
 
 
-class ReorderTransposeLoop_v1(Sequential, Transformation):
+class ReorderTransposeLoop_v1(Sequential):
     """Exhaustively apply transpose reordering transformations."""
 
     passes = [

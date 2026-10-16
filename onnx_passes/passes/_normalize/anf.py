@@ -1,5 +1,5 @@
-from onnx_passes.passes._base import RewriteRuleSet, Transformation, Sequential
-from onnx_passes.passes._verify import Verify
+from onnx_passes.passes.base import RewriteRuleSet, Sequential
+from onnx_passes.passes.verify import Verify
 
 import onnx_ir as ir
 
@@ -82,7 +82,7 @@ class BitwiseToANF_v1(RewriteRuleSet, Verify):
         return True
 
 
-class BooleanToANFLoop_v1(Sequential, Transformation):
+class BooleanToANFLoop_v1(Sequential):
     """Exhaustively apply the boolean to ANF term rewriting system."""
 
     passes = [
@@ -92,7 +92,7 @@ class BooleanToANFLoop_v1(Sequential, Transformation):
     exhaustive = True
 
 
-class BitwiseToANFLoop_v1(Sequential, Transformation):
+class BitwiseToANFLoop_v1(Sequential):
     """Exhaustively apply the bitwise to ANF term rewriting system."""
 
     passes = [
