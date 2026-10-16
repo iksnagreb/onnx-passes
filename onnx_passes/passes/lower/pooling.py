@@ -150,7 +150,7 @@ class LowerPoolToReduce_v1(RewriteRuleSetTemplate, Verify):
             # not reduce along the channel axis.
             op.Reshape(
                 windows := op.Im2Col(
-                    x, **im2col_attributes, _domain=CUSTOM_DOMAIN, _version=2
+                    x, **im2col_attributes, _domain=CUSTOM_DOMAIN
                 ),
                 op.Concat(
                     op.Shape(windows, end=-1),

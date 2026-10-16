@@ -111,7 +111,7 @@ class LowerConvToMatMul_v1(RewriteRule, Verify):
             # Generate sliding windows from the input using the custom Im2Col
             # operator
             op.Im2Col(
-                x, **attributes, _domain=CUSTOM_DOMAIN, _version=2
+                x, **attributes, _domain=CUSTOM_DOMAIN
             ),
             # Shuffle and flatten weights into channels-last (input channel in
             # the innermost dimension) layout

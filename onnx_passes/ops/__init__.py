@@ -201,25 +201,12 @@ class ArgSort_v1(OnnxOperator):
         return argsort
 
 
-class Im2Col_v1(OnnxOperator):
-    """Sliding window generator Im2Col operator."""
-
-    @staticmethod
-    def script(op: Opset):
-        """Generate an ONNX Script function implementing Im2Col."""
-
-        def im2col(x, indices):
-            return op.Gather(op.Flatten(x), indices, axis=1)
-
-        return im2col
-
-
 from typing import Sequence
 
 INTS = Sequence[int]
 
 
-class Im2Col_v2(OnnxOperator):
+class Im2Col_v1(OnnxOperator):
     """Sliding window generator Im2Col operator."""
 
     @staticmethod
