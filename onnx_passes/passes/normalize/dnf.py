@@ -93,8 +93,8 @@ class BitwiseToDNF_v1(RewriteRuleSet, Verify):
 # Reuse common reordering passes to arrive at a more minimal representation, but
 # do not use the distributive reordering: here, we always want to distribute and
 # operations to end up with a sum of products.
-from onnx_passes.passes._reorder import commutative
-from onnx_passes.passes._reorder import associative
+from onnx_passes.passes.reorder import commutative
+from onnx_passes.passes.reorder import associative
 
 
 class BooleanToDNFLoop_v1(Sequential):

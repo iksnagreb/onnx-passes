@@ -1,7 +1,7 @@
 from onnx_passes.passes.base import Transformation, RewriteRule
 from onnx_passes.passes.verify import Verify, tolerance
 
-from onnx_passes.passes._layouts import LayoutError, layout_converter_pattern
+from onnx_passes.passes.layouts import LayoutError, layout_converter_pattern
 
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 

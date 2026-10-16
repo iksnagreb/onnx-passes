@@ -271,8 +271,8 @@ class RewriteSwishAsSilu_v1(RewriteRule, Verify):
 
 from onnx_passes.passes.base import Sequential
 
-from onnx_passes.passes import _fold_constants
-from onnx_passes.passes._multithreshold.absorb.mul import AbsorbMulIntoComparison_v1
+from onnx_passes.passes import fold_constants
+from onnx_passes.passes.multithreshold.absorb.mul import AbsorbMulIntoComparison_v1
 
 
 class AbsorbSwishIntoComparison_v1(Sequential):
@@ -286,7 +286,7 @@ class AbsorbSwishIntoComparison_v1(Sequential):
         RewriteSwishAsSilu_v1,
         AbsorbMulIntoComparison_v1,
         AbsorbSiluIntoComparison_v1,
-        _fold_constants,
+        fold_constants,
     ]
 
     exhaustive = True

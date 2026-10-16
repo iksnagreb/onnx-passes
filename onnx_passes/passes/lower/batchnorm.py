@@ -81,7 +81,7 @@ class LowerBatchNormalizationToMulAdd_v1(RewriteRule, Verify):
 # at least one inference-mode BatchNormalization before further normalization
 # passes or any pass sequence that applies AddDefaultAttributes_v1 followed by
 # cleanup (unused removal) exhaustively...
-from onnx_passes.passes._normalize.attributes import AddDefaultAttributes_v1
+from onnx_passes.passes.normalize.attributes import AddDefaultAttributes_v1
 
 
 class NormalizeAndLowerBatchNorm_v1(Sequential):

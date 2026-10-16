@@ -1,7 +1,7 @@
 from onnx_passes.passes.base import RewriteRule, Sequential
 from onnx_passes.passes.verify import Verify, tolerance
 
-from onnx_passes.passes._unbroadcast.elementwise import unbroadcast
+from onnx_passes.passes.unbroadcast.elementwise import unbroadcast
 
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 
@@ -638,7 +638,7 @@ class UnbroadcastThresholds_v1(RewriteRule, Verify):
         )
 
 
-from onnx_passes.passes import _fold_constants
+from onnx_passes.passes import fold_constants
 
 
 class NormalizeMultiThresholdLoop_v1(Sequential):
@@ -651,7 +651,7 @@ class NormalizeMultiThresholdLoop_v1(Sequential):
         EliminateDeadThresholds_v1,
         DeduplicateThresholds_v1,
         UnbroadcastThresholds_v1,
-        _fold_constants
+        fold_constants
     ]
 
     exhaustive = True

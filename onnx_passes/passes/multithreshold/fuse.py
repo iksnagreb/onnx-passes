@@ -158,7 +158,7 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
         return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
 
 
-from onnx_passes.passes import _fold_constants
+from onnx_passes.passes import fold_constants
 
 
 class FuseMultiThresholdLoop_v1(Sequential):
@@ -167,7 +167,7 @@ class FuseMultiThresholdLoop_v1(Sequential):
     passes = [
         FuseScaleIntoMultiThreshold_v1,
         FuseAddedMultiThresholds_v1,
-        _fold_constants
+        fold_constants
     ]
 
     exhaustive = True

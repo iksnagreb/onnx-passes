@@ -23,10 +23,10 @@ class InlineFunctions_v1(Transformation, Verify):
         return ir.passes.common.InlinePass(_criterion)(model)
 
 
-from onnx_passes.passes._inline import reduce
+from onnx_passes.passes.inline import reduce
 
 
-class InlineLoop_v1(Sequential, Transformation):
+class InlineLoop_v1(Sequential):
     """Exhaustively apply inlining transformations."""
 
     passes = [
