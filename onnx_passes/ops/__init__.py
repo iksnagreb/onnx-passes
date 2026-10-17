@@ -509,7 +509,7 @@ class Quant_v1(OnnxOperator):
                     )
                 ),
                 # Non-bipolar encodings: Clip to integer bounds and round
-                # according to the rounding mode
+                # according to the standard ONNX rounding mode
                 op.Round(op.Clip(q, minimum, maximum))
             )
 
