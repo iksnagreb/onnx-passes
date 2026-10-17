@@ -226,8 +226,8 @@ class Verify(Pass, ABC):
 
                 if not np.all(np.isclose(x, y, **kwargs) | np.isnan(y)):
                     raise VerificationError(
-                        f"Output {tensor.name} not within tolerance"
-                        f" after '{self.identifier}'"
+                        f"Output {tensor.name} not within tolerance {kwargs}"
+                        f" after '{self.identifier}': {np.max(np.abs(x - y))}"
                     )
 
         # Check whether all metrics lie within the required range and raise
