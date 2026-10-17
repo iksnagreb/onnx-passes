@@ -1,9 +1,7 @@
-from onnx_passes.passes.base import (
-    RewriteRule, Transformation, Sequential, _cleanup
-)
+from onnx_passes.passes.base import RewriteRule, Transformation, Sequential
 from onnx_passes.passes.verify import Verify, tolerance
 
-from onnx_passes.ops import link_ops
+from onnx_passes.ops import link_ops, DOMAIN as PASSES_DOMAIN
 
 import onnx_ir as ir
 import numpy as np
@@ -16,7 +14,7 @@ from onnxscript import GraphBuilder
 
 # Backlists operator types from evaluation-based constant folding
 BLACKLIST: set[str] = {
-    "Constant", "GatherElements"
+    "Constant", "GatherElements", "Quant", "ConstantStop"
 }
 
 
@@ -61,10 +59,23 @@ def _fold_constants(model: ir.Model,
         # context mapping input name to numpy array
         context = {}
 
+        skip = False
+
         for x in node.inputs:
             if x is not None:
+                # Skip collecting further values for input constants annotated
+                # to not be constant-folded
+                if x.meta.get("constant_stop"):
+                    skip = True
+                    break
+
                 if (value := ir.convenience.get_const_tensor(x)) is not None:
                     context[x.name] = value.numpy()
+
+        # Do not even try to execute with incomplete input list for not to be
+        # constant folded operations
+        if skip:
+            continue
 
         # Use the ONNX reference evaluator to execute the node on the context
         # collecting named outputs into the context as well
@@ -77,15 +88,21 @@ def _fold_constants(model: ir.Model,
             for y in node.outputs:
                 if (name := y.name) is not None:
                     ir.convenience.replace_all_uses_with(
-                        y, op.Constant(value=ir.tensor(context[name])), True
+                        y,
+                        const := op.Constant(value=ir.tensor(context[name])),
+                        True
                     )
+
+                    # Propagate any constant folding stops to the new constant
+                    # output value
+                    if y.meta.get("constant_stop"):
+                        const.meta["constant_stop"] = True
+
                     modified = True
         except RuntimeError:
             pass
 
-    # Cleanup the graph removing now disconnected nodes
-    result = _cleanup(model, inplace=True)
-    return ir.passes.PassResult(result.model, result.modified or modified)
+    return ir.passes.PassResult(model, modified)
 
 
 class FoldConstantCastLike_v1(RewriteRule, Verify):
@@ -237,6 +254,26 @@ class FoldConstantEmptyOutput_v1(RewriteRule, Verify):
         )
 
 
+class FoldConstantStop_v1(RewriteRule, Verify):
+    """Fold custom ConstantStop operator by annotating the tensor metadata.
+
+    This propagates constant stop annotations to be recognized by the reference
+    evaluator based automatic constant folding.
+
+    Note: Use fold_constants.release or ReleaseConstants_v1 to allow annotated
+    constants to participate in constant folding again.
+    """
+
+    @staticmethod
+    def pattern(op, x):
+        return op.ConstantStop(x, _domain=PASSES_DOMAIN)
+
+    @staticmethod
+    def rewrite(op, x):
+        x.meta["constant_stop"] = True
+        return op.Identity(x)
+
+
 @tolerance
 class FoldConstants_v1(Transformation, Verify):
     """Applies constant folding to the model."""
@@ -254,6 +291,7 @@ class FoldConstantsLoop_v1(Sequential, Transformation):
         FoldConstantSize_v1,
         FoldConstantGatherElements_v1,
         FoldConstantEmptyOutput_v1,
+        FoldConstantStop_v1,
         FoldConstants_v1
     ]
 

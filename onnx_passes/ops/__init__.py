@@ -630,6 +630,19 @@ class Ulp_v1(OnnxOperator):
         return ulp
 
 
+class ConstantStop_v1(OnnxOperator):
+    """Stop constants from being processed by constant-folding."""
+
+    @staticmethod
+    def script(op: Opset):
+        """Generate an ONNX Script function implementing ConstantStop."""
+
+        def constant_stop(x):
+            return op.Identity(x)
+
+        return constant_stop
+
+
 def link_ops_from_graph(model: ir.Model, graph: ir.Graph) -> ir.Model:
     """Links functions implementing custom-Ops into the ONNX model."""
 

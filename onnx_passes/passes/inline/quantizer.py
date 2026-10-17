@@ -140,7 +140,18 @@ class InlineQuant_v1(RewriteRule, Verify):
 
         # Multiply quantized value by scale and shift by zeropoint: Integer
         # to float dequantization.
-        return op.Mul(op.Sub(q, z), s)
+        return op.Mul(
+            op.Sub(
+                # If this quantizer is on a constant/parameter path, block the
+                # flow of constant-folding at the quantized values.
+                op.ConstantStop(
+                    q,
+                    _domain=PASSES_DOMAIN
+                ),
+                z
+            ),
+            s
+        )
 
 
 class InlineQONNXQuant_v1(RewriteRule, Verify):
@@ -375,7 +386,18 @@ class InlineQONNXQuant_v1(RewriteRule, Verify):
 
         # Multiply quantized value by scale and shift by zeropoint: Integer
         # to float dequantization.
-        return op.Mul(op.Sub(q, z), s)
+        return op.Mul(
+            op.Sub(
+                # If this quantizer is on a constant/parameter path, block the
+                # flow of constant-folding at the quantized values.
+                op.ConstantStop(
+                    q,
+                    _domain=PASSES_DOMAIN
+                ),
+                z
+            ),
+            s
+        )
 
 
 class InlineQuantizer_v1(Sequential):
