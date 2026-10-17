@@ -23,14 +23,16 @@ class EliminateNaNComparison_v1(RewriteRuleSetTemplate, Verify):
         return partial(op)(x, y)
 
     @staticmethod
-    def check(context, x, y):
-        if (x := ir.convenience.get_const_tensor(x)) is not None:
-            if np.all(np.isnan(x)):
-                return True
+    def check(context, x: ir.Value, y):
+        if x.dtype is not None and x.dtype.is_floating_point():
+            if (x := ir.convenience.get_const_tensor(x)) is not None:
+                if np.all(np.isnan(x.numpy())):
+                    return True
 
-        if (y := ir.convenience.get_const_tensor(y)) is not None:
-            if np.all(np.isnan(y)):
-                return True
+        if y.dtype is not None and y.dtype.is_floating_point():
+            if (y := ir.convenience.get_const_tensor(y)) is not None:
+                if np.all(np.isnan(y.numpy())):
+                    return True
 
         return False
 
