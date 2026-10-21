@@ -159,6 +159,7 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
 
 
 from onnx_passes.passes import fold_constants
+from onnx_passes.passes import multithreshold
 
 
 class FuseMultiThresholdLoop_v1(Sequential):
@@ -167,7 +168,8 @@ class FuseMultiThresholdLoop_v1(Sequential):
     passes = [
         FuseScaleIntoMultiThreshold_v1,
         FuseAddedMultiThresholds_v1,
-        fold_constants
+        fold_constants,
+        multithreshold.normalize,
     ]
 
     exhaustive = True
