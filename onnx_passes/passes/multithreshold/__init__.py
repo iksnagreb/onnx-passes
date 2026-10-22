@@ -8,6 +8,7 @@ from onnx_passes.passes.multithreshold import convert
 from onnx_passes.passes.multithreshold import absorb
 from onnx_passes.passes.multithreshold import normalize
 from onnx_passes.passes.multithreshold import fuse
+from onnx_passes.passes.multithreshold import decompose
 
 
 class ConvertToMultiThresholds_v1(Sequential):
