@@ -282,6 +282,9 @@ class FoldConstants_v1(Transformation, Verify):
         return _fold_constants(model, inplace=True)
 
 
+from onnx_passes.passes.fold_constants import release
+
+
 class FoldConstantsLoop_v1(Sequential, Transformation):
     """Exhaustively applies constant folding to the model."""
 
