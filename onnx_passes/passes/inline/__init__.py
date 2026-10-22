@@ -24,6 +24,7 @@ class InlineFunctions_v1(Transformation, Verify):
 
 
 from onnx_passes.passes.inline import reduce
+from onnx_passes.passes.inline import quantizer
 
 
 class InlineLoop_v1(Sequential):
