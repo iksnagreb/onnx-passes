@@ -260,7 +260,7 @@ class InlineQONNXQuant_v1(RewriteRule, Verify):
         elif rounding_mode.as_string() == "CEIL":
             y = op.Ceil(c)
 
-        # Rounding mode "FLOOR" - matches standard ONNX Ceil operator
+        # Rounding mode "FLOOR" - matches standard ONNX Floor operator
         # behavior
         elif rounding_mode.as_string() == "FLOOR":
             y = op.Floor(c)

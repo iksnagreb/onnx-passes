@@ -114,7 +114,7 @@ class Quant_v1(OnnxOperator, domain=DOMAIN):
             elif rounding_mode == op.Constant(value_string="CEIL"):
                 y = op.Ceil(c)
 
-            # Rounding mode "FLOOR" - matches standard ONNX Ceil operator
+            # Rounding mode "FLOOR" - matches standard ONNX Floor operator
             # behavior
             elif rounding_mode == op.Constant(value_string="FLOOR"):
                 y = op.Floor(c)
