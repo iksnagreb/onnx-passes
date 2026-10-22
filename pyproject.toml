@@ -29,7 +29,7 @@ dependencies = [
     "networkx>=3.0.0",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
-    "rich>=15.0.0",
+    "rich>=13.0.0",
     "scipy<2.0.0"
 ]
 
