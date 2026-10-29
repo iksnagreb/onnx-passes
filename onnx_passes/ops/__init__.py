@@ -734,3 +734,7 @@ def link_ops(model: ir.Model) -> ir.Model:
     link_ops_from_graph(model, model.graph)
 
     return model
+
+
+import onnx_passes.ops.qonnx
+import onnx_passes.ops.brevitas

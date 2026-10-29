@@ -3,6 +3,7 @@ from onnx_passes.passes.verify import Verify
 
 from onnx_passes.ops import DOMAIN as PASSES_DOMAIN
 from onnx_passes.ops.qonnx import DOMAIN as QONNX_DOMAIN
+from onnx_passes.ops.brevitas import DOMAIN as BREVITAS_DOMAIN
 
 import onnx_ir as ir
 import numpy as np
@@ -400,10 +401,28 @@ class InlineQONNXQuant_v1(RewriteRule, Verify):
         )
 
 
+class InlineBrevitasQuant_v1(InlineQONNXQuant_v1, Verify):
+    """Inline QONNX custom quantizer (Brevitas domain) into the graph."""
+
+    @staticmethod
+    def pattern(op, x, s, z, bitwidth, signed, narrow, rounding_mode):
+        return op.Quant(
+            x,
+            s,
+            z,
+            bitwidth,
+            signed=signed,
+            narrow=narrow,
+            rounding_mode=rounding_mode,
+            _domain=BREVITAS_DOMAIN
+        )
+
+
 class InlineQuantizer_v1(Sequential):
     """Apply quantizer inlining transformations."""
 
     passes = [
         InlineQuant_v1,
         InlineQONNXQuant_v1,
+        InlineBrevitasQuant_v1,
     ]

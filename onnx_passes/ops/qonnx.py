@@ -4,7 +4,6 @@ import onnx_ir as ir
 import numpy as np
 
 DOMAIN = "qonnx.custom_op.general"
-BREVITAS_DOMAIN = "onnx.brevitas"
 
 
 class Quant_v1(OnnxOperator, domain=DOMAIN):
