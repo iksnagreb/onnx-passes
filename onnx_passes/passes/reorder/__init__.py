@@ -15,6 +15,7 @@ from onnx_passes.passes.reorder import reduce
 from onnx_passes.passes.reorder import where
 from onnx_passes.passes.reorder import im2col
 
+from onnx_passes.passes import inline
 from onnx_passes.passes import normalize
 from onnx_passes.passes import fold_constants
 from onnx_passes.passes import eliminate
@@ -25,6 +26,7 @@ class Reorder_v1(Sequential):
 
     passes = [
         fold_constants,
+        inline,
         normalize,
         eliminate,
         reshape,
