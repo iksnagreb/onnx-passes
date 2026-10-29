@@ -472,6 +472,35 @@ class EliminateIdentityConcat_v1(RewriteRule, Verify):
         return op.Identity(x)
 
 
+from onnx_passes.ops import DOMAIN as PASSES_DOMAIN
+
+
+class EliminateIdentityIm2Col_v1(RewriteRule, Verify):
+    """Eliminate identity Im2Col operations."""
+
+    @staticmethod
+    def pattern(op, x, dilations, kernel_shape, strides):
+        return op.Im2Col(
+            x,
+            dilations=dilations,
+            kernel_shape=kernel_shape,
+            strides=strides,
+            _domain=PASSES_DOMAIN
+        )
+
+    @staticmethod
+    def check(context, x, dilations, kernel_shape, strides):
+        if np.all(np.asarray(dilations.as_ints()) == 1):
+            if np.all(np.asarray(kernel_shape.as_ints()) == 1):
+                return np.all(np.asarray(strides.as_ints()) == 1)
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, dilations, kernel_shape, strides):
+        return op.Identity(x)
+
+
 from onnx_passes.passes.base import Transformation, Sequential
 
 # Common identity elimination pass build into ONNX IR and ONNXScript
@@ -511,6 +540,7 @@ class EliminateIdentityLoop_v1(Sequential):
         EliminateIdentitySlice_v1,
         EliminateIdentityReduce_v1,
         EliminateIdentityConcat_v1,
+        EliminateIdentityIm2Col_v1,
         EliminateIdentity_v1
     ]
 
