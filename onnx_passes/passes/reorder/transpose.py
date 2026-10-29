@@ -272,9 +272,13 @@ class MoveReducePastTranspose_v1(RewriteRule, Verify):
                 reduce.inputs[0],
                 perm=perm
             ),
-            # Transpose axes via gathering from the permutation list
+            # Transpose axes via gathering from the inverse permutation list
             op.Gather(
-                op.Constant(value_ints=perm),
+                op.Constant(
+                    value_ints=[
+                        perm.index(i) for i in range(len(perm))
+                    ]
+                ),
                 reduce.inputs[1]
             ),
             **reduce.attributes
