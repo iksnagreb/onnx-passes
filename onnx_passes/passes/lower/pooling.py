@@ -55,7 +55,7 @@ class LowerPoolToReduce_v1(RewriteRuleSetTemplate, Verify):
                 return False
 
         if (pads := attributes.get("pads")) is not None:
-            if np.any(pads.as_ints() != 0):
+            if np.any(np.asarray(pads.as_ints()) != 0):
                 return False
 
         return True

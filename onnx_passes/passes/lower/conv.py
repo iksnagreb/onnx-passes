@@ -33,7 +33,7 @@ class LowerConvToMatMul_v1(RewriteRule, Verify):
                 return False
 
         if (pads := attributes.get("pads")) is not None:
-            if np.any(pads.as_ints() != 0):
+            if np.any(np.asarray(pads.as_ints()) != 0):
                 return False
 
         # Convolution lowering does not handle grouped convolutions - should be
