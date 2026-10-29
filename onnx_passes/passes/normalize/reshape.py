@@ -199,6 +199,42 @@ class RewriteExpandAsReshape_v1(RewriteRule, Verify):
         return op.Reshape(x, shape)
 
 
+from onnx_passes.ops import DOMAIN as PASSES_DOMAIN
+
+
+class RewriteIm2ColAsReshape_v1(RewriteRule, Verify):
+    """Rewrite Im2Col as Reshape if the kernel spans the entire input."""
+
+    @staticmethod
+    def pattern(op, x, dilations, kernel_shape, strides):
+        return op.Im2Col(
+            x,
+            dilations=dilations,
+            kernel_shape=kernel_shape,
+            strides=strides,
+            _domain=PASSES_DOMAIN
+        )
+
+    @staticmethod
+    def check(context, x, dilations, kernel_shape, strides):
+        if np.all(np.asarray(dilations.as_ints()) == 1):
+            if x.shape is not None and x.shape.is_static():
+                return tuple(kernel_shape.as_ints()) == tuple(x.shape[1:-1])
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, dilations, kernel_shape, strides):
+        return op.Reshape(
+            x,
+            op.Constant(
+                value_ints=[
+                    x.shape[0], *((len(x.shape) - 2) * [1]), -1
+                ]
+            )
+        )
+
+
 class FuseConsecutiveReshapes_v1(RewriteRule, Verify):
     """Fuses two consecutive reshape operations into a single reshape."""
 
