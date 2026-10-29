@@ -289,13 +289,19 @@ class InferMultiThreshold_v1(RewriteRule, Verify):
         return op.ReduceSum(
             OrValue([
                 steps := op.Cast(
-                    op.GreaterOrEqual(
-                        op.Reshape(
-                            x,
-                            shape
+                    OrValue([
+                        op.GreaterOrEqual(
+                            op.Reshape(
+                                x,
+                                shape
+                            ),
+                            thresholds
                         ),
-                        thresholds
-                    ),
+                        op.GreaterOrEqual(
+                            x,
+                            thresholds
+                        ),
+                    ]),
                     to=dtype
                 ),
                 OrValue([
@@ -312,6 +318,21 @@ class InferMultiThreshold_v1(RewriteRule, Verify):
 
     @staticmethod
     def check_v13(context, x, thresholds, weights, shape, axes, dtype):
+        # Reduce along an existing singleton axis at the end if no expanded
+        # shape is matched
+        if shape is None:
+            if (shape := x.shape) is None or shape.is_dynamic():
+                return False
+
+            if (axes := ir.convenience.get_const_tensor(axes)) is not None:
+                if tuple(axes.numpy()) in {(-1,), (len(shape) - 1,)}:
+                    if shape[-1] == 1:
+                        # So far MultiThreshold always yields FLOAT, relax this
+                        # in some future version...
+                        return dtype.as_int() == ir.DataType.FLOAT
+
+            return False
+
         # Reduce exactly the single last axis expanded by the reshape operation
         if (shape := ir.convenience.get_const_tensor(shape)) is not None:
             if (axes := ir.convenience.get_const_tensor(axes)) is not None:
@@ -329,6 +350,15 @@ class InferMultiThreshold_v1(RewriteRule, Verify):
         # matched (scalar expanded via broadcasting)
         if weights is None:
             weights = op.Cast(op.Constant(value_float=1.0), to=dtype)
+
+        # Insert implicit identity Reshape if no expanded shape is matched but
+        # the final axis of the input is a singleton
+        if shape is None:
+            shape = op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, x.shape[:]
+                )
+            )
 
         return op.MultiThreshold(
             # The matched pattern unsqueezes the thresholding axis at the end
