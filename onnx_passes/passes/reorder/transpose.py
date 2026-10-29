@@ -316,13 +316,53 @@ class MovePadPastTranspose_v1(RewriteRule, Verify):
         )
 
 
+class MoveExpandPastTranspose_v1(RewriteRule, Verify):
+    """Reorder expand operations to follow transpose."""
+
+    @staticmethod
+    def pattern(op, x, shape, perm):
+        return op.Transpose(op.Expand(x, shape), perm=perm)
+
+    @staticmethod
+    def rewrite(op, x, shape, perm):
+        return op.Expand(
+            op.Transpose(
+                # Pad the input shape with leading dimensions of size one, such
+                # that the shape of x has same rank as the expanded shape.
+                op.Unsqueeze(
+                    x,
+                    op.Range(
+                        op.Constant(value_int=0),
+                        # Rank difference between x and expanded shape, i.e.,
+                        # length of the permutation
+                        op.Sub(
+                            op.Size(shape),
+                            op.Size(
+                                op.Shape(x)
+                            )
+                        ),
+                        op.Constant(value_int=1)
+                    )
+                ),
+                perm=perm
+            ),
+            op.Gather(
+                shape,
+                op.Constant(
+                    value_ints=perm.as_ints()
+                )
+            )
+        )
+
+
 class ReorderTransposeLoop_v1(Sequential):
     """Exhaustively apply transpose reordering transformations."""
 
     passes = [
         MoveElementwisePastTranspose_v1,
         MoveMatMulPastTranspose_v1,
-        MoveReducePastTranspose_v1
+        MoveReducePastTranspose_v1,
+        MoveExpandPastTranspose_v1,
     ]
 
     exhaustive = True
