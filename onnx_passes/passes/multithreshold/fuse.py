@@ -1,7 +1,10 @@
 from onnx_passes.passes.base import RewriteRule, Sequential
 from onnx_passes.passes.verify import Verify, tolerance
 
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
+from onnx_passes.ops import DOMAIN as PASSES_DOMAIN
+
+import onnx_ir as ir
+import numpy as np
 
 
 @tolerance
@@ -11,7 +14,7 @@ class FuseScaleIntoMultiThreshold_v1(RewriteRule, Verify):
     @staticmethod
     def pattern(op, x, thresholds, weights, scale):
         return op.Mul(
-            op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN),
+            op.MultiThreshold(x, thresholds, weights, _domain=PASSES_DOMAIN),
             scale
         )
 
@@ -27,7 +30,7 @@ class FuseScaleIntoMultiThreshold_v1(RewriteRule, Verify):
                     scale, op.Constant(value_ints=[-1])
                 )
             ),
-            _domain=CUSTOM_DOMAIN
+            _domain=PASSES_DOMAIN
         )
 
     @property
@@ -42,8 +45,8 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
     @staticmethod
     def pattern(op, x, thresholds1, weights1, thresholds2, weights2):
         return op.Add(
-            op.MultiThreshold(x, thresholds1, weights1, _domain=CUSTOM_DOMAIN),
-            op.MultiThreshold(x, thresholds2, weights2, _domain=CUSTOM_DOMAIN),
+            op.MultiThreshold(x, thresholds1, weights1, _domain=PASSES_DOMAIN),
+            op.MultiThreshold(x, thresholds2, weights2, _domain=PASSES_DOMAIN),
         )
 
     @staticmethod
@@ -155,7 +158,124 @@ class FuseAddedMultiThresholds_v1(RewriteRule, Verify):
             axis=-1
         )
 
-        return op.MultiThreshold(x, thresholds, weights, _domain=CUSTOM_DOMAIN)
+        return op.MultiThreshold(x, thresholds, weights, _domain=PASSES_DOMAIN)
+
+
+@tolerance
+class FuseConsecutiveMultiThresholds_v1(RewriteRule, Verify):
+    """Fuses two consecutive MultiThreshold operations into a single operation.
+    """
+
+    @staticmethod
+    def pattern_v18(op, x, thresholds1, weights1, thresholds2, weights2):
+        return op.MultiThreshold(
+            op.MultiThreshold(
+                x, thresholds1, weights1, _domain=PASSES_DOMAIN
+            ),
+            thresholds2, weights2, _domain=PASSES_DOMAIN
+        )
+
+    @staticmethod
+    def check_v18(context, x, thresholds1, weights1, thresholds2, weights2):
+        # All thresholds must be sorted to make use of the cumulative sum of the
+        # step weights, which only gives a correct sketch of the function if the
+        # corresponding thresholds are in increasing order.
+        if (t1 := ir.convenience.get_const_tensor(thresholds1)) is None:
+            return False
+
+        if np.any(np.sort(t1, axis=-1) != t1):
+            return False
+
+        if (t2 := ir.convenience.get_const_tensor(thresholds2)) is None:
+            return False
+
+        if np.any(np.sort(t2, axis=-1) != t2):
+            return False
+
+        # With non-constant step weights, this transformation gets messy rather
+        # quickly - for now restrict this to the constant case...
+        if ir.convenience.get_const_tensor(weights1) is not None:
+            return ir.convenience.get_const_tensor(weights2) is not None
+
+        return False
+
+    @staticmethod
+    def rewrite_v18(op, x, thresholds1, weights1, thresholds2, weights2):
+        # The cumulative sum of the padded weights gives the output levels of
+        # the first MultiThreshold function.
+        levels = op.CumSum(
+            op.Pad(
+                # Expand the weights to match the thresholds at least along the
+                # thresholding, i.e., final, axis.
+                op.Expand(
+                    weights1,
+                    op.Shape(
+                        op.Unsqueeze(
+                            x,
+                            op.Constant(value_ints=[-1])
+                        )
+                    )
+                ),
+                # Add zero padding on the left such that the output levels start
+                # counting at the zero level
+                op.Constant(value_ints=[1, 0]),
+                op.CastLike(
+                    op.Constant(value_int=0),
+                    weights1
+                ),
+                op.Constant(value_ints=[-1]),
+            ),
+            op.Constant(value_int=-1)
+        )
+
+        # Transform this sketch of the first function according to the second
+        # MultiThreshold function.
+        levels = op.MultiThreshold(
+            levels, thresholds2, weights2, _domain=PASSES_DOMAIN
+        )
+
+        # Compute transformed step weights matching the thresholds of the first
+        # MultiThreshold function by taking the "derivative" of the transformed
+        # output levels, i.e., use a sliding [-1,+1] kernel.
+        fused_weights = op.Sub(
+            # Shift the levels one to the left, dropping the leftmost padded
+            # level - this gives the +1 weight for the derivative kernel.
+            op.Slice(
+                levels,
+                op.Constant(value_ints=[1]),
+                op.Shape(
+                    levels, start=-1
+                ),
+                op.Constant(value_ints=[-1]),
+            ),
+            # Slice of the final level, keeping the leftmost padded level - this
+            # gives the -1 weight for the derivative kernel.
+            op.Slice(
+                levels,
+                op.Constant(value_ints=[0]),
+                op.Constant(value_ints=[-1]),
+                op.Constant(value_ints=[-1]),
+            )
+        )
+
+        # Bias the output by where the zero level of the first function gets
+        # mapped by the second function, i.e., the leftmost transformed level.
+        bias = op.Squeeze(
+            op.Slice(
+                levels,
+                op.Constant(value_ints=[+0]),
+                op.Constant(value_ints=[+1]),
+                op.Constant(value_ints=[-1]),
+            ),
+            op.Constant(value_ints=[-1]),
+        )
+
+        return op.Add(
+            op.MultiThreshold(
+                x, thresholds1, fused_weights, _domain=PASSES_DOMAIN
+            ),
+            bias
+        )
 
 
 from onnx_passes.passes import fold_constants
@@ -168,6 +288,7 @@ class FuseMultiThresholdLoop_v1(Sequential):
     passes = [
         FuseScaleIntoMultiThreshold_v1,
         FuseAddedMultiThresholds_v1,
+        FuseConsecutiveMultiThresholds_v1,
         fold_constants,
         multithreshold.normalize,
     ]
