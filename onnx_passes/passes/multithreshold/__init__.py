@@ -37,6 +37,7 @@ class OptimizeMultiThresholds_v1(Sequential):
     passes = [
         anf,
         reorder,
+        absorb,
         anf
     ]
 
