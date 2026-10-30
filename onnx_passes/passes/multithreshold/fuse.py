@@ -210,10 +210,7 @@ class FuseConsecutiveMultiThresholds_v1(RewriteRule, Verify):
                 op.Expand(
                     weights1,
                     op.Shape(
-                        op.Unsqueeze(
-                            x,
-                            op.Constant(value_ints=[-1])
-                        )
+                        thresholds1, start=-1
                     )
                 ),
                 # Add zero padding on the left such that the output levels start
@@ -226,6 +223,24 @@ class FuseConsecutiveMultiThresholds_v1(RewriteRule, Verify):
                 op.Constant(value_ints=[-1]),
             ),
             op.Constant(value_int=-1)
+        )
+
+        # Expand the second MultiThreshold function to accommodate the extra
+        # axis introduced by the weights of the first.
+        thresholds2 = op.Unsqueeze(
+            op.Expand(
+                thresholds2,
+                op.Constant(value_ints=[1])
+            ),
+            op.Constant(value_ints=[-2])
+        )
+
+        weights2 = op.Unsqueeze(
+            op.Expand(
+                weights2,
+                op.Constant(value_ints=[1])
+            ),
+            op.Constant(value_ints=[-2])
         )
 
         # Transform this sketch of the first function according to the second
