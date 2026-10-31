@@ -5,6 +5,8 @@ from onnx_passes.traits.elementwise import produced_by_elementwise
 
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 
+import onnx_ir as ir
+
 
 class MoveElementwisePastIm2Col_v1(RewriteRule, Verify):
     """Reorder elementwise operations to follow Im2Col where applicable."""
@@ -14,6 +16,13 @@ class MoveElementwisePastIm2Col_v1(RewriteRule, Verify):
         return op.Im2Col(
             produced_by_elementwise, _outputs=["out"], _domain=CUSTOM_DOMAIN
         )
+
+    @staticmethod
+    def check(context, out):
+        # As input generators tend to be expensive, do not reorder this if there
+        # is more than one non-constant input.
+        xs = out.producer().inputs[0].producer()
+        return sum(ir.convenience.get_const_tensor(x) is None for x in xs) == 1
 
     @staticmethod
     def rewrite(op, out):
