@@ -21,7 +21,7 @@ class MoveElementwisePastIm2Col_v1(RewriteRule, Verify):
     def check(context, out):
         # As input generators tend to be expensive, do not reorder this if there
         # is more than one non-constant input.
-        xs = out.producer().inputs[0].producer()
+        xs = out.producer().inputs[0].producer().inputs
         return sum(ir.convenience.get_const_tensor(x) is None for x in xs) == 1
 
     @staticmethod
