@@ -293,6 +293,40 @@ class FuseConsecutiveMultiThresholds_v1(RewriteRule, Verify):
         )
 
 
+@tolerance
+class FuseAddIntoMultiThreshold_v1(RewriteRule, Verify):
+    """Fuse constant addition preceding MultiThreshold into the thresholds.
+
+    This seems redundant, already covered by absorption passes, but additions
+    might reappear when fusing chains of MultiThreshold operations.
+    """
+
+    @staticmethod
+    def pattern(op, x, y, thresholds, weights):
+        return op.MultiThreshold(
+            op.Add(x, y), thresholds, weights, _domain=PASSES_DOMAIN
+        )
+
+    @staticmethod
+    def check(context, x, y, thresholds, weights):
+        return ir.convenience.get_const_tensor(y) is not None
+
+    @staticmethod
+    def rewrite(op, x, y, thresholds, weights):
+        return op.MultiThreshold(
+            x,
+            op.Sub(
+                thresholds,
+                op.Unsqueeze(
+                    y,
+                    op.Constant(value_ints=[-1])
+                )
+            ),
+            weights,
+            _domain=PASSES_DOMAIN
+        )
+
+
 from onnx_passes.passes import fold_constants
 from onnx_passes.passes import multithreshold
 
@@ -304,6 +338,7 @@ class FuseMultiThresholdLoop_v1(Sequential):
         FuseScaleIntoMultiThreshold_v1,
         FuseAddedMultiThresholds_v1,
         FuseConsecutiveMultiThresholds_v1,
+        FuseAddIntoMultiThreshold_v1,
         fold_constants,
         multithreshold.normalize,
     ]
