@@ -1,0 +1,73 @@
+from onnx_passes.passes.base import RewriteRule, Sequential
+from onnx_passes.passes.verify import Verify
+
+import onnx_ir as ir
+import numpy as np
+
+
+class EliminateWhere_v1(RewriteRule, Verify):
+    """Eliminates Where with constant all True/False condition input."""
+
+    @staticmethod
+    def pattern(op, condition, lhs, rhs):
+        return op.Where(condition, lhs, rhs, _outputs=["out"])
+
+    @staticmethod
+    def check(op, condition, lhs, rhs, out):
+        if condition := ir.convenience.get_const_tensor(condition):
+            return np.all(condition.numpy()) or not np.any(condition.numpy())
+        return False
+
+    @staticmethod
+    def rewrite(op, condition, lhs, rhs, out):
+        if np.all(ir.convenience.get_const_tensor(condition).numpy()):
+            return op.Expand(
+                lhs,
+                op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, out.shape[:]
+                    )
+                )
+            )
+        return op.Expand(
+            rhs,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
+        )
+
+
+class EliminateIdentityWhere_v1(RewriteRule, Verify):
+    """Eliminate Where with two identical branches."""
+
+    @staticmethod
+    def pattern(op, condition, x):
+        return op.Where(condition, x, x, _outputs=["out"])
+
+    @staticmethod
+    def check(op, condition, x, out):
+        return out.shape is not None and out.shape.is_static()
+
+    @staticmethod
+    def rewrite(op, condition, x, out):
+        return op.Expand(
+            x,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
+        )
+
+
+class EliminateBranchesLoop_v1(Sequential):
+    """Exhaustively apply branch elimination transformations."""
+
+    passes = [
+        EliminateWhere_v1,
+        EliminateIdentityWhere_v1,
+    ]
+
+    exhaustive = True

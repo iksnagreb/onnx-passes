@@ -1,396 +1,547 @@
-# ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
+from onnx_passes.passes.base import (
+    RewriteRule, RewriteRuleSet, RewriteRuleSetTemplate
+)
+from onnx_passes.passes.verify import Verify
+
 import onnx_ir as ir
-
-# Need to import the passes module to set up the registry and make the
-# @passes.register decorator work
-import onnx_passes.passes as passes
-
-# Derive Transformations (allowed to modify the graph) from pattern-based
-# rewrite rules
-from onnx_passes.passes.base import Transformation, RewriteRulePass
-
-# NumPy used during match condition checks to operate on shapes and tensors
 import numpy as np
 
+from abc import ABC
+from typing import Callable, Any
 
-# Removes all multiplications without effect from the graph, i.e., x * 1 = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityMul(Transformation, RewriteRulePass):
+
+class EliminateIdentity(RewriteRule, ABC):
+    """Template: Eliminate the identity element of the operation."""
+
+    operator: Callable
+    identity: Any
+
+    def match_identity(self, _, value: ir.Value):
+        """Value level checker for the identity element."""
+        if (value := ir.convenience.get_const_tensor(value)) is not None:
+            return np.all(value.numpy() == self.identity)
+        return False
+
+    def pattern(self, op, x):
+        return self.operator(op, x, self.match_identity, _outputs=["out"])
+
+    @staticmethod
+    def check(op, x, out):
+        return out.shape is not None and out.shape.is_static()
+
+    @staticmethod
+    def rewrite(op, x, out):
+        return op.Expand(
+            x,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
+        )
+
+
+class EliminateIdentityAdd_v1(EliminateIdentity, Verify):
+    """Eliminate addition of the identity element."""
+
+    identity = 0
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Add(x, y, *args, **kwargs)
+
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.Mul(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == 1)
-        return False
+class EliminateIdentitySub_v1(EliminateIdentity, Verify):
+    """Eliminate subtraction of the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = 0
 
-
-# Removes all divisions without effect from the graph, i.e., x / 1 = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityDiv(Transformation, RewriteRulePass):
-    def pattern(self, op, x, a):
-        return op.Div(x, a, _outputs=["_out"])
-
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == 1)
-        return False
-
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Sub(x, y, *args, **kwargs)
 
 
-# Removes all bitwise-and without effect from the graph, i.e., x & 11...1 = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityBitwiseAnd(Transformation, RewriteRulePass):
+class EliminateIdentityMul_v1(EliminateIdentity, Verify):
+    """Eliminate multiplication of the identity element."""
+
+    identity = 1
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Mul(x, y, *args, **kwargs)
+
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.BitwiseAnd(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == ~0)
-        return False
+class EliminateIdentityDiv_v1(EliminateIdentity, Verify):
+    """Eliminate division of the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = 1
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Div(x, y, *args, **kwargs)
 
 
-# Removes all logical-and without effect from the graph, i.e., x and True = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityAnd(Transformation, RewriteRulePass):
+class EliminateIdentityOr_v1(EliminateIdentity, Verify):
+    """Eliminate boolean Or of the identity element."""
+
+    identity = False
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Or(x, y, *args, **kwargs)
+
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.And(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == True)
-        return False
+class EliminateIdentityBitwiseOr_v1(EliminateIdentity, Verify):
+    """Eliminate bitwise Or of the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = 0
 
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.BitwiseOr(x, y, *args, **kwargs)
 
-# Removes all additions without effect from the graph, i.e., x + 0 = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityAdd(Transformation, RewriteRulePass):
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.Add(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == 0)
-        return False
+class EliminateIdentityAnd_v1(EliminateIdentity, Verify):
+    """Eliminate boolean And of the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = True
 
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.And(x, y, *args, **kwargs)
 
-# Removes all subtractions without effect from the graph, i.e., x - 0 = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentitySub(Transformation, RewriteRulePass):
-    def pattern(self, op, x, a):
-        return op.Sub(x, a, _outputs=["_out"])
-
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == 0)
-        return False
-
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
-
-
-# Removes all bitwise-or without effect from the graph, i.e., x | 0 = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityBitwiseOr(Transformation, RewriteRulePass):
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.BitwiseOr(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == 0)
-        return False
+class EliminateIdentityBitwiseAnd_v1(EliminateIdentity, Verify):
+    """Eliminate bitwise And of the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = ~0
 
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.BitwiseAnd(x, y, *args, **kwargs)
 
-# Removes all logical-or without effect from the graph, i.e., x or False = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityOr(Transformation, RewriteRulePass):
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.Or(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == False)
-        return False
+class EliminateIdentityXor_v1(EliminateIdentity, Verify):
+    """Eliminate boolean Xor of the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = False
 
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Xor(x, y, *args, **kwargs)
 
-# Removes all bitwise-xor without effect from the graph, i.e., x ^ 0 = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityBitwiseXor(Transformation, RewriteRulePass):
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.BitwiseXor(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == 0)
-        return False
+class EliminateIdentityBitwiseXor_v1(EliminateIdentity, Verify):
+    """Eliminate bitwise Xor of the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = 0
 
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.BitwiseXor(x, y, *args, **kwargs)
 
-# Removes all logical-xor without effect from the graph, i.e., x != False = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityXor(Transformation, RewriteRulePass):
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.Xor(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == False)
-        return False
+class EliminateIdentityBitShift_v1(EliminateIdentity, Verify):
+    """Eliminate bitshift with the identity element."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = 0
 
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.BitShift(x, y, *args, **kwargs)
 
-# Removes all bit-shifts without effect from the graph, i.e., x << 0 (>> 0) = x
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityBitShift(Transformation, RewriteRulePass):
     @property
-    def commute(self):
+    def commute(self) -> bool:
         return True
 
-    def pattern(self, op, x, a):
-        return op.BitShift(x, a, _outputs=["_out"])
 
-    def check(self, op, x, a, _out):
-        if a := ir.convenience.get_const_tensor(a):
-            return _out.shape is not None and np.all(a.numpy() == 0)
-        return False
+class EliminateIdentityMin_v1(EliminateIdentity, Verify):
+    """Eliminate minimum identity element, i.e., +infinity."""
 
-    def rewrite(self, op, x, a, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    identity = +np.inf
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Min(x, y, *args, **kwargs)
+
+    @property
+    def commute(self) -> bool:
+        return True
 
 
-# Checks for matrix eye being a valid identity matrix to be multiplied with
-# matrix x from either side
-def check_identity_matmul(x, eye):
+class EliminateIdentityMax_v1(EliminateIdentity, Verify):
+    """Eliminate maximum identity element, i.e., -infinity."""
+
+    identity = -np.inf
+
+    @staticmethod
+    def operator(op, x, y, *args, **kwargs):
+        return op.Max(x, y, *args, **kwargs)
+
+    @property
+    def commute(self) -> bool:
+        return True
+
+
+def identity_matrix(_, matrix: ir.Value):
+    """Value level checker for the identity matrix in any dimensions."""
+
     # Try to unpack the shapes, raises ValueError if there are not enough
     # dimensions to unpack (identity matrix needs at least 2 dimensions)
     try:
-        *_, N, M = eye.shape
+        *_, N, M = matrix.shape
     except ValueError:
         return False
 
-    # The potential identity matrix must be square and match the last two
-    # dimensions of the intput (only last dimension in case of 1D input)
-    if N == M and tuple(x.shape[-2:]) in {(N, N), (N,)}:
-        if eye := ir.convenience.get_const_tensor(eye):
-            # Broadcasts over any batch dimensions
-            return np.all(eye == np.eye(N, N))
+    # The potential identity matrix must be square and match the broadcast NxN
+    # identity matrix, i.e., it must be identity in all leading dimensions.
+    if (N == M) and (matrix := ir.convenience.get_const_tensor(matrix)):
+        return np.all(matrix == np.eye(N, N))
 
-    # Not constant or not a valid identity matrix
     return False
 
 
-# Eliminates constant matrix multiplications without effect, i.e.,
-# multiplications by the identity matrix which exists for square matrices
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityMatMulLhs(Transformation, RewriteRulePass):
-    def pattern(self, op, x, eye):
-        return op.MatMul(eye, x, _outputs=["_out"])
+class EliminateIdentityMatMul_v1(RewriteRuleSet, Verify):
+    """Eliminate multiplication of the identity matrix."""
 
-    def check(self, op, x, eye, _out):
-        if x.shape is not None and x.shape.is_static():
-            if eye.shape is not None and eye.shape.is_static():
-                return _out.shape is not None and check_identity_matmul(x, eye)
-        return False
+    @staticmethod
+    def pattern():
+        return [
+            lambda op, x: op.MatMul(x, identity_matrix, _outputs=["out"]),
+            lambda op, x: op.MatMul(identity_matrix, x, _outputs=["out"]),
+        ]
 
-    def rewrite(self, op, x, eye, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
+    def check(self):
+        return [
+            lambda op, x, out: out.shape is not None and out.shape.is_static(),
+            lambda op, x, out: out.shape is not None and out.shape.is_static(),
+        ]
+
+    @staticmethod
+    def rewrite():
+        return [
+            lambda op, x, out: op.Expand(
+                x,
+                op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, out.shape[:]
+                    )
+                )
+            ),
+            lambda op, x, out: op.Expand(
+                x,
+                op.Constant(
+                    value_ints=ir.Attr(
+                        "value_ints", ir.AttributeType.INTS, out.shape[:]
+                    )
+                )
+            ),
+        ]
 
 
-# Eliminates constant matrix multiplications without effect, i.e.,
-# multiplications by the identity matrix which exists for square matrices
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityMatMulRhs(Transformation, RewriteRulePass):
-    def pattern(self, op, x, eye):
-        return op.MatMul(x, eye, _outputs=["_out"])
+class EliminateIdentityCast_v1(RewriteRule, Verify):
+    """Eliminates identity Cast where the target type is the input type."""
 
-    def check(self, op, x, eye, _out):
-        if x.shape is not None and x.shape.is_static():
-            if eye.shape is not None and eye.shape.is_static():
-                return _out.shape is not None and check_identity_matmul(x, eye)
-        return False
-
-    def rewrite(self, op, x, eye, _out):
-        return op.Expand(x, op.Constant(value_ints=list(_out.shape)))
-
-
-# Eliminates type-casts where the target type is known and the same as the type
-# of the input: This rule matches the Cast operator with attribute target type
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityCast(Transformation, RewriteRulePass):
-    def pattern(self, op, x, to):
+    @staticmethod
+    def pattern(op, x, to):
         return op.Cast(x, to=to)
 
-    def check(self, op, x, to):
+    @staticmethod
+    def check(op, x, to):
         return x.dtype == to.as_int()
 
-    def rewrite(self, op, x, to):
+    @staticmethod
+    def rewrite(op, x, to):
         return op.Identity(x)
 
 
-# Eliminates type-casts where the target type is known and the same as the type
-# of the input: This rule matches the Cast operator with target type derived
-# from a second input
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityCastLike(Transformation, RewriteRulePass):
-    def pattern(self, op, x, y):
-        return op.CastLike(x, y)
+class EliminateIdentityCastLike_v1(RewriteRule, Verify):
+    """Eliminate identity Cast where the target type is the input type."""
 
-    def check(self, op, x, y):
-        return x.dtype == y.dtype
+    @staticmethod
+    def pattern(op, x, target):
+        return op.CastLike(x, target)
 
-    def rewrite(self, op, x, y):
+    @staticmethod
+    def check(op, x, target):
+        return x.dtype == target.dtype and target.dtype is not None
+
+    @staticmethod
+    def rewrite(op, x, target):
         return op.Identity(x)
 
 
-# Eliminates Expand (broadcast) where the target shape is known and the same as
-# the static shape of the input
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityExpand(Transformation, RewriteRulePass):
-    def pattern(self, op, x, shape):
+class EliminateIdentityExpand_v1(RewriteRule, Verify):
+    """Eliminate Expand where the target shape is the same as the input."""
+
+    @staticmethod
+    def pattern(op, x, shape):
         return op.Expand(x, shape)
 
-    def check(self, op, x, shape):
+    @staticmethod
+    def check(op, x, shape):
         if x.shape is not None and x.shape.is_static():
             if (shape := ir.convenience.get_const_tensor(shape)) is not None:
-                return np.all(shape.numpy() == x.shape)
+                return tuple(shape.numpy()) == x.shape
         return False
 
-    def rewrite(self, op, x, shape):
+    @staticmethod
+    def rewrite(op, x, shape):
         return op.Identity(x)
 
 
-# Domain used by custom operators implemented with this library
-from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
-# Make custom Im2Col operator available for convolution lowering
-from onnx_passes.ops.im2col import Im2Col  # noqa: Used indirectly via registry
+class EliminateIdentityReshape_v1(RewriteRule, Verify):
+    """Eliminate Reshape where the target shape is the same as the input."""
+
+    @staticmethod
+    def pattern(op, x, shape):
+        return op.Reshape(x, shape)
+
+    @staticmethod
+    def check(op, x, shape):
+        if x.shape is not None and x.shape.is_static():
+            if (shape := ir.convenience.get_const_tensor(shape)) is not None:
+                return tuple(shape.numpy()) == x.shape
+        return False
+
+    @staticmethod
+    def rewrite(op, x, shape):
+        return op.Identity(x)
 
 
-# Eliminates Im2Col (input generators) where the output shape is the same as the
-# input shape, which is given if the kernel, stride and dilation are all 1
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentityIm2Col(Transformation, RewriteRulePass):
-    def pattern(self, op, x, indices, dilations, kernel_shape, strides):
-        return op.Im2Col(
-            x, indices, dilations=dilations, kernel_shape=kernel_shape,
-            strides=strides, _domain=CUSTOM_DOMAIN
+class EliminateIdentityTranspose_v1(RewriteRule, Verify):
+    """Eliminate identity transpose operations, i.e., identity permutations."""
+
+    @staticmethod
+    def pattern(op, x, perm):
+        return op.Transpose(x, perm=perm)
+
+    @staticmethod
+    def check(op, x, perm):
+        if perm is not None and perm.as_ints() is not None:
+            return np.all(perm.as_ints() == tuple(range(len(perm.as_ints()))))
+        return False
+
+    @staticmethod
+    def rewrite(op, x, perm):
+        return op.Identity(x)
+
+
+class EliminateIdentitySlice_v1(RewriteRule):
+    """Eliminate identity Slice operations."""
+
+    @staticmethod
+    def pattern(op, x, starts, ends, axes, steps):
+        return op.Slice(x, starts, ends, axes, steps, _outputs=["y"])
+
+    @staticmethod
+    def check(op, x, starts, ends, axes, steps, y):
+        # Constant steps to check for reversal of elements
+        if (steps := ir.convenience.get_const_tensor(steps)) is not None:
+            # Static and identical input and output shapes
+            if x.shape is not None and x.shape.is_static():
+                if y.shape is not None and y.shape.is_static():
+                    if tuple(x.shape.numpy()) == tuple(y.shape.numpy()):
+                        # Slicing backwards might keep the shape but rearrange
+                        # the content, this should be rejected
+                        return np.all(steps.numpy() == 1)
+        return False
+
+    @staticmethod
+    def rewrite(op, x, starts, ends, axes, steps, y):
+        return op.Identity(x)
+
+
+class EliminateIdentityReduce_v1(RewriteRuleSetTemplate, Verify):
+    """Eliminate identity Reduce operations."""
+
+    patterns = (
+        lambda op: op.ReduceL1,
+        lambda op: op.ReduceL2,
+        lambda op: op.ReduceLogSum,
+        lambda op: op.ReduceLogSumExp,
+        lambda op: op.ReduceMax,
+        lambda op: op.ReduceMean,
+        lambda op: op.ReduceMin,
+        lambda op: op.ReduceProd,
+        lambda op: op.ReduceSum,
+        lambda op: op.ReduceSumSquare,
+    )
+
+    @staticmethod
+    def pattern_v18(partial, op, x):
+        return partial(op)(x, _allow_other_inputs=True, _outputs=["out"])
+
+    @staticmethod
+    def check_v18(context, x, out):
+        # Collect original attributes (all Reduce* share supported and defaults
+        # attributes) and infer the default noop_with_empty_axes.
+        attributes = out.producer().attributes
+
+        if not (noop_with_empty_axes := attributes.get("noop_with_empty_axes")):
+            noop_with_empty_axes = ir.Attr(
+                "noop_with_empty_axes", ir.AttributeType.INT, 0
+            )
+
+        # There are two ways in which Reduce can be an identity operation, both
+        # relying on static input and output shapes
+        if x.shape is None or x.shape.is_dynamic():
+            return False
+
+        if out.shape is None or out.shape.is_dynamic():
+            return False
+
+        # A) The reduction axes are empty and the noop_with_empty_axes attribute
+        #    is set to 1
+
+        # Handle both, missing optional and explicitly empty axes input if this
+        # is noop_with_empty_axes=1
+        axes: ir.Value | None = None
+
+        if len(out.producer().inputs) > 1:
+            axes = out.producer().inputs[1]
+
+        if axes is None or axes.shape is not None and np.prod(axes.shape) == 0:
+            return noop_with_empty_axes.as_int() == 1
+
+        # B) The input shape is singleton (i.e., size 1) in all reduction axes
+        #    which for this case must be a constant tensor.
+
+        if (axes := ir.convenience.get_const_tensor(axes)) is not None:
+            return np.all(np.asarray(x.shape)[axes.numpy()] == 1)
+
+        return False
+
+    @staticmethod
+    def rewrite_v18(partial, op, x, out):
+        return op.Reshape(
+            x,
+            op.Constant(
+                value_ints=ir.Attr(
+                    "value_ints", ir.AttributeType.INTS, out.shape[:]
+                )
+            )
         )
 
-    def check(self, op, x, indices, dilations, kernel_shape, strides):
-        if dilations is not None:
-            if np.any(np.asarray(dilations.as_ints()) != 1):
-                return False
 
-        if kernel_shape is not None:
-            if np.any(np.asarray(kernel_shape.as_ints()) != 1):
-                return False
+class EliminateIdentityConcat_v1(RewriteRule, Verify):
+    """Eliminate identity Concat operations."""
 
-        if strides is not None:
-            if np.any(np.asarray(strides.as_ints()) != 1):
-                return False
+    @staticmethod
+    def pattern(op, x, axis):
+        return op.Concat(x, axis=axis)
 
-        return True
+    @staticmethod
+    def check(context, x, axis):
+        return len(context.root.outputs) == 1
 
-    def rewrite(self, op, x, indices, dilations, kernel_shape, strides):
+    @staticmethod
+    def rewrite(op, x, axis):
         return op.Identity(x)
 
 
-# Identity elimination pass build into ONNX IR and ONNXScript
+from onnx_passes.ops import DOMAIN as PASSES_DOMAIN
+
+
+class EliminateIdentityIm2Col_v1(RewriteRule, Verify):
+    """Eliminate identity Im2Col operations."""
+
+    @staticmethod
+    def pattern(op, x, dilations, kernel_shape, strides):
+        return op.Im2Col(
+            x,
+            dilations=dilations,
+            kernel_shape=kernel_shape,
+            strides=strides,
+            _domain=PASSES_DOMAIN
+        )
+
+    @staticmethod
+    def check(context, x, dilations, kernel_shape, strides):
+        if np.all(np.asarray(dilations.as_ints()) == 1):
+            if np.all(np.asarray(kernel_shape.as_ints()) == 1):
+                return np.all(np.asarray(strides.as_ints()) == 1)
+
+        return False
+
+    @staticmethod
+    def rewrite(op, x, dilations, kernel_shape, strides):
+        return op.Identity(x)
+
+
+from onnx_passes.passes.base import Transformation, Sequential
+
+# Common identity elimination pass build into ONNX IR and ONNXScript
 from onnx_ir.passes.common import IdentityEliminationPass
 
 
-@passes.verify.equality
-@passes.register("eliminate")
-@passes.register("eliminate-identity")
-class EliminateIdentity(passes.base.Transformation):
+class EliminateIdentity_v1(Transformation):
+    """Eliminate Identity operators where applicable."""
+
     def call(self, model: ir.Model) -> ir.passes.PassResult:
         return IdentityEliminationPass()(model)
+
+
+class EliminateIdentityLoop_v1(Sequential):
+    """Exhaustively apply identity elimination transformations."""
+
+    passes = [
+        EliminateIdentityAdd_v1,
+        EliminateIdentitySub_v1,
+        EliminateIdentityMul_v1,
+        EliminateIdentityDiv_v1,
+        EliminateIdentityOr_v1,
+        EliminateIdentityBitwiseOr_v1,
+        EliminateIdentityAnd_v1,
+        EliminateIdentityBitwiseAnd_v1,
+        EliminateIdentityXor_v1,
+        EliminateIdentityBitwiseXor_v1,
+        EliminateIdentityBitShift_v1,
+        EliminateIdentityMin_v1,
+        EliminateIdentityMax_v1,
+        EliminateIdentityMatMul_v1,
+        EliminateIdentityCast_v1,
+        EliminateIdentityCastLike_v1,
+        EliminateIdentityExpand_v1,
+        EliminateIdentityReshape_v1,
+        EliminateIdentityTranspose_v1,
+        EliminateIdentitySlice_v1,
+        EliminateIdentityReduce_v1,
+        EliminateIdentityConcat_v1,
+        EliminateIdentityIm2Col_v1,
+        EliminateIdentity_v1
+    ]
+
+    exhaustive = True

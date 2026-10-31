@@ -1,4 +1,38 @@
-# Include basic inlining transformations
-import onnx_passes.passes.inline.functions
-import onnx_passes.passes.inline.batchnorm
-import onnx_passes.passes.inline.gemm
+from onnx_passes.passes.base import Transformation, Sequential
+from onnx_passes.passes.verify import Verify
+
+import onnx_ir as ir
+
+# Common passes already implemented in ONNX IR
+import onnx_ir.passes.common
+
+_BLACKLIST: set[str] = {
+    "Quant", "MultiThreshold", "Im2Col"
+}
+
+
+def _criterion(function: ir.Function) -> bool:
+    """Decide whether to inline the function."""
+    return function.name not in _BLACKLIST
+
+
+class InlineFunctions_v1(Transformation, Verify):
+    """Inline model local ONNX functions into the main graph."""
+
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        return ir.passes.common.InlinePass(_criterion)(model)
+
+
+from onnx_passes.passes.inline import reduce
+from onnx_passes.passes.inline import quantizer
+
+
+class InlineLoop_v1(Sequential):
+    """Exhaustively apply inlining transformations."""
+
+    passes = [
+        InlineFunctions_v1,
+        reduce
+    ]
+
+    exhaustive = True
