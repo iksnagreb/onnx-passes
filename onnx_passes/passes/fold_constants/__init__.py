@@ -71,6 +71,9 @@ def _fold_constants(model: ir.Model,
 
                 if (value := ir.convenience.get_const_tensor(x)) is not None:
                     context[x.name] = value.numpy()
+                else:
+                    skip = True
+                    break
 
         # Do not even try to execute with incomplete input list for not to be
         # constant folded operations
