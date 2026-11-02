@@ -72,6 +72,8 @@ class CompileToMultiThresholds_v1(Sequential):
     3. Threshold normalization from ANF to fused MultiThreshold custom operator
        and specific optimizations: sorting, deduplication, elimination of dead
        thresholds and parameter tensor unbroadcasting.
+
+    See https://arxiv.org/abs/2610.21825
     """
 
     passes = [
