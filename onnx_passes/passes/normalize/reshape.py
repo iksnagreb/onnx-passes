@@ -9,11 +9,11 @@ class RewriteFlattenAsReshape_v1(RewriteRule, Verify):
     """Rewrite Flatten operations as Reshape."""
 
     @staticmethod
-    def pattern_v13(op, x, axis):
+    def pattern_v11(op, x, axis):
         return op.Flatten(x, axis=axis)
 
     @staticmethod
-    def rewrite_v13(op, x, axis):
+    def rewrite_v11(op, x, axis):
         # Calculate the sizes of the two output axes: The first flattens the
         # input shape up to the axis, the second flattens the rest.
         dim0 = op.ReduceProd(
