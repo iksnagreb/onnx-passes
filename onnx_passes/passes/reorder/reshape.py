@@ -16,6 +16,11 @@ class MoveElementwisePastReshape_v1(RewriteRule, Verify):
         return op.Reshape(produced_by_elementwise, shape, _outputs=["out"])
 
     @staticmethod
+    def check(context, shape, out):
+        xs = out.producer().inputs[0].producer().inputs
+        return sum(ir.convenience.get_const_tensor(x) is None for x in xs) <= 1
+
+    @staticmethod
     def rewrite(op, shape, out):
         # Find the elementwise operator which produces the input to the matched
         # reshape operator (the value level check guarantees this exists and is
