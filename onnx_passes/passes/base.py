@@ -448,7 +448,12 @@ def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
         ir.passes.common.ShapeInferencePass()
     ])
 
-    return cleanup(model)
+    result = cleanup(model)
+
+    if result.modified:
+        result = _give_canonical_names(result.model, inplace=True)
+
+    return result
 
 
 class Transformation(Pass, ABC):
