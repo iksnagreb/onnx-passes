@@ -142,7 +142,7 @@ class OnnxPasses(Config, use_attribute_docstrings=True):
                 # Update settings with resolved passes which actually modified
                 # the model to save these to the settings dump
                 self.passes = [
-                    f"{p.identifier}" for p in state.modified_by
+                    f"{identifier}" for identifier in state.modified_by
                 ]
 
             with open(f"{self.output}.passes.yaml", "w") as file:

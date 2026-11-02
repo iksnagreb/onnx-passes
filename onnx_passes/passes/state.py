@@ -1,4 +1,5 @@
 # Define configuration structures as dataclasses
+import copy
 from dataclasses import dataclass, field
 # Type hints for annotating dataclass members
 from typing import Any
@@ -47,8 +48,8 @@ class State:
 
     counter: int = field(default=0)
     history: list[type] = field(default_factory=list)
-    modified_by: list[object] = field(default_factory=list)
-    verified_by: list[tuple[object, VerifyState]] = field(default_factory=list)
+    modified_by: list[str] = field(default_factory=list)
+    verified_by: list[tuple[str, VerifyState]] = field(default_factory=list)
 
     @property
     def last(self):
@@ -77,7 +78,7 @@ class State:
                 f"Tried to log modified result without ever logging a pass"
             )
 
-        self.modified_by.append(p)
+        self.modified_by.append(p.identifier)
 
     def log_verified_by(self, p, inputs, outputs, expected, context, **metrics):
         """Logs a verification result to the state."""
@@ -90,5 +91,10 @@ class State:
             )
 
         self.verified_by.append(
-            (p, State.VerifyState(inputs, outputs, expected, context, metrics))
+            (
+                p.identifier,
+                State.VerifyState(
+                    inputs, outputs, expected, context, metrics
+                )
+            )
         )
