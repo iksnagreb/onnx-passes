@@ -651,7 +651,7 @@ class UnbroadcastThresholds_v1(RewriteRule, Verify):
         # reinsert the parameter tensors into the graph. Expand the output back
         # to the original shape to not lose any dimensions.
         thresholds = unbroadcast(thresholds, axes=range(thresholds.ndim - 1))
-        weights = unbroadcast(weights, axes=range(weights.ndim - 1))
+        weights = unbroadcast(weights)
 
         thresholds = op.Constant(value=ir.tensor(thresholds))
         weights = op.Constant(value=ir.tensor(weights))
