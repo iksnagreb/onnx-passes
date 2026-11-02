@@ -3,19 +3,16 @@ This demo model comprises a sequence of transpose operations alongside simple
 elementwise operations, such as addition, multiplication and activation
 functions such as Relu and Gelu. All but the transpose following the Gelu are
 matched by another transpose and the overall permutation of axes could be
-expressed by a single transpose at the output.
+expressed by a single transpose at the input (or output).
 ```bash
-netron --browse model.onnx
+onnx-passes --browse -o out.onnx --verify.inputs inp.npy model.onnx \
+ canonicalize
 ```
 
 ## Transpose Streamlining with Constant-Folding
-Streamlining transposes is categorized as shape streamlining. Without constant 
-folding, transpose propagation and elimination might be blocked. When combining
-transpose and shape streamlining with constant folding, shapes and transposes
-propagate and can be folded into constant parameter tensors. As expected, only
-the unmatched transpose following the Gelu remain and propagates to the end of
-the graph:
+Streamlining transposes is part of the reordering passes, where 
+elementwise-transpose are reordered such that transposes propagate upwards the graph and combine cancel out via normalization passes.
 ```bash
-onnx-passes -c cfg.yaml -o out.onnx model.onnx streamline checker verify
-netron --browse out.onnx
+onnx-passes --browse -o out.onnx --verify.inputs inp.npy model.onnx \
+ canonicalize reorder
 ```

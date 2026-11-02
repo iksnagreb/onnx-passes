@@ -1,363 +1,334 @@
-# ir.Model, ir.passes.PassResult, ir.from_proto, ir.to_proto, ...
+# Build a class hierarchy of ONNX passes starting from ABC
+from abc import ABC
+# Path to files or directories
+from pathlib import Path
+# Type hints for annotating dataclass members
+from typing import Any, Callable
+# Verification styles are selected via enums
+from enum import Enum
+
+# ONNX intermediate representation
 import onnx_ir as ir
-# NumPy for handling verification reference data
+# Numpy arrays are used for verification inputs/outputs
 import numpy as np
 
-# Base class for all custom ONNX IR passes developed in this library - this base
-# class defines the (optional) interface for configuration and state tracking
-from onnx_passes.passes.base import Pass, Analysis
-# Utility functions on Pass objects for loading reference data and injecting
-# pre- and post-conditions
-from onnx_passes.passes.util import (
-    inject_pre_post_condition, load_reference_data
-)
-# Custom, configurable wrapper around ONNX Runtime for model execution
-from onnx_passes.passes.runtime import evaluate_model
+# Use the ONNX reference evaluator to evaluate the model for verification
+from onnx.reference import ReferenceEvaluator
 
-# Need to import the passes module to set up the registry and make the
-# @passes.register decorator work
-import onnx_passes.passes as passes
+# Pass configuration and state tracking structures and the base class for all
+# passes
+from onnx_passes.passes.config import Config
+from onnx_passes.passes.state import State
+from onnx_passes.passes.base import Pass, VerificationError
+
+from onnx_passes.ops import link_ops
 
 
-# Exception type indicating verification failure while evaluating pre- and
-# post-conditions - currently does not do add anything ontop the base Exception.
-class VerificationError(Exception):
-    ...
+def _evaluate_model(model: ir.Model, inputs: list[Any]):
+    """Evaluates the model using the ONNX reference evaluator."""
+
+    # Link all missing custom operator functions from out domains into the model
+    # graph
+    model = link_ops(model)
+
+    # Fill the execution context with the input values assuming they
+    # correspond to the model graph inputs in correct order
+    context = {}
+
+    for tensor, value in zip(model.graph.inputs, inputs):
+        if (dtype := tensor.dtype) is not None:
+            value = np.asarray(value, dtype.numpy())
+        context[tensor.name] = np.asarray(value)
+
+    # Use the ONNX reference evaluator to execute the model on the context
+    # collecting named outputs into the context as well
+    session = ReferenceEvaluator(ir.to_proto(model))
+    context = session.run(None, context, intermediate=True)
+
+    # Collect the outputs from the execution context assuming they
+    # correspond to the model graph outputs in correct order
+    outputs = []
+
+    for tensor in model.graph.outputs:
+        outputs.append(np.asarray(context[tensor.name]))  # noqa: Not None...?
+
+    return outputs, context
 
 
-# Calculates the maximum absolute error between all outputs and expected outputs
+# Use importlib for dynamic imports
+from importlib import import_module
+
+
+def _resolve_metric(identifier: str | Callable):
+    """Resolves the metric evaluation function from the identifier."""
+
+    # Pass through already resolved callables
+    if isinstance(identifier, Callable):
+        return identifier
+
+    identifier: str = str(identifier)
+
+    # First try to look up the function in the global scope, if it is not there,
+    # try interpreting the identifier as a fully qualified name
+    try:
+        return globals()[identifier]
+    except KeyError:
+        try:
+            *module, function = identifier.split(".")
+            return getattr(import_module(".".join(module)), function)
+        except ValueError or KeyError or ModuleNotFoundError:
+            raise KeyError(f"Could not resolve metric: {identifier}")
+
+
+class Verify(Pass, ABC):
+    """Makes a pass verify the model after application."""
+
+    class Method(Enum):
+        """Selectors for verification methods."""
+        EQUALITY = 0
+        TOLERANCE = 1
+        METRIC = 2
+
+    _method: Method = Method.EQUALITY
+
+    _inputs: list[Any]
+    _outputs: list[Any]
+    _expected: list[Any]
+    _expected_model: ir.Model
+
+    def __init__(self, config: Config = Config()):
+        """Initializes the pass with a pass configuration."""
+        super().__init__(config)
+
+        # Clear the verification data
+        self._inputs = []
+        self._outputs = []
+        self._expected = []
+
+    def prepare_verify(self, model: ir.Model):
+        """Prepare model verification before applying the pass."""
+
+        # Skip verification if disabled globally by setting the configuration
+        # entry to False
+        if not self.config.verify:
+            if self.config.logging.verbose:
+                print(
+                    f"Skipping verification of {self.identifier}:"
+                    f" Verification not enabled"
+                )
+            return
+
+        # Load the reference inputs and expected outputs from files if not
+        # already loaded
+        if not self._inputs:
+            for file_or_value in self.config.verify.inputs:  # noqa: Not bool
+                if isinstance(file_or_value, Path | str):
+                    file_or_value = np.load(file_or_value)
+                self._inputs.append(file_or_value)
+
+        if not self._expected:
+            for file_or_value in self.config.verify.expected:  # noqa: Not bool
+                if isinstance(file_or_value, Path | str):
+                    file_or_value = np.load(file_or_value)
+                self._expected.append(file_or_value)
+
+        # Equality- and tolerance-based verification compares before and after
+        # results instead of some fixed expectation
+        if self._method in {Verify.Method.EQUALITY, Verify.Method.TOLERANCE}:
+            self._expected_model = model.clone(deep_copy=True)
+
+    def verify(self, result: ir.passes.PassResult):
+        """Verify the model after applying the pass."""
+
+        # Skip verification if disabled globally by setting the configuration
+        # entry to False or if the model has not been changed by the pass
+        if not self.config.verify:
+            if self.config.logging.verbose:
+                print(
+                    f"Skipping verification of {self.identifier}:"
+                    f" Verification not enabled"
+                )
+            return
+
+        if not result.modified:
+            if self.config.logging.verbose:
+                print(
+                    f"Skipping verification of {self.identifier}:"
+                    f" Model not modified"
+                )
+            return
+
+        # Equality- and tolerance-based verification compares before and after
+        # results instead of some fixed expectation
+        if self._method in {Verify.Method.EQUALITY, Verify.Method.TOLERANCE}:
+            # Use the ONNX reference evaluator to execute the expected model on
+            # the inputs collecting expected outputs
+            try:
+                self._expected, _ = _evaluate_model(
+                    self._expected_model, self._inputs
+                )
+            except RuntimeError as e:
+                raise VerificationError(
+                    f"Verification of pass '{self.identifier}' failed"
+                ) from e
+
+        # Use the ONNX reference evaluator to execute the model on the inputs
+        # collecting outputs and the full execution context as well
+        try:
+            self._outputs, context = _evaluate_model(result.model, self._inputs)
+        except RuntimeError as e:
+            raise VerificationError(
+                f"Verification of pass '{self.identifier}' failed"
+            ) from e
+
+        # Discard the full execution context if not requested for debugging
+        # purposes
+        if not self.config.verify.full_context_dump:  # noqa: Not bool
+            context = None
+
+        # Compare the produced to the expected outputs depending on the selected
+        # verification method
+        metrics = {}
+
+        if self._method == Verify.Method.METRIC:
+            for metric in self.config.verify.metrics:  # noqa: Not None
+                function = _resolve_metric(key := metric.function)
+
+                if not isinstance(key, str):
+                    key = f"{key.__module__}.{key.__name__}"  # noqa: __module__
+
+                metrics[key] = function(self._outputs, self._expected)
+
+        # Log the verification inputs and outputs to the metadata for debugging
+        # before evaluating the condition and potentially raising expections
+        result.model.meta.setdefault("passes", State()).log_verified_by(
+            self,
+            self._inputs, self._outputs, self._expected, context, **metrics
+        )
+
+        # Compare for *strict* equality of *all* values from *all* outputs
+        if self._method == Verify.Method.EQUALITY:
+            for tensor, x, y in zip(
+                    result.model.graph.outputs, self._outputs, self._expected
+            ):
+                if not np.all((x == y) | np.isnan(y)):
+                    raise VerificationError(
+                        f"Output '{tensor.name}' not as expected"
+                        f" after '{self.identifier}'"
+                    )
+
+        # Compare equality within tolerance of *all* values from *all* outputs
+        if self._method == Verify.Method.TOLERANCE:
+            for tensor, x, y in zip(
+                    result.model.graph.outputs, self._outputs, self._expected
+            ):
+                kwargs = self.config.verify.tolerance.model_dump()
+
+                if not np.all(np.isclose(x, y, **kwargs) | np.isnan(y)):
+                    raise VerificationError(
+                        f"Output {tensor.name} not within tolerance {kwargs}"
+                        f" after '{self.identifier}': {np.max(np.abs(x - y))}"
+                    )
+
+        # Check whether all metrics lie within the required range and raise
+        # exception if not
+        if self._method == Verify.Method.METRIC:
+            for metric in self.config.verify.metrics:  # noqa: Not None
+                key, (_min, _max) = metric.function, metric.range
+
+                if not isinstance(key, str):
+                    key = f"{key.__module__}.{key.__name__}"  # noqa: __module__
+
+                if not _min <= (value := metrics[key]) <= _max:
+                    raise VerificationError(
+                        f"{key} {value} not within [{_min}, {_max}] as required"
+                        f" after '{self.identifier}'"
+                    )
+
+        if self.config.logging.verbose:
+            print(
+                f"Successfully verified model after {self.identifier}"
+            )
+
+
+def equality(cls):
+    """Marks a pass to verify the model for strict equality."""
+
+    if not issubclass(cls, Verify):
+        raise SyntaxError(f"Decorator only applies to verified passes: {cls}")
+
+    cls._method = Verify.Method.EQUALITY
+
+    return cls
+
+
+def tolerance(cls):
+    """Marks a pass to verify the model within tolerance."""
+
+    if not issubclass(cls, Verify):
+        raise SyntaxError(f"Decorator only applies to verified passes: {cls}")
+
+    cls._method = Verify.Method.TOLERANCE
+
+    return cls
+
+
+def metric(cls):
+    """Marks a pass to verify the model via metrics."""
+
+    if not issubclass(cls, Verify):
+        raise SyntaxError(f"Decorator only applies to verified passes: {cls}")
+
+    cls._method = Verify.Method.METRIC
+
+    return cls
+
+
+@metric
+class VerifyMetrics_v1(Verify):
+    """Metric-based verification of the model without actually modifying."""
+
+    @property
+    def in_place(self) -> bool:
+        return True
+
+    @property
+    def changes_input(self) -> bool:
+        return True
+
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        return ir.passes.PassResult(model, True)
+
+
 def max_abs_error(produced: list, expected: list) -> float:
+    """Calculate the maximum absolute error between each pair of elements."""
+
     try:
         return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
     except TypeError:
         # Try fallback interpreting all values as 32-bit floats
         produced = [x.astype(np.float32) for x in produced]
         expected = [y.astype(np.float32) for y in expected]
+
         return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
 
 
-# Calculates the classification accuracy by interpreting the list of produced
-# outputs as a single tensor of class probabilities and the expected as a single
-# tensor of matching expected classes
 def accuracy(produced: list, expected: list) -> float:
-    # Unwrap the single probability and expected classes tensors
+    """Calculate top-1 classification accuracy for produced probabilities.
+
+    This implementation assumes the model produces a single output tensor with
+    class probabilities along its final axis. Preceding axes may be spatial or
+    batch dimensions and will be flattened.
+    """
+
+    # Assuming a single global output from the model, unwrap the produced and
+    # expected list. If the shape of the expected classes indicates these are
+    # class probabilities as well, summarize these first.
     probabilities, classes = produced[0], expected[0]
-    # Get predicted classes by taking the top-1 probability prediction
+
+    if classes.shape == probabilities.shape:
+        classes = classes.argmax(axis=-1)
+
     predictions = probabilities.argmax(axis=-1)
-    # Total number of predictions: Expected number of class predictions
-    total = classes.size
-    # Classification accuracy is the fraction of correct classifications
-    return float(sum(predictions == classes) / total)  # noqa: sum(bool...)
 
-
-# Calculates the top-5 classification accuracy by interpreting the list of
-# produced outputs as a single tensor of class probabilities and the expected as
-# a single tensor of matching expected classes
-def top_5_accuracy(produced: list, expected: list) -> float:
-    # Unwrap the single probability and expected classes tensors
-    probabilities, classes = produced[0], expected[0]
-    # Get predicted classes by taking the top-1 probability prediction
-    predictions = probabilities.argsort(axis=-1)[:, -5:]
-    # Add broadcastable dimensions matching the top-5 to the classes
-    classes = classes[:, None]
-    # Total number of predictions: Expected number of class predictions
-    total = classes.size
-    # Classification accuracy is the fraction of correct classifications
-    return float(sum((predictions == classes).any(axis=-1)) / total)  # noqa
-
-
-# Counts the number of mispredictions by taking the argmax along the final axis
-def count_mispredictions(produced: list, expected: list) -> float:
-    # Unwrap the single probability and expected probabilities tensors
-    probabilities, expected = produced[0], expected[0]
-    # Count instances where the predicted and expected class differ
-    return np.sum(probabilities.argmax(axis=-1) != expected.argmax(axis=-1))
-
-
-# Injects equality-based verification into an ONNX IR pass by checking if the
-# model output on some reference is equal to the known expected output
-def equality(cls: type[Pass]):
-    # Pre-condition comparing model outputs to a reference for strict
-    # equality - should not fail, prepares for post-condition
-    def requires(self: Pass, model: ir.Model) -> None:
-        # Verification can be disabled globally by setting it to False or
-        # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {}):
-            return
-
-        # Load ONNX Runtime configuration
-        onnxruntime = self.config.setdefault("onnxruntime", {})
-
-        # Load reference input data for verification
-        inputs, _ = load_reference_data(self)
-        # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs, **onnxruntime)
-        # Set the produced output as the expectation checked against as the
-        # post-condition
-        self.expected = produced
-
-    # Post-condition comparing model outputs to a reference for strict
-    # equality - fails raising VerificationError if the output does not match
-    def ensures(self: Pass, result: ir.passes.PassResult) -> None:
-        # Verification can be disabled globally by setting it to False or
-        # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {}):
-            return
-
-        # Verbosity can be enabled globally by setting it to True
-        self.config.setdefault("logging", {}).setdefault("verbose", False)
-
-        # Skip evaluating on post-condition if the pass did not modify the
-        # model
-        if not result.modified:
-            # Verbosity should now be defined, either defaulting to False or
-            # explicitly
-            if self.config["logging"]["verbose"]:
-                # TODO: Make use of a proper logger...
-                print(f"Skipping verification of {self.__class__.__name__}")
-            # Exit here, skipping running inference
-            return
-
-        # Extract the model from the pass results
-        model = result.model
-
-        # Load ONNX Runtime configuration
-        onnxruntime = self.config.setdefault("onnxruntime", {})
-
-        # Load reference input data for verification
-        inputs, _ = load_reference_data(self)
-        # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs, **onnxruntime)
-
-        # Prepare logging verification results to the state dictionary
-        self.state_dict.setdefault("verify", {})
-
-        # Log the full input-output-expectation history for each
-        # verification pass
-        self.state_dict["verify"].setdefault("history", {})[self.id] = (
-            inputs, produced, self.expected, context
-        )
-
-        # Compare for *strict* equality of *all* values from *all* outputs
-        for output, x, y in zip(model.graph.outputs, produced, self.expected):
-            if np.any(x != y):
-                raise VerificationError(f"{output.name} not as expected")
-
-        # Verbosity should now be defined, either defaulting to False or
-        # explicitly
-        if self.config["logging"]["verbose"]:
-            # TODO: Make use of a proper logger...
-            print(f"Verified {self.__class__.__name__}")
-
-    # Inject the pre- and post-condition into the ONNX IR pass and return the
-    # modified class to allow for arbitrarily stacking decorators
-    return inject_pre_post_condition(cls, requires, ensures)
-
-
-# Explicit verification pass: Treated as an analysis pass, does not change the
-# model but has side effects by running equality-based verification
-@equality
-@passes.register("verify")
-class VerifyEquality(Analysis):
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(model, True)
-
-
-# Injects tolerance-based verification into an ONNX IR pass by showing the model
-# output on some reference to be within tolerance of the known expected output
-def tolerance(cls: type[Pass]):
-    # Pre-condition comparing model outputs to a reference for equality within
-    # tolerance - should not fail, prepares for post-condition
-    def requires(self: Pass, model: ir.Model) -> None:
-        # Verification can be disabled globally by setting it to False or
-        # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {}):
-            return
-
-        # Load ONNX Runtime configuration
-        onnxruntime = self.config.setdefault("onnxruntime", {})
-
-        # Load reference input data for verification
-        inputs, _ = load_reference_data(self)
-        # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs, **onnxruntime)
-        # Set the produced output as the expectation checked against as the
-        # post-condition
-        self.expected = produced
-
-    # Post-condition comparing model outputs to a reference for equality within
-    # tolerance - fails raising VerificationError if the output does not match
-    def ensures(self: Pass, result: ir.passes.PassResult) -> None:
-        # Verification can be disabled globally by setting it to False or
-        # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {}):
-            return
-
-        # Skip evaluating on post-condition if the pass did not modify the
-        # model
-        if not result.modified:
-            # Verbosity should now be defined, either defaulting to False or
-            # explicitly
-            if self.config["logging"]["verbose"]:
-                # TODO: Make use of a proper logger...
-                print(f"Skipping verification of {self.__class__.__name__}")
-            # Exit here, skipping running inference
-            return
-
-        # Extract the model from the pass results
-        model = result.model
-
-        # Load ONNX Runtime configuration
-        onnxruntime = self.config.setdefault("onnxruntime", {})
-
-        # Load reference input data for verification
-        inputs, _ = load_reference_data(self)
-        # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs, **onnxruntime)
-
-        # Prepare logging of the error to the state dictionary to track model
-        # degradation
-        self.state_dict.setdefault("verify", {}).setdefault("max_abs_error", [])
-        # Compute the maximum absolute error between produced and expected
-        # output: Computing the mean, probably does not make sense...
-        error = max_abs_error(produced, self.expected)
-        # Append the error to the log associated to the just-verified pass
-        self.state_dict["verify"]["max_abs_error"].append({cls.__name__: error})
-
-        # Log the full input-output-expectation history for each
-        # verification pass
-        self.state_dict["verify"].setdefault("history", {})[self.id] = (
-            inputs, produced, self.expected, context
-        )
-
-        # Read the optional verification tolerance configuration from the
-        # configuration dictionary of the pass. Defaults according to NumPy.
-        _tolerance = self.config["verify"].setdefault("tolerance", {})
-
-        # Compare equality within tolerance of *all* values from *all* outputs
-        for output, x, y in zip(model.graph.outputs, produced, self.expected):
-            if not np.allclose(x, y, **_tolerance):
-                raise VerificationError(f"{output.name} not within tolerance")
-
-        # Verbosity can be enabled globally by setting it to True
-        self.config.setdefault("logging", {}).setdefault("verbose", False)
-        # Verbosity should now be defined, either defaulting to False or
-        # explicitly
-        if self.config["logging"]["verbose"]:
-            # TODO: Make use of a proper logger...
-            print(f"Verified {self.__class__.__name__}")
-
-    # Inject the pre- and post-condition into the ONNX IR pass and return the
-    # modified class to allow for arbitrarily stacking decorators
-    return inject_pre_post_condition(cls, requires, ensures)
-
-
-# Explicit verification pass: Treated as an analysis pass, does not change the
-# model but has side effects by running tolerance-based verification
-@tolerance
-@passes.register("verify")
-class VerifyTolerance(Analysis):
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(model, True)
-
-
-# Injects metric-based verification into an ONNX IR pass by evaluating a metric,
-# such as accuracy, over some reference dataset.
-def metric(cls: type[Pass]):
-    # Pre-condition comparing model outputs to a reference via a task-specific
-    # metric - should not fail, prepares for post-condition
-    def requires(self: Pass, model: ir.Model) -> None:
-        # Verification can be disabled globally by setting it to False or
-        # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {}):
-            return
-
-        # Metric-based verification requires as section configuring how to
-        # calculate metrics and the range of acceptable results: Assume empty...
-        self.config["verify"].setdefault("metrics", {})
-
-    # Post-condition comparing model outputs to a reference via a task-specific
-    # metric - fails raising VerificationError if the output does not match
-    def ensures(self: Pass, result: ir.passes.PassResult) -> None:
-        # Verification can be disabled globally by setting it to False or
-        # specifying an explicitly empty configuration dictionary
-        if not self.config.setdefault("verify", {}):
-            return
-
-        # Load reference input and output data for verification
-        inputs, expected = load_reference_data(self)
-
-        # Specifiyng no expected reference output allows to skip all
-        # metric-based verification
-        if not expected:
-            return
-
-        # Skip evaluating on post-condition if the pass did not modify the
-        # model
-        if not result.modified:
-            # Verbosity should now be defined, either defaulting to False or
-            # explicitly
-            if self.config["logging"]["verbose"]:
-                # TODO: Make use of a proper logger...
-                print(f"Skipping verification of {self.__class__.__name__}")
-            # Exit here, skipping running inference
-            return
-
-        # Extract the model from the pass results
-        model = result.model
-
-        # Load ONNX Runtime configuration
-        onnxruntime = self.config.setdefault("onnxruntime", {})
-
-        # Evaluate the model on the reference inputs and collect all results
-        produced, context = evaluate_model(model, inputs, **onnxruntime)
-
-        # Metric-based verification requires as section configuring how to
-        # calculate metrics and the range of acceptable results
-        for _metric, (_min, _max) in self.config["verify"]["metrics"].items():
-            # The _metric key should be resolvable to some functions within
-            # scope - custom functions can be injected via config "imports"
-            function = eval(_metric)
-            # Evaluate the metric on the produced vs. expected outputs
-            value = function(produced, expected)
-
-            # Prepare logging of the metric to the state dictionary to track
-            # model degradation
-            self.state_dict.setdefault("verify", {}).setdefault(_metric, [])
-            # Append the metric to the log associated to the just-verified pass
-            self.state_dict["verify"][_metric].append({cls.__name__: value})
-
-            # Log the full input-output-expectation history for each
-            # verification pass
-            self.state_dict["verify"].setdefault("history", {})[self.id] = (
-                inputs, produced, expected, context
-            )
-
-            # Assemble the potential error message in advance...
-            msg = f"{_metric} {value} not within [{_min}, {_max}] as required"
-
-            # Check whether the metric lies within the required range and raise
-            # exception if not
-            if not (_min <= value <= _max):
-                raise VerificationError(msg)
-
-        # Verbosity can be enabled globally by setting it to True
-        self.config.setdefault("logging", {}).setdefault("verbose", False)
-        # Verbosity should now be defined, either defaulting to False or
-        # explicitly
-        if self.config["logging"]["verbose"]:
-            # TODO: Make use of a proper logger...
-            print(f"Verified {self.__class__.__name__}")
-
-    # Inject the pre- and post-condition into the ONNX IR pass and return the
-    # modified class to allow for arbitrarily stacking decorators
-    return inject_pre_post_condition(cls, requires, ensures)
-
-
-# Explicit verification pass: Treated as an analysis pass, does not change the
-# model but has side effects by running metric-based verification
-@metric
-@passes.register("verify")
-class VerifyMetric(Analysis):
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(model, True)
+    return float(sum(predictions == classes) / classes.size)

@@ -30,6 +30,9 @@ rewriter closely follows the familiar (1)-(3) process while hiding most of the
 graph internals, such as node removal and insertion or wiring node inputs and
 outputs to other nodes.
 
+See the [overview poster](docs/finn_workshop_fpl26_poster.pdf) presented at the
+FINN workshop at FPL'26 for more context and a few motivational examples.
+
 ## Installation
 ```
 pip install onnx-passes
@@ -37,64 +40,60 @@ pip install onnx-passes
 
 ## Tightly Verified Transformations
 When successively transforming and optimizing a model, it is important to ensure
-that the resulting model still matches the original model (at least within some
-reasonable tolerance). To do this, the FINN framework injects verification steps
-at a coarse schedule into the flow by evaluating the model and comparing the
-outputs to a known reference. This project experiments with taking this a step
-further by allowing to tightly verify the model after each individual pass
-application. As a pass developer, novel passes can easily be enabled for
-verification by tagging them with the appropriate verification decorator.
+that the resulting model still matches the original model at least within some
+reasonable tolerance.
+
+Via the [ONNX ReferenceEvaluator](https://onnx.ai/onnx/api/reference.html) the
+model can be executed after each individual pass application, allowing for a
+tightly verify the model transformation. Novel passes can easily be enabled for
+verification by deriving from the `Verify` base and optionally tagging them with
+the appropriate verification decorator.
 ```python
-# This transformation rewires any addition with two distinct inputs to add the
-# first input to itself while ignoring the second one. This is not a valid
-# equivalent transformation. However, as it is tagged to verify equality,
-# applying this to any model containing Adds will raise a VerificationError
-@passes.verify.equality
-@passes.register()
-class BreakAdds(Transformation, RewriteRulePass):
-    def pattern(self, op, x, y):
+from onnx_passes.passes.base import RewriteRule
+from onnx_passes.passes.verify import Verify
+
+
+class BreakAdds_v1(RewriteRule, Verify):
+    """Break Add operations with distinct inputs on purpose."""
+
+    @staticmethod
+    def pattern(op, x, y):
         return op.Add(x, y)
 
-    def check(self, _, x, y):
+    @staticmethod
+    def check(context, x, y):
         return x != y
 
-    def rewrite(self, op, x, y):
+    @staticmethod
+    def rewrite(op, x, y):
         return op.Add(x, x)
 ```
 Applying this demo transformation with the command-line flow will produce
-outputs roughly as follows:
+outputs roughly as follows (with the option `--browse` the failed model is shown
+via [Netron](https://github.com/lutzroeder/netron)):
 ```
-$ onnx-passes -c cfg.yaml -o out.onnx model.onnx ... BreakAdds ...
+$ onnx-passes --browse model.onnx ... BreakAdds ... --verify.inputs ...
 ...
-Applied 1 of general pattern rewrite rules.
-PostconditionError: Post-condition for pass 'BreakAdds' failed
-VerificationError: global_output_0 not as expected
+VerificationError: Output 'global_output__0' not as expected after 'BreakAdd_v1'
+Serving 'debug-checkpoint.onnx' at http://localhost:20236
 ```
 
 Currently three verification methods are implemented: equality-, tolerance- and
-metric-based verification, where equality- and tolerance-based roughly
-correspond to what is implemented in FINN, where the novel metric-based method
-allows the user to inject metrics and accepted metric ranges for verification.
-This method could become relevant once introducing approximating optimizations
-which no longer guarantee model equality and tracking degradation of a
-task-specific metric, such as accuracy, is more indicative.
+metric-based verification. Metric-based verification could become relevant once
+introducing approximating optimizations which no longer guarantee model equality
+and tracking degradation of a task-specific metric, such as accuracy, is more
+indicative.
 
-## Roadmap and Ideas
-- [x] Skeleton of pass base-classes: *Analysis*, *Annotation*, *Transformation*,
-*RewriteRulePass* and *ComposePass*
-- [x] Basic cleanup and constant-folding transformations based on ONNX IR and
-ONNX Script
-- [x] Infrastructure for tight verification of transformations via
-[ONNX Runtime](https://github.com/microsoft/onnxruntime) model execution
-- [x] Simple command-line script `onnx-passes` for experimenting with
-pass-application and verification
-- [ ] QONNX interoperability: `Quant`, `BipolarQuant`, `Trunc` and
-`MultiThreshold` operators, arbitrary-precision integer data types _(work in
-progress)_ 
-- [ ] Reimplement streamlining similar to FINN _(work in progress)_ 
-- [ ] Annotating and resolving pass dependencies and follow-up post-processing 
-transformations, e.g., _streamline_ **needs** _shape-inference_ and **must be 
-followed by** _cleanup_
-- [ ] Verification of structural properties of a graph, e.g., cycle-free, 
-isomorphic to..., connected, ...
-- [ ] ...
+## Compiling Multi-Threshold Operators
+The [`multithreshold`](onnx_passes/passes/multithreshold/__init__.py#L62)
+submodule implements compilation of quantized activation functions to custom
+[`MultiThreshold`](onnx_passes/ops/__init__.py#L523) operators for efficient
+implementation with FINN as described in our corresponding publication:
+```bibtex
+@article{berganski2026compiling,
+  title={Compiling Multi-Threshold Operators for Quantized Non-Monotonic and Fine-Granular Activations in Custom-Tailored DNN Accelerators},
+  author={Berganski, Christoph and Jentzsch, Felix and Platzner, Marco},
+  journal={arXiv preprint arXiv:2610.21825},
+  year={2026}
+}
+```
