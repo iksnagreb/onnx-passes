@@ -331,4 +331,4 @@ def accuracy(produced: list, expected: list) -> float:
 
     predictions = probabilities.argmax(axis=-1)
 
-    return float(sum(predictions == classes) / classes.size)
+    return float(np.sum(predictions == classes)) / classes.size
