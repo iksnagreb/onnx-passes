@@ -73,11 +73,10 @@ def count_mac_by_op_type(node: ir.Node) -> int | None:
 
 # Shortcuts for annotating the different count breakdown categories: These are
 # all combinations of dictionaries and tuples mapping some identifier to integer
-OP_TYPE = tuple[str, str, str]
 COUNT_PER_NODE = dict[str | None, int]
-COUNT_PER_DTYPE = dict[ir.DataType | None, int]
-COUNT_PER_OP_TYPE = dict[OP_TYPE | None, int]
-COUNT_PER_ATTR_TYPE = dict[ir.AttributeType | None, int]
+COUNT_PER_DTYPE = dict[str | None, int]
+COUNT_PER_OP_TYPE = dict[str | None, int]
+COUNT_PER_ATTR_TYPE = dict[str | None, int]
 
 
 class MACCounts(BaseModel, use_attribute_docstrings=True):
@@ -105,10 +104,10 @@ class MACCounts(BaseModel, use_attribute_docstrings=True):
             if (count := count_mac_by_op_type(node)) is not None:
                 counts.per_node[node.name] = count
 
-                if node.op_identifier() not in counts.per_op_type:
-                    counts.per_op_type[node.op_identifier()] = 0
+                if node.op_type not in counts.per_op_type:
+                    counts.per_op_type[node.op_type] = 0
 
-                counts.per_op_type[node.op_identifier()] += count
+                counts.per_op_type[node.op_type] += count
 
         return counts
 
@@ -135,10 +134,10 @@ class OperationCounts(BaseModel, use_attribute_docstrings=True):
         counts = OperationCounts()
 
         for node in ir.traversal.RecursiveGraphIterator(model.graph):
-            if node.op_identifier() not in counts.per_op_type:
-                counts.per_op_type[node.op_identifier()] = 0
+            if node.op_type not in counts.per_op_type:
+                counts.per_op_type[node.op_type] = 0
 
-            counts.per_op_type[node.op_identifier()] += 1
+            counts.per_op_type[node.op_type] += 1
 
         counts.mac_ops = MACCounts.from_model(model)
 
@@ -154,7 +153,7 @@ class EffectiveIntegerCounts(BaseModel, use_attribute_docstrings=True):
     per_node: dict[str | None, COUNT_PER_DTYPE] = {}
     """Number of effectively integer-valued parameters per node."""
 
-    per_op_type: dict[OP_TYPE, COUNT_PER_DTYPE] = {}
+    per_op_type: dict[str, COUNT_PER_DTYPE] = {}
     """Number of effectively integer-valued parameters per operator type."""
 
     @computed_field
@@ -176,11 +175,16 @@ class EffectiveIntegerCounts(BaseModel, use_attribute_docstrings=True):
                     if np.all(np.round(param.numpy()) == param.numpy()):
                         count = param.numpy().size
 
-                        # Per data type parameter counts
-                        if value.dtype not in counts.per_type:
-                            counts.per_type[value.dtype] = 0
+                        if (dtype := value.dtype) is not None:
+                            dtype = dtype.name
+                        else:
+                            dtype = None
 
-                        counts.per_type[value.dtype] += count
+                        # Per data type parameter counts
+                        if dtype not in counts.per_type:
+                            counts.per_type[dtype] = 0
+
+                        counts.per_type[dtype] += count
 
                         for c in value.consumers():
                             # Per data type per node parameter counts
@@ -189,21 +193,21 @@ class EffectiveIntegerCounts(BaseModel, use_attribute_docstrings=True):
 
                             per_type = counts.per_node[c.name]
 
-                            if value.dtype not in per_type:
-                                per_type[value.dtype] = 0
+                            if dtype not in per_type:
+                                per_type[dtype] = 0
 
-                            per_type[value.dtype] += count
+                            per_type[dtype] += count
 
                             # Per data type per operator type parameter counts
-                            if c.op_identifier() not in counts.per_op_type:
-                                counts.per_op_type[c.op_identifier()] = {}
+                            if c.op_type not in counts.per_op_type:
+                                counts.per_op_type[c.op_type] = {}
 
-                            per_type = counts.per_op_type[c.op_identifier()]
+                            per_type = counts.per_op_type[c.op_type]
 
-                            if value.dtype not in per_type:
-                                per_type[value.dtype] = 0
+                            if dtype not in per_type:
+                                per_type[dtype] = 0
 
-                            per_type[value.dtype] += count
+                            per_type[dtype] += count
 
                 except:  # noqa: Broad on purpose to ignore non-numeric values
                     pass
@@ -220,7 +224,7 @@ class NonzeroCounts(BaseModel, use_attribute_docstrings=True):
     per_node: dict[str | None, COUNT_PER_DTYPE] = {}
     """Number of non-zero parameters per node."""
 
-    per_op_type: dict[OP_TYPE | None, COUNT_PER_DTYPE] = {}
+    per_op_type: dict[str | None, COUNT_PER_DTYPE] = {}
     """Number of non-zero parameters per operator type."""
 
     @computed_field
@@ -239,11 +243,16 @@ class NonzeroCounts(BaseModel, use_attribute_docstrings=True):
             if (param := ir.convenience.get_const_tensor(value)) is not None:
                 count = int(np.sum(param.numpy() != 0))
 
-                # Per data type parameter counts
-                if value.dtype not in counts.per_type:
-                    counts.per_type[value.dtype] = 0
+                if (dtype := value.dtype) is not None:
+                    dtype = dtype.name
+                else:
+                    dtype = None
 
-                counts.per_type[value.dtype] += count
+                # Per data type parameter counts
+                if dtype not in counts.per_type:
+                    counts.per_type[dtype] = 0
+
+                counts.per_type[dtype] += count
 
                 for c in value.consumers():
                     # Per data type per node parameter counts
@@ -252,21 +261,21 @@ class NonzeroCounts(BaseModel, use_attribute_docstrings=True):
 
                     per_type = counts.per_node[c.name]
 
-                    if value.dtype not in per_type:
-                        per_type[value.dtype] = 0
+                    if dtype not in per_type:
+                        per_type[dtype] = 0
 
-                    per_type[value.dtype] += count
+                    per_type[dtype] += count
 
                     # Per data type per operator type parameter counts
-                    if c.op_identifier() not in counts.per_op_type:
-                        counts.per_op_type[c.op_identifier()] = {}
+                    if c.op_type not in counts.per_op_type:
+                        counts.per_op_type[c.op_type] = {}
 
-                    per_type = counts.per_op_type[c.op_identifier()]
+                    per_type = counts.per_op_type[c.op_type]
 
-                    if value.dtype not in per_type:
-                        per_type[value.dtype] = 0
+                    if dtype not in per_type:
+                        per_type[dtype] = 0
 
-                    per_type[value.dtype] += count
+                    per_type[dtype] += count
 
         return counts
 
@@ -280,7 +289,7 @@ class ParameterCounts(BaseModel, use_attribute_docstrings=True):
     per_node: dict[str | None, COUNT_PER_DTYPE] = {}
     """Number of parameters per node."""
 
-    per_op_type: dict[OP_TYPE | None, COUNT_PER_DTYPE] = {}
+    per_op_type: dict[str | None, COUNT_PER_DTYPE] = {}
     """Number of parameters per operator type."""
 
     effective_integer: EffectiveIntegerCounts = EffectiveIntegerCounts()
@@ -303,11 +312,16 @@ class ParameterCounts(BaseModel, use_attribute_docstrings=True):
 
         for value in ir.convenience.create_value_mapping(model.graph).values():
             if (param := ir.convenience.get_const_tensor(value)) is not None:
-                # Per data type parameter counts
-                if value.dtype not in counts.per_type:
-                    counts.per_type[value.dtype] = 0
+                if (dtype := value.dtype) is not None:
+                    dtype = dtype.name
+                else:
+                    dtype = None
 
-                counts.per_type[value.dtype] += param.numpy().size
+                # Per data type parameter counts
+                if dtype not in counts.per_type:
+                    counts.per_type[dtype] = 0
+
+                counts.per_type[dtype] += param.numpy().size
 
                 for c in value.consumers():
                     # Per data type per node parameter counts
@@ -316,21 +330,21 @@ class ParameterCounts(BaseModel, use_attribute_docstrings=True):
 
                     per_type = counts.per_node[c.name]
 
-                    if value.dtype not in per_type:
-                        per_type[value.dtype] = 0
+                    if dtype not in per_type:
+                        per_type[dtype] = 0
 
-                    per_type[value.dtype] += param.numpy().size
+                    per_type[dtype] += param.numpy().size
 
                     # Per data type per operator type parameter counts
-                    if c.op_identifier() not in counts.per_op_type:
-                        counts.per_op_type[c.op_identifier()] = {}
+                    if c.op_type not in counts.per_op_type:
+                        counts.per_op_type[c.op_type] = {}
 
-                    per_type = counts.per_op_type[c.op_identifier()]
+                    per_type = counts.per_op_type[c.op_type]
 
-                    if value.dtype not in per_type:
-                        per_type[value.dtype] = 0
+                    if dtype not in per_type:
+                        per_type[dtype] = 0
 
-                    per_type[value.dtype] += param.numpy().size
+                    per_type[dtype] += param.numpy().size
 
         counts.effective_integer = EffectiveIntegerCounts.from_model(model)
         counts.nonzero = NonzeroCounts.from_model(model)
@@ -350,7 +364,7 @@ class AttributeCounts(BaseModel, use_attribute_docstrings=True):
     per_node: dict[str | None, COUNT_PER_ATTR_TYPE] = {}
     """Number of attributes per node."""
 
-    per_op_type: dict[OP_TYPE | None, COUNT_PER_ATTR_TYPE] = {}
+    per_op_type: dict[str | None, COUNT_PER_ATTR_TYPE] = {}
     """Number of attributes per operator type."""
 
     @computed_field
@@ -368,10 +382,10 @@ class AttributeCounts(BaseModel, use_attribute_docstrings=True):
         for node in ir.traversal.RecursiveGraphIterator(model.graph):
             for attribute in node.attributes.values():
                 # Per data type attribute counts
-                if attribute.type not in counts.per_type:
-                    counts.per_type[attribute.type] = 0
+                if attribute.type.name not in counts.per_type:
+                    counts.per_type[attribute.type.name] = 0
 
-                counts.per_type[attribute.type] += 1
+                counts.per_type[attribute.type.name] += 1
 
                 # Per attribute name attribute counts
                 if attribute.name not in counts.per_name:
@@ -385,21 +399,21 @@ class AttributeCounts(BaseModel, use_attribute_docstrings=True):
 
                 per_type = counts.per_node[node.name]
 
-                if attribute.type not in per_type:
-                    per_type[attribute.type] = 0
+                if attribute.type.name not in per_type:
+                    per_type[attribute.type.name] = 0
 
-                per_type[attribute.type] += 1
+                per_type[attribute.type.name] += 1
 
                 # Per data type per operator type attribute counts
-                if node.op_identifier() not in counts.per_op_type:
-                    counts.per_op_type[node.op_identifier()] = {}
+                if node.op_type not in counts.per_op_type:
+                    counts.per_op_type[node.op_type] = {}
 
-                per_type = counts.per_op_type[node.op_identifier()]
+                per_type = counts.per_op_type[node.op_type]
 
-                if attribute.type not in per_type:
-                    per_type[attribute.type] = 0
+                if attribute.type.name not in per_type:
+                    per_type[attribute.type.name] = 0
 
-                per_type[attribute.type] += 1
+                per_type[attribute.type.name] += 1
 
         return counts
 
