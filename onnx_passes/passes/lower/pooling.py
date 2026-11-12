@@ -1,5 +1,5 @@
-from onnx_passes.passes.base import RewriteRuleSetTemplate
-from onnx_passes.passes.verify import Verify, tolerance
+from onnx_passes.rewrite import RewriteRuleSetTemplate
+from onnx_passes.verify import Verify, tolerance
 
 from onnx_passes.ops import DOMAIN as CUSTOM_DOMAIN
 

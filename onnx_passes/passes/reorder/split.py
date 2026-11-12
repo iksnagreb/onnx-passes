@@ -1,5 +1,5 @@
-from onnx_passes.passes.base import Transformation, Sequential
-from onnx_passes.passes.verify import Verify
+from onnx_passes.base import Transformation, Sequential
+from onnx_passes.verify import Verify
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 

@@ -1,5 +1,6 @@
-from onnx_passes.passes.base import RewriteRuleSetTemplate, Sequential
-from onnx_passes.passes.verify import Verify
+from onnx_passes.base import Sequential
+from onnx_passes.rewrite import RewriteRuleSetTemplate
+from onnx_passes.verify import Verify
 
 
 class EliminateIdempotence_v1(RewriteRuleSetTemplate, Verify):

@@ -1,5 +1,6 @@
-from onnx_passes.passes.base import Transformation, RewriteRule
-from onnx_passes.passes.verify import Verify, tolerance
+from onnx_passes.base import Transformation
+from onnx_passes.rewrite import RewriteRule
+from onnx_passes.verify import Verify, tolerance
 
 from onnx_passes.passes.layouts import LayoutError, layout_converter_pattern
 

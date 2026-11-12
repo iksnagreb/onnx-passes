@@ -1,7 +1,4 @@
-# Define configuration structures as dataclasses
-import copy
 from dataclasses import dataclass, field
-# Type hints for annotating dataclass members
 from typing import Any
 
 

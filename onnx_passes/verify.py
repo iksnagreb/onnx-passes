@@ -1,26 +1,16 @@
-# Build a class hierarchy of ONNX passes starting from ABC
 from abc import ABC
-# Path to files or directories
 from pathlib import Path
-# Type hints for annotating dataclass members
 from typing import Any, Callable
-# Verification styles are selected via enums
 from enum import Enum
 
-# ONNX intermediate representation
 import onnx_ir as ir
-# Numpy arrays are used for verification inputs/outputs
 import numpy as np
 
-# Use the ONNX reference evaluator to evaluate the model for verification
 from onnx.reference import ReferenceEvaluator
 
-# Pass configuration and state tracking structures and the base class for all
-# passes
-from onnx_passes.passes.config import Config
-from onnx_passes.passes.state import State
-from onnx_passes.passes.base import Pass, VerificationError
-
+from onnx_passes.config import Config
+from onnx_passes.state import State
+from onnx_passes.base import Pass, VerificationError
 from onnx_passes.ops import link_ops
 
 

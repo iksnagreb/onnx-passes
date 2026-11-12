@@ -48,9 +48,10 @@ model can be executed after each individual pass application, allowing for a
 tightly verify the model transformation. Novel passes can easily be enabled for
 verification by deriving from the `Verify` base and optionally tagging them with
 the appropriate verification decorator.
+
 ```python
-from onnx_passes.passes.base import RewriteRule
-from onnx_passes.passes.verify import Verify
+from onnx_passes.rewrite import RewriteRule
+from onnx_passes.verify import Verify
 
 
 class BreakAdds_v1(RewriteRule, Verify):

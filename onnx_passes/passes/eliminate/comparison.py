@@ -1,7 +1,6 @@
-from onnx_passes.passes.base import (
-    RewriteRuleSetTemplate, RewriteAsConstant, Sequential
-)
-from onnx_passes.passes.verify import Verify
+from onnx_passes.base import Sequential
+from onnx_passes.rewrite import RewriteRuleSetTemplate, RewriteAsConstant
+from onnx_passes.verify import Verify
 
 import onnx_ir as ir
 import numpy as np

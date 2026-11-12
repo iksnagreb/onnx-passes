@@ -1,4 +1,4 @@
-from onnx_passes.passes.base import Sequential
+from onnx_passes.base import Sequential
 
 from onnx_passes.passes.normalize import attributes
 from onnx_passes.passes.normalize import reshape

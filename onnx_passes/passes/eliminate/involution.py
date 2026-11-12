@@ -1,7 +1,6 @@
-from onnx_passes.passes.base import (
-    RewriteRuleSetTemplate, RewriteRule, Sequential
-)
-from onnx_passes.passes.verify import Verify
+from onnx_passes.base import Sequential
+from onnx_passes.rewrite import RewriteRuleSetTemplate, RewriteRule
+from onnx_passes.verify import Verify
 
 
 class EliminateInvolution_v1(RewriteRuleSetTemplate, Verify):

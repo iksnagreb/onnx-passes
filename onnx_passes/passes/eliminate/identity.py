@@ -1,7 +1,7 @@
-from onnx_passes.passes.base import (
-    RewriteRule, RewriteRuleSet, RewriteRuleSetTemplate
+from onnx_passes.rewrite import (
+    RewriteRule, RewriteRuleSetTemplate, RewriteRuleSet
 )
-from onnx_passes.passes.verify import Verify
+from onnx_passes.verify import Verify
 
 import onnx_ir as ir
 import numpy as np
@@ -501,7 +501,7 @@ class EliminateIdentityIm2Col_v1(RewriteRule, Verify):
         return op.Identity(x)
 
 
-from onnx_passes.passes.base import Transformation, Sequential
+from onnx_passes.base import Transformation, Sequential
 
 # Common identity elimination pass build into ONNX IR and ONNXScript
 from onnx_ir.passes.common import IdentityEliminationPass

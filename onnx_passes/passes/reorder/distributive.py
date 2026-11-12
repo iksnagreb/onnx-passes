@@ -1,7 +1,6 @@
-from onnx_passes.passes.base import (
-    RewriteRule, RewriteRuleSetTemplate, Sequential
-)
-from onnx_passes.passes.verify import Verify, tolerance
+from onnx_passes.base import Sequential
+from onnx_passes.rewrite import RewriteRule, RewriteRuleSetTemplate
+from onnx_passes.verify import Verify, tolerance
 
 from onnxscript.rewriter.pattern import OrValue
 

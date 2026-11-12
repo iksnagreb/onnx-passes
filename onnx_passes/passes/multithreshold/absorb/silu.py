@@ -1,5 +1,5 @@
-from onnx_passes.passes.base import RewriteRule, RewriteRuleSetTemplate
-from onnx_passes.passes.verify import Verify
+from onnx_passes.rewrite import RewriteRule, RewriteRuleSetTemplate
+from onnx_passes.verify import Verify
 
 import onnx_ir as ir
 import numpy as np
@@ -269,7 +269,7 @@ class RewriteSwishAsSilu_v1(RewriteRule, Verify):
         )
 
 
-from onnx_passes.passes.base import Sequential
+from onnx_passes.base import Sequential
 
 from onnx_passes.passes import fold_constants
 from onnx_passes.passes.multithreshold.absorb.mul import (

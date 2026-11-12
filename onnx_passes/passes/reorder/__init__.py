@@ -1,4 +1,4 @@
-from onnx_passes.passes.base import Sequential
+from onnx_passes.base import Sequential
 
 from onnx_passes.passes.reorder import reshape
 from onnx_passes.passes.reorder import expand

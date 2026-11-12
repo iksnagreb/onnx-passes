@@ -1,5 +1,6 @@
-from onnx_passes.passes.base import RewriteRule, Transformation, Sequential
-from onnx_passes.passes.verify import Verify, tolerance
+from onnx_passes.base import Transformation, Sequential
+from onnx_passes.rewrite import RewriteRule
+from onnx_passes.verify import Verify, tolerance
 
 from onnx_passes.ops import link_ops, DOMAIN as PASSES_DOMAIN
 

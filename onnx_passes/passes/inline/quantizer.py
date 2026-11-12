@@ -1,5 +1,6 @@
-from onnx_passes.passes.base import Sequential, RewriteRule
-from onnx_passes.passes.verify import Verify
+from onnx_passes.base import Sequential
+from onnx_passes.rewrite import RewriteRule
+from onnx_passes.verify import Verify
 
 from onnx_passes.ops import DOMAIN as PASSES_DOMAIN
 from onnx_passes.ops.qonnx import DOMAIN as QONNX_DOMAIN

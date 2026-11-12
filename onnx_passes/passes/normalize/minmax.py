@@ -1,5 +1,5 @@
-from onnx_passes.passes.base import RewriteRule, RewriteRuleSet
-from onnx_passes.passes.verify import Verify
+from onnx_passes.rewrite import RewriteRule, RewriteRuleSet
+from onnx_passes.verify import Verify
 
 
 class RewriteWhereAsMin_v1(RewriteRuleSet, Verify):

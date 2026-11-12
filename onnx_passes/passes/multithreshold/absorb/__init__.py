@@ -1,4 +1,4 @@
-from onnx_passes.passes.base import Transformation, Sequential
+from onnx_passes.base import Transformation, Sequential
 
 from onnx_passes.passes.multithreshold.absorb import add
 from onnx_passes.passes.multithreshold.absorb import mul

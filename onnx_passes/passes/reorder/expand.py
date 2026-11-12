@@ -1,5 +1,6 @@
-from onnx_passes.passes.base import RewriteRule, Sequential
-from onnx_passes.passes.verify import Verify
+from onnx_passes.base import Sequential
+from onnx_passes.rewrite import RewriteRule
+from onnx_passes.verify import Verify
 
 from onnx_passes.traits.elementwise import produced_by_elementwise
 from onnx_passes.traits.expand import produced_by_expand
