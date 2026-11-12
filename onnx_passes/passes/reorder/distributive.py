@@ -239,10 +239,13 @@ class ReorderMatMulDistributiveLhs_v1(RewriteRule, Verify):
     def check(context, x, y, z):
         # Dynamic or missing shapes would lead to endless back and forth between
         # forward and reverse distributive rules (if we do not force constant
-        # folding as part of every cleanup)
+        # folding as part of every cleanup). Both shapes are required to be
+        # static as the rewrite broadcasts the constant to the common shape.
         if y.shape is None or y.shape.is_dynamic():
-            if z.shape is None or z.shape.is_dynamic():
-                return False
+            return False
+
+        if z.shape is None or z.shape.is_dynamic():
+            return False
 
         # Reorder configurations which bring together constants, allowing for
         # constant propagation without increasing the number of operations:
@@ -357,10 +360,13 @@ class ReorderMatMulDistributiveRhs_v1(RewriteRule, Verify):
     def check(context, x, y, z):
         # Dynamic or missing shapes would lead to endless back and forth between
         # forward and reverse distributive rules (if we do not force constant
-        # folding as part of every cleanup)
+        # folding as part of every cleanup). Both shapes are required to be
+        # static as the rewrite broadcasts the constant to the common shape.
         if x.shape is None or x.shape.is_dynamic():
-            if y.shape is None or y.shape.is_dynamic():
-                return False
+            return False
+
+        if y.shape is None or y.shape.is_dynamic():
+            return False
 
         # Reorder configurations which bring together constants, allowing for
         # constant propagation without increasing the number of operations:
