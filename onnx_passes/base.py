@@ -1,7 +1,9 @@
 import os
 import inspect
+import yaml
 
-from abc import ABC
+from pydantic import BaseModel
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,15 @@ def enter_pass(model: ir.Model, p: "Pass"):
     """Log a pass to the active_pass metadata of the model."""
     model.meta.setdefault("active_passes", []).append(p)
 
+    if "passes_list" not in model.meta:
+        model.meta["passes_list"] = []
+
+    if "modified_by" not in model.meta:
+        model.meta["modified_by"] = []
+
+    if "verified_by" not in model.meta:
+        model.meta["verified_by"] = []
+
 
 def exit_pass(model: ir.Model, p: "Pass"):
     """Remove the pass from the active_pass metadata of the model."""
@@ -45,7 +56,9 @@ def modified_by(model: ir.Model, p: "Pass"):
             f"Tried to log {p.identifier} while {active.identifier} is active"
         )
 
-    model.meta.setdefault("modified_by", []).append(p.identifier)
+    model.meta.setdefault("modified_by", []).append(
+        (len(model.meta["passes_list"]), p.identifier)
+    )
 
 
 def verified_by(model: ir.Model, p: "Pass", result: Any):
@@ -55,7 +68,9 @@ def verified_by(model: ir.Model, p: "Pass", result: Any):
             f"Tried to log {p.identifier} while {active.identifier} is active"
         )
 
-    model.meta.setdefault("verified_by", []).append({p.identifier: result})
+    model.meta.setdefault("verified_by", []).append(
+        (len(model.meta["passes_list"]), p.identifier, result)
+    )
 
 
 def analyzed_by(model: ir.Model, p: "Pass", result: Any):
@@ -65,7 +80,9 @@ def analyzed_by(model: ir.Model, p: "Pass", result: Any):
             f"Tried to log {p.identifier} while {active.identifier} is active"
         )
 
-    model.meta.setdefault("analyzed_by", []).append({p.identifier: result})
+    model.meta.setdefault("analyzed_by", []).append(
+        (len(model.meta["passes_list"]), p.identifier, result)
+    )
 
 
 def profiled_by(model: ir.Model, p: "Pass", result: Any):
@@ -75,7 +92,9 @@ def profiled_by(model: ir.Model, p: "Pass", result: Any):
             f"Tried to log {p.identifier} while {active.identifier} is active"
         )
 
-    model.meta.setdefault("profiled_by", []).append({p.identifier: result})
+    model.meta.setdefault("profiled_by", []).append(
+        (len(model.meta["passes_list"]), p.identifier, result)
+    )
 
 
 # Registry of ONNX pass implementations: Do not use directly, deriving from Pass
@@ -481,7 +500,7 @@ def cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
     if not inplace:
         model = model.clone(deep_copy=True)
 
-    cleanup = ir.passes.PassManager([
+    cleanup_passes = ir.passes.PassManager([
         ir.passes.common.TopologicalSortPass(),
         ir.passes.common.IdentityEliminationPass(),
         ir.passes.common.RemoveUnusedNodesPass(),
@@ -497,10 +516,8 @@ def cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
         ir.passes.common.ShapeInferencePass()
     ])
 
-    result = cleanup(model)
-
-    if result.modified:
-        result = give_canonical_names(result.model, inplace=True)
+    result = cleanup_passes(model)
+    result = give_canonical_names(result.model, inplace=True)
 
     return result
 
@@ -533,6 +550,70 @@ class Transformation(Pass, ABC):
             return ir.passes.PassResult(result.model, True)
 
         return result
+
+
+# Dictionary of known metadata keys as claimed by Analysis passes: Used to keep
+# track of a unique assignment of keys to passes
+_metadata_keys = {}
+
+
+class Analysis(Pass, ABC):
+    """Base class for deriving analysis passes not modifying the model."""
+
+    def __init__(self, config: Config = Config()):
+        super().__init__(config)
+
+        # Ensure each metadata_key is used by exactly one analysis pass, the
+        # first one to register claims the key.
+        if self.metadata_key in _metadata_keys:
+            if (other := _metadata_keys[self.metadata_key]) != self.identifier:
+                raise RuntimeError(
+                    f"{self.identifier}: metadata_key '{self.metadata_key}' is"
+                    f" already used by {other}"
+                )
+
+        _metadata_keys[self.metadata_key] = self.identifier
+
+    @property
+    def metadata_key(self):
+        """Model serialized metadata key to store analysis results."""
+        return self.__class__.__name__.lower()
+
+    @property
+    def in_place(self) -> bool:
+        return True
+
+    @property
+    def changes_input(self) -> bool:
+        return True
+
+    @abstractmethod
+    def analyze(self, model: ir.Model) -> Any:
+        """Collect any analysis result from the model."""
+        ...
+
+    def call(self, model: ir.Model) -> ir.passes.PassResult:
+        # Log the analysis results to the non-serialized metadata store as is,
+        # i.e., as any python object to be pickled at the end.
+        if (result := self.analyze(model)) is None:
+            return ir.passes.PassResult(model, False)
+
+        analyzed_by(model, self, result)
+
+        # Convert the results to YAML format for serialization as a serialized
+        # string in the model metadata_props and printed to console.
+        if isinstance(result, BaseModel):
+            result = result.model_dump(exclude_defaults=True)
+
+        result = yaml.dump(result, sort_keys=False)
+        model.metadata_props[self.metadata_key] = result
+
+        if self.config.logging.verbose:
+            print(f"\n{result}")
+
+        # Analysis passes never change the model (changing metadata annotations
+        # are not considered as changing the model).
+        return ir.passes.PassResult(model, False)
 
 
 class Sequential(Pass, ABC):
