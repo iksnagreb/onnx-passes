@@ -274,22 +274,6 @@ def metric(cls):
     return cls
 
 
-@metric
-class VerifyMetrics_v1(Verify):
-    """Metric-based verification of the model without actually modifying."""
-
-    @property
-    def in_place(self) -> bool:
-        return True
-
-    @property
-    def changes_input(self) -> bool:
-        return True
-
-    def call(self, model: ir.Model) -> ir.passes.PassResult:
-        return ir.passes.PassResult(model, True)
-
-
 def max_abs_error(produced: list, expected: list) -> float:
     """Calculate the maximum absolute error between each pair of elements."""
 
