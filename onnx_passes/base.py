@@ -13,7 +13,6 @@ import onnx_ir.passes.common
 
 # Pass configuration and state tracking structures
 from onnx_passes.config import Config
-from onnx_passes.state import State
 
 # Link custom operators as functions into the graph
 from onnx_passes.ops import link_ops
@@ -22,6 +21,61 @@ from onnx_passes.ops import link_ops
 class VerificationError(Exception):
     """Exception indicating verification failure evaluating the model."""
     ...
+
+
+def enter_pass(model: ir.Model, p: "Pass"):
+    """Log a pass to the active_pass metadata of the model."""
+    model.meta.setdefault("active_passes", []).append(p)
+
+
+def exit_pass(model: ir.Model, p: "Pass"):
+    """Remove the pass from the active_pass metadata of the model."""
+    if (active := model.meta["active_passes"].pop()) != p:
+        raise RuntimeError(
+            f"Tried to exit {p.identifier} while {active.identifier} is active"
+        )
+
+    model.meta.setdefault("passes_list", []).append(p.identifier)
+
+
+def modified_by(model: ir.Model, p: "Pass"):
+    """Add the active pass to the modified_by metadata of the model."""
+    if (active := model.meta["active_passes"][-1]) != p:
+        raise RuntimeError(
+            f"Tried to log {p.identifier} while {active.identifier} is active"
+        )
+
+    model.meta.setdefault("modified_by", []).append(p.identifier)
+
+
+def verified_by(model: ir.Model, p: "Pass", result: Any):
+    """Add verification result the verified_by metadata of the model."""
+    if (active := model.meta["active_passes"][-1]) != p:
+        raise RuntimeError(
+            f"Tried to log {p.identifier} while {active.identifier} is active"
+        )
+
+    model.meta.setdefault("verified_by", []).append({p.identifier: result})
+
+
+def analyzed_by(model: ir.Model, p: "Pass", result: Any):
+    """Add analysis result the analyzed_by metadata of the model."""
+    if (active := model.meta["active_passes"][-1]) != p:
+        raise RuntimeError(
+            f"Tried to log {p.identifier} while {active.identifier} is active"
+        )
+
+    model.meta.setdefault("analyzed_by", []).append({p.identifier: result})
+
+
+def profiled_by(model: ir.Model, p: "Pass", result: Any):
+    """Add profiling result the profiled_by metadata of the model."""
+    if (active := model.meta["active_passes"][-1]) != p:
+        raise RuntimeError(
+            f"Tried to log {p.identifier} while {active.identifier} is active"
+        )
+
+    model.meta.setdefault("profiled_by", []).append({p.identifier: result})
 
 
 # Registry of ONNX pass implementations: Do not use directly, deriving from Pass
@@ -86,7 +140,7 @@ class Pass(ir.passes.PassBase, ABC):
         if self.config.logging.checkpoint:
             ir.save(model, f"before-{self.config.logging.checkpoint}")
 
-        model.meta.setdefault("passes", State()).log_pass(self)
+        enter_pass(model, self)
 
         # Evaluate the precondition on the model, which raises an exception to
         # indicate failure. Pass through any PreconditionError and wrap all
@@ -161,7 +215,7 @@ class Pass(ir.passes.PassBase, ABC):
         # If the pass modified the model, apply the ONNX checker pass to check
         # the consistency of the model
         if result.modified:
-            model.meta.setdefault("passes", State()).log_modified_by(self)
+            modified_by(model, self)
 
             if self.config.logging.verbose:
                 print(f"Checking modified model after {self.identifier}")
@@ -198,6 +252,8 @@ class Pass(ir.passes.PassBase, ABC):
         # Final log message when leaving the pass
         if self.config.logging.verbose:
             print(f"Leaving {self.identifier}")
+
+        exit_pass(model, self)
 
         return result
 

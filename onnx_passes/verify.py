@@ -1,5 +1,6 @@
 from abc import ABC
 from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any, Callable
 from enum import Enum
 
@@ -9,12 +10,12 @@ import numpy as np
 from onnx.reference import ReferenceEvaluator
 
 from onnx_passes.config import Config
-from onnx_passes.state import State
-from onnx_passes.base import Pass, VerificationError
+from onnx_passes.base import Pass, VerificationError, verified_by
 from onnx_passes.ops import link_ops
 
 
-def _evaluate_model(model: ir.Model, inputs: list[Any]):
+def _evaluate_model(model: ir.Model,
+                    inputs: list[Any]) -> tuple[list, dict[str, Any]]:
     """Evaluates the model using the ONNX reference evaluator."""
 
     # Link all missing custom operator functions from out domains into the model
@@ -68,6 +69,32 @@ def _resolve_metric(identifier: str | Callable):
             return getattr(import_module(".".join(module)), function)
         except ValueError or KeyError or ModuleNotFoundError:
             raise KeyError(f"Could not resolve metric: {identifier}")
+
+
+@dataclass(frozen=True)
+class VerifyResult:
+    """Verification results.
+
+    Attributes
+    ----------
+    inputs : list[Any]
+        Model inputs used for verification
+    outputs : list[Any]
+        Model outputs produced by verification
+    expected : list[Any]
+        Model outputs expected for verification
+    context : dict[str, Any] | None = None
+        Optional full execution context from verification
+    metrics : dict[str, Any] | None = None
+        Optional metrics from metric-based verification
+    """
+
+    inputs: list[Any]
+    outputs: list[Any]
+    expected: list[Any]
+
+    context: dict[str, Any] | None = field(default=None)
+    metrics: dict[str, Any] | None = field(default=None)
 
 
 class Verify(Pass, ABC):
@@ -191,9 +218,12 @@ class Verify(Pass, ABC):
 
         # Log the verification inputs and outputs to the metadata for debugging
         # before evaluating the condition and potentially raising expections
-        result.model.meta.setdefault("passes", State()).log_verified_by(
+        verified_by(
+            result.model,
             self,
-            self._inputs, self._outputs, self._expected, context, **metrics
+            VerifyResult(
+                self._inputs, self._outputs, self._expected, context, metrics
+            )
         )
 
         # Compare for *strict* equality of *all* values from *all* outputs

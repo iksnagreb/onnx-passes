@@ -93,7 +93,7 @@ class OnnxPasses(Config, use_attribute_docstrings=True):
                 error = error.__cause__
 
             # Try to extract the model from the failed context to save model and
-            # state for debugging and drop into netron if browsing output
+            # metadata for debugging and drop into netron if browsing output
             try:
                 model = inspect.trace()[-1][0].f_locals["model"]
 
@@ -102,9 +102,13 @@ class OnnxPasses(Config, use_attribute_docstrings=True):
 
                 ir.save(model, filename := "debug-checkpoint.onnx")
 
-                if state := model.meta["passes"]:
-                    with lzma.open(f"{filename}.passes.pkl.xz", "wb") as file:
-                        pickle.dump(state, file)  # noqa: lzma file
+                if meta := model.meta:
+                    if "active_passes" in meta:
+                        for i, p in enumerate(meta["active_passes"]):
+                            meta["active_passes"][i] = p.identifier
+
+                    with lzma.open(f"{filename}.meta.pkl.xz", "wb") as file:
+                        pickle.dump(meta, file)  # noqa: lzma file
             except:  # noqa: broad on purpose
                 filename = None
 
@@ -126,8 +130,8 @@ class OnnxPasses(Config, use_attribute_docstrings=True):
 
             return
 
-        # If configured save the result model and serialize the state metadata
-        # as a compressed pickle file and dump the settings as applied
+        # If configured save the result model and serialize the metadata as a
+        # compressed pickle file and dump the settings as applied
         if self.output:
             import pickle
             import lzma
@@ -135,14 +139,18 @@ class OnnxPasses(Config, use_attribute_docstrings=True):
 
             ir.save(result.model, self.output)
 
-            if state := result.model.meta["passes"]:
-                with lzma.open(f"{self.output}.passes.pkl.xz", "wb") as file:
-                    pickle.dump(state, file)  # noqa: 'SupportsWrite[bytes]'?
+            if meta := result.model.meta:
+                if "active_passes" in meta:
+                    for i, p in enumerate(meta["active_passes"]):
+                        meta["active_passes"][i] = p.indentifier
+
+                with lzma.open(f"{self.output}.meta.pkl.xz", "wb") as file:
+                    pickle.dump(meta, file)  # noqa: 'SupportsWrite[bytes]'?
 
                 # Update settings with resolved passes which actually modified
                 # the model to save these to the settings dump
                 self.passes = [
-                    f"{identifier}" for identifier in state.modified_by
+                    f"{identifier}" for identifier in meta["modified_by"]
                 ]
 
             with open(f"{self.output}.passes.yaml", "w") as file:
@@ -150,11 +158,13 @@ class OnnxPasses(Config, use_attribute_docstrings=True):
                     self.model_dump(mode="json", exclude_defaults=True), file
                 )
 
-        if state := result.model.meta["passes"]:
+        if meta := result.model.meta:
             # Collect and print basic pass application statistics from the state
             # dictionary tracked via model metadata
             total, modified_by, verified_by = (
-                state.counter, len(state.modified_by), len(state.verified_by)
+                len(meta["passes_list"]),
+                len(meta["modified_by"]),
+                len(meta["verified_by"])
             )
 
             console.print(
