@@ -337,8 +337,8 @@ def resolve_module(identifier: str):
             return None
 
 
-def _give_canonical_names(model: ir.Model,
-                          inplace: bool = True) -> ir.passes.PassResult:
+def give_canonical_names(model: ir.Model,
+                         inplace: bool = True) -> ir.passes.PassResult:
     """Assigns canonical names to all nodes and values in the model graph."""
 
     # Optionally apply this to a deep copy of the model and keep the original
@@ -417,7 +417,7 @@ def _give_canonical_names(model: ir.Model,
     return ir.passes.PassResult(model, modified)
 
 
-def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
+def cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
     """Performs basic cleanup of the model graph."""
 
     # Optionally cleanup a deep copy of the model and keep the original
@@ -444,7 +444,7 @@ def _cleanup(model: ir.Model, inplace: bool = True) -> ir.passes.PassResult:
     result = cleanup(model)
 
     if result.modified:
-        result = _give_canonical_names(result.model, inplace=True)
+        result = give_canonical_names(result.model, inplace=True)
 
     return result
 
@@ -471,8 +471,8 @@ class Transformation(Pass, ABC):
 
             link_ops(result.model)
 
-            _cleanup(result.model, inplace=True)
-            _give_canonical_names(result.model, inplace=True)
+            cleanup(result.model, inplace=True)
+            give_canonical_names(result.model, inplace=True)
 
             return ir.passes.PassResult(result.model, True)
 
