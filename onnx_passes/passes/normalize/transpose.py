@@ -35,22 +35,22 @@ class FuseConsecutiveTransposes_v1(RewriteRule, Verify):
 
 
 def _remove_singleton_transpose(perm, shape: tuple[int, ...]):
-    """Remove permutations of singleton dimensions."""
+    """Remove permutations of singleton dimensions.
 
-    # Find permutations of singleton dimensions
-    singleton_perm = {}
+    Singleton axes can be assigned to the output positions receiving singleton
+    axes in any order without changing the result of the transpose. Assigning
+    them in ascending order reverts permutations among singleton axes while
+    leaving the permutation of all other axes untouched.
+    """
 
-    for axis in perm:
-        if shape[axis] == shape[perm[axis]] == 1:
-            if axis != perm[axis]:
-                singleton_perm[axis] = perm[axis]
+    # Output positions receiving a singleton axis of the input
+    positions = [i for i, axis in enumerate(perm) if shape[axis] == 1]
 
-    # Revert permutations of singleton dimensions
+    # Reassign the singleton axes to these positions in ascending order
     perm = list(perm)
 
-    for i, axis in enumerate(perm):
-        if axis in singleton_perm:
-            perm[i] = singleton_perm[axis]
+    for i, axis in zip(positions, sorted(perm[i] for i in positions)):
+        perm[i] = axis
 
     return tuple(perm)
 

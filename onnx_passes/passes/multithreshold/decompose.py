@@ -74,12 +74,22 @@ class DecomposeIntoUnitStepsMultiThresholds_v1(RewriteRule, Verify):
             for threshold, weight in channel.items():
                 channel[threshold] = round(weight / scale)
 
+        # Convert each channel to a list of (threshold, weight) pairs: Dead
+        # thresholds inserted below repeat an already present threshold, which
+        # cannot be represented by a dictionary keyed by the threshold
+        unique = [list(channel.items()) for channel in unique]
+
+        # Number of thresholds a channel occupies after replication below: Each
+        # unit step takes one slot, as does each dead threshold
+        def count_steps(channel):
+            return sum(abs(weight) if weight else 1 for _, weight in channel)
+
         # Fill up all channels to the same number of thresholds, inserting some
         # dead thresholds to have homogeneous shapes
-        max_steps = int(max(sum(channel.values()) for channel in unique))
+        max_steps = max(count_steps(channel) for channel in unique)
 
         for channel in unique:
-            for _ in range(max_steps - int(sum(channel.values()))):
+            for _ in range(max_steps - count_steps(channel)):
                 # Repeat dead copies of the last threshold or zeros if there is
                 # no last threshold
                 channel.append((channel[-1][0] if channel else 0, 0))
@@ -89,7 +99,7 @@ class DecomposeIntoUnitStepsMultiThresholds_v1(RewriteRule, Verify):
         replicates = []
 
         for channel in unique:
-            for threshold, weight in channel.items():
+            for threshold, weight in channel:
                 if weight:
                     for _ in range(int(abs(weight))):
                         replicates.append((threshold, np.sign(weight)))
