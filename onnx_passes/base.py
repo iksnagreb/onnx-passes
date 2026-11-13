@@ -39,7 +39,7 @@ def enter_pass(model: ir.Model, p: "Pass"):
         model.meta["verified_by"] = []
 
 
-def exit_pass(model: ir.Model, p: "Pass"):
+def leave_pass(model: ir.Model, p: "Pass"):
     """Remove the pass from the active_pass metadata of the model."""
     if (active := model.meta["active_passes"].pop()) != p:
         raise RuntimeError(
@@ -153,13 +153,13 @@ class Pass(ir.passes.PassBase, ABC):
 
         # Write to log when entering the pass: Always log the pass to the
         # metadata and if configured write to the output and store checkpoints
+        enter_pass(model, self)
+
         if self.config.logging.verbose:
             print(f"Entering {self.identifier}")
 
         if self.config.logging.checkpoint:
             ir.save(model, f"before-{self.config.logging.checkpoint}")
-
-        enter_pass(model, self)
 
         # Evaluate the precondition on the model, which raises an exception to
         # indicate failure. Pass through any PreconditionError and wrap all
@@ -272,7 +272,7 @@ class Pass(ir.passes.PassBase, ABC):
         if self.config.logging.verbose:
             print(f"Leaving {self.identifier}")
 
-        exit_pass(model, self)
+        leave_pass(model, self)
 
         return result
 
