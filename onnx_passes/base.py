@@ -49,6 +49,25 @@ def leave_pass(model: ir.Model, p: "Pass"):
     model.meta.setdefault("passes_list", []).append(p.identifier)
 
 
+def active_pass(model: ir.Model) -> "Pass | None":
+    """Get the active_pass metadata from the model."""
+    if "active_passes" in model.meta:
+        return model.meta["active_passes"][-1]
+
+    return None
+
+
+def active_pass_id(model: ir.Model) -> str | None:
+    """Get the id (enumerating named passes) of the active pass."""
+    if "active_passes" in model.meta:
+        name = model.meta["active_passes"][-1].__class__.__name__
+        counter = len(model.meta.setdefault("passes_list", []))
+
+        return f"{counter:010d}-{name}"
+
+    return None
+
+
 def modified_by(model: ir.Model, p: "Pass"):
     """Add the active pass to the modified_by metadata of the model."""
     if (active := model.meta["active_passes"][-1]) != p:
@@ -227,14 +246,16 @@ class Pass(ir.passes.PassBase, ABC):
             # Make sure the directory exists...
             os.makedirs(path, exist_ok=True)
             # Mark this as the after-the-pass checkpoint
-            filename = os.path.join(path, f"{model.meta['passes'].id}.onnx")
+            filename = os.path.join(
+                path, f"{active_pass_id(result.model)}.onnx"
+            )
             # Save the model checkpoint
             ir.save(result.model, filename)
 
         # If the pass modified the model, apply the ONNX checker pass to check
         # the consistency of the model
         if result.modified:
-            modified_by(model, self)
+            modified_by(result.model, self)
 
             if self.config.logging.verbose:
                 print(f"Checking modified model after {self.identifier}")
@@ -272,7 +293,7 @@ class Pass(ir.passes.PassBase, ABC):
         if self.config.logging.verbose:
             print(f"Leaving {self.identifier}")
 
-        leave_pass(model, self)
+        leave_pass(result.model, self)
 
         return result
 
