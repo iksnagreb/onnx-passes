@@ -1,6 +1,7 @@
 import os
 import inspect
 import yaml
+import time
 
 from pydantic import BaseModel
 from abc import ABC, abstractmethod
@@ -13,11 +14,11 @@ import onnx_ir as ir
 # custom infrastructure.
 import onnx_ir.passes.common
 
-# Pass configuration and state tracking structures
 from onnx_passes.config import Config
-
-# Link custom operators as functions into the graph
 from onnx_passes.ops import link_ops
+
+from onnx_passes.analysis.summary import Summary
+from onnx_passes.analysis.profile import Time
 
 
 class VerificationError(Exception):
@@ -37,6 +38,12 @@ def enter_pass(model: ir.Model, p: "Pass"):
 
     if "verified_by" not in model.meta:
         model.meta["verified_by"] = []
+
+    if "analyzed_by" not in model.meta:
+        model.meta["analyzed_by"] = []
+
+    if "profiled_by" not in model.meta:
+        model.meta["profiled_by"] = []
 
 
 def leave_pass(model: ir.Model, p: "Pass"):
@@ -173,6 +180,7 @@ class Pass(ir.passes.PassBase, ABC):
         # Write to log when entering the pass: Always log the pass to the
         # metadata and if configured write to the output and store checkpoints
         enter_pass(model, self)
+        t0 = time.time()
 
         if self.config.logging.verbose:
             print(f"Entering {self.identifier}")
@@ -289,9 +297,29 @@ class Pass(ir.passes.PassBase, ABC):
                 f"Verification of pass '{self.identifier}' failed"
             ) from e
 
-        # Final log message when leaving the pass
+        # Final log message when leaving the pass and collect profiling
+        # statistics into the metadata store if enabled.
         if self.config.logging.verbose:
             print(f"Leaving {self.identifier}")
+
+        t1 = time.time()
+
+        if self.config.profile:
+            # Measure pass application time and simple model summary statistics
+            # for profiling
+            profiled_by(result.model, self, Time(start=t0, end=t1))
+            profiled_by(result.model, self, Summary.from_model(result.model))
+
+            # Collect basic pass application statistics from the metadata state
+            # dictionary tracked via model metadata
+            result.model.metadata_props["passes"] = yaml.dump({
+                # Note: +1 as the currently active pass will only count after
+                # leaving
+                "total": len(result.model.meta["passes_list"]) + 1,
+                "modified_by": len(result.model.meta["modified_by"]),
+                "verified_by": len(result.model.meta["verified_by"]),
+                "analyzed_by": len(result.model.meta["analyzed_by"]),
+            }, sort_keys=False)
 
         leave_pass(result.model, self)
 

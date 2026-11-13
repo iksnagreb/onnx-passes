@@ -52,6 +52,26 @@ class VerifyConfig(BaseSettings, use_attribute_docstrings=True):
     """Path to the verification reference outputs"""
 
 
+class AnalysisConfig(BaseSettings, use_attribute_docstrings=True):
+    """Configuration options for analysis passes"""
+
+    inputs: list[Path | str | Any] = Field(default_factory=list)
+    """Path to the analysis reference inputs"""
+
+    expected: list[Path | str | Any] = Field(default_factory=list)
+    """Path to the analysis reference outputs"""
+
+
+class ProfilingConfig(BaseSettings, use_attribute_docstrings=True):
+    """Configuration options for pass profiling"""
+
+    inputs: list[Path | str | Any] = Field(default_factory=list)
+    """Path to the profiling reference inputs"""
+
+    expected: list[Path | str | Any] = Field(default_factory=list)
+    """Path to the profiling reference outputs"""
+
+
 class Config(BaseSettings, use_attribute_docstrings=True):
     """Top-level configuration for pass application."""
 
@@ -60,3 +80,9 @@ class Config(BaseSettings, use_attribute_docstrings=True):
 
     verify: VerifyConfig | bool = False
     """Configuration options for pass verification"""
+
+    analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+    """Configuration options for analysis passes"""
+
+    profile: ProfilingConfig | bool = False
+    """Configuration options for pass profiling"""
