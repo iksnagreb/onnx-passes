@@ -7,44 +7,9 @@ from enum import Enum
 import onnx_ir as ir
 import numpy as np
 
-from onnx.reference import ReferenceEvaluator
-
 from onnx_passes.config import Config
 from onnx_passes.base import Pass, VerificationError, verified_by
-from onnx_passes.ops import link_ops
-
-
-def _evaluate_model(model: ir.Model,
-                    inputs: list[Any]) -> tuple[list, dict[str, Any]]:
-    """Evaluates the model using the ONNX reference evaluator."""
-
-    # Link all missing custom operator functions from out domains into the model
-    # graph
-    model = link_ops(model)
-
-    # Fill the execution context with the input values assuming they
-    # correspond to the model graph inputs in correct order
-    context = {}
-
-    for tensor, value in zip(model.graph.inputs, inputs):
-        if (dtype := tensor.dtype) is not None:
-            value = np.asarray(value, dtype.numpy())
-        context[tensor.name] = np.asarray(value)
-
-    # Use the ONNX reference evaluator to execute the model on the context
-    # collecting named outputs into the context as well
-    session = ReferenceEvaluator(ir.to_proto(model))
-    context = session.run(None, context, intermediate=True)
-
-    # Collect the outputs from the execution context assuming they
-    # correspond to the model graph outputs in correct order
-    outputs = []
-
-    for tensor in model.graph.outputs:
-        outputs.append(np.asarray(context[tensor.name]))  # noqa: Not None...?
-
-    return outputs, context
-
+from onnx_passes.eval import evaluate_model
 
 # Use importlib for dynamic imports
 from importlib import import_module
@@ -181,7 +146,7 @@ class Verify(Pass, ABC):
             # Use the ONNX reference evaluator to execute the expected model on
             # the inputs collecting expected outputs
             try:
-                self._expected, _ = _evaluate_model(
+                self._expected, _ = evaluate_model(
                     self._expected_model, self._inputs
                 )
             except RuntimeError as e:
@@ -192,7 +157,7 @@ class Verify(Pass, ABC):
         # Use the ONNX reference evaluator to execute the model on the inputs
         # collecting outputs and the full execution context as well
         try:
-            self._outputs, context = _evaluate_model(result.model, self._inputs)
+            self._outputs, context = evaluate_model(result.model, self._inputs)
         except RuntimeError as e:
             raise VerificationError(
                 f"Verification of pass '{self.identifier}' failed"
