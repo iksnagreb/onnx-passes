@@ -1,7 +1,7 @@
 from abc import ABC
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 from enum import Enum
 
 import onnx_ir as ir
@@ -10,30 +10,7 @@ import numpy as np
 from onnx_passes.config import Config
 from onnx_passes.base import Pass, VerificationError, verified_by
 from onnx_passes.eval import evaluate_model
-
-# Use importlib for dynamic imports
-from importlib import import_module
-
-
-def _resolve_metric(identifier: str | Callable):
-    """Resolves the metric evaluation function from the identifier."""
-
-    # Pass through already resolved callables
-    if isinstance(identifier, Callable):
-        return identifier
-
-    identifier: str = str(identifier)
-
-    # First try to look up the function in the global scope, if it is not there,
-    # try interpreting the identifier as a fully qualified name
-    try:
-        return globals()[identifier]
-    except KeyError:
-        try:
-            *module, function = identifier.split(".")
-            return getattr(import_module(".".join(module)), function)
-        except ValueError or KeyError or ModuleNotFoundError:
-            raise KeyError(f"Could not resolve metric: {identifier}")
+from onnx_passes.metrics import resolve_metric
 
 
 @dataclass(frozen=True)
@@ -174,7 +151,7 @@ class Verify(Pass, ABC):
 
         if self._method == Verify.Method.METRIC:
             for metric in self.config.verify.metrics:  # noqa: Not None
-                function = _resolve_metric(key := metric.function)
+                function = resolve_metric(key := metric.function)
 
                 if not isinstance(key, str):
                     key = f"{key.__module__}.{key.__name__}"  # noqa: __module__
@@ -267,37 +244,3 @@ def metric(cls):
     cls._method = Verify.Method.METRIC
 
     return cls
-
-
-def max_abs_error(produced: list, expected: list) -> float:
-    """Calculate the maximum absolute error between each pair of elements."""
-
-    try:
-        return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
-    except TypeError:
-        # Try fallback interpreting all values as 32-bit floats
-        produced = [x.astype(np.float32) for x in produced]
-        expected = [y.astype(np.float32) for y in expected]
-
-        return max(np.max(np.abs(x - y)) for x, y in zip(produced, expected))
-
-
-def accuracy(produced: list, expected: list) -> float:
-    """Calculate top-1 classification accuracy for produced probabilities.
-
-    This implementation assumes the model produces a single output tensor with
-    class probabilities along its final axis. Preceding axes may be spatial or
-    batch dimensions and will be flattened.
-    """
-
-    # Assuming a single global output from the model, unwrap the produced and
-    # expected list. If the shape of the expected classes indicates these are
-    # class probabilities as well, summarize these first.
-    probabilities, classes = produced[0], expected[0]
-
-    if classes.shape == probabilities.shape:
-        classes = classes.argmax(axis=-1)
-
-    predictions = probabilities.argmax(axis=-1)
-
-    return float(np.sum(predictions == classes)) / classes.size
