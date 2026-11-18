@@ -65,6 +65,9 @@ class AnalysisConfig(BaseSettings, use_attribute_docstrings=True):
 class ProfilingConfig(BaseSettings, use_attribute_docstrings=True):
     """Configuration options for pass profiling"""
 
+    metrics: list[str | Callable] = Field(default_factory=list)
+    """Metrics for reference evaluation based profiling"""
+
     inputs: list[Path | str | Any] = Field(default_factory=list)
     """Path to the profiling reference inputs"""
 

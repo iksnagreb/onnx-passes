@@ -6,19 +6,22 @@ import time
 from pydantic import BaseModel
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import onnx_ir as ir
+import numpy as np
 
 # Common cleanup passes already implemented in ONNX IR, used here without any
 # custom infrastructure.
 import onnx_ir.passes.common
 
 from onnx_passes.config import Config
+from onnx_passes.eval import evaluate_model
+from onnx_passes.metrics import resolve_metric
 from onnx_passes.ops import link_ops
 
 from onnx_passes.analysis.summary import Summary
-from onnx_passes.analysis.profile import Time
+from onnx_passes.analysis.profile import Time, Metrics
 
 
 class VerificationError(Exception):
@@ -309,6 +312,37 @@ class Pass(ir.passes.PassBase, ABC):
             # for profiling
             profiled_by(result.model, self, Time(start=t0, end=t1))
             profiled_by(result.model, self, Summary.from_model(result.model))
+
+            # If reference inputs and outputs are given for profiling, evaluate
+            # the model and calculate metrics
+            if not isinstance(self.config.profile, bool):
+                if self.config.profile.inputs and self.config.profile.expected:
+                    inputs = []
+                    expected = []
+
+                    for file_or_value in self.config.profile.inputs:
+                        if isinstance(file_or_value, Path | str):
+                            file_or_value = np.load(file_or_value)
+                        inputs.append(file_or_value)
+
+                    for file_or_value in self.config.profile.expected:
+                        if isinstance(file_or_value, Path | str):
+                            file_or_value = np.load(file_or_value)
+                        expected.append(file_or_value)
+
+                    produced, _ = evaluate_model(model, inputs)
+
+                    metrics = Metrics()
+
+                    for key in self.config.profile.metrics:
+                        function = resolve_metric(key)
+
+                        if isinstance(key, Callable):
+                            key = f"{key.__module__}.{key.__name__}"
+
+                        metrics.by_name[key] = function(produced, expected)
+
+                    profiled_by(result.model, self, metrics)
 
             # Collect basic pass application statistics from the metadata state
             # dictionary tracked via model metadata
