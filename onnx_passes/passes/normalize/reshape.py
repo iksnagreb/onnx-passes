@@ -170,10 +170,15 @@ class RewriteUnsqueezeAsReshape_v1(RewriteRule, Verify):
             op.Constant(value_int=1)
         )
 
+        # Unsqueezed dimensions preceding all input dimensions map to index -1,
+        # which is overwritten below but must still be gatherable: Pad the
+        # input shape by a trailing 1, as the shape of a scalar input is empty
+        dims = op.Concat(op.Shape(x), op.Constant(value_ints=[1]), axis=0)
+
         # Derive the output shape by (1) collecting input dimensions according
         # to the index mapping and, (2) updating the shape by setting all
         # unsqueezed dimension to 1
-        shape = op.ScatterElements(op.Gather(op.Shape(x), indices), axes, _1)
+        shape = op.ScatterElements(op.Gather(dims, indices), axes, _1)
 
         # Use the (dynamic) shape calculation as second input to the reshape
         # operation finally replacing the unsqueeze
